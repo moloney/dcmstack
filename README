@@ -1,0 +1,7 @@
+========
+dcmstack
+========
+
+This package provides DICOM to Nifti conversion with the added ability to 
+extract meta data from the source DICOMs and inject it into a Nifti header 
+extension or write it out as a JSON formatted text file.
