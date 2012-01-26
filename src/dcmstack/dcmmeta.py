@@ -148,7 +148,7 @@ class NiftiWrapper(object):
         #Check if the slice/time/vector dimensions match
         img_shape = self.nii_img.get_shape()
         meta_shape = self._meta_ext.get_shape()
-        return meta_shape[2:] == img_shape[2:]
+        return meta_shape[3:] == img_shape[3:]
     
     def slices_valid(self):
         '''Check if the meta data corresponding to individual slices appears to 
