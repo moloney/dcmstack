@@ -154,7 +154,8 @@ class NiftiWrapper(object):
         '''Check if the meta data corresponding to individual slices appears to 
         be valid for the wrapped nifti image.'''
 
-        if self._meta_ext.get_n_slices() != self.nii_img.get_n_slices():
+        if (self._meta_ext.get_n_slices() != 
+           self.nii_img.get_header().get_n_slices()):
             return False
         
         #Check that the affines match
