@@ -194,10 +194,10 @@ class NiftiWrapper(object):
             if self.samples_valid():
                 if (len(shape) > 3 and shape[3] > 1 and 
                    key in meta_dict['time']['samples']):
-                    return meta_dict['time']['samples'][key][index[2]]
+                    return meta_dict['time']['samples'][key][index[3]]
                 if (len(shape) > 4 and shape[4] > 1 and 
                    key in meta_dict['vector']['samples']):
-                    return meta_dict['vector']['samples'][key][index[3]]
+                    return meta_dict['vector']['samples'][key][index[4]]
                 
             #Finally, if aligned, try per-slice values
             if self.slices_valid():
