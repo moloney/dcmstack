@@ -5,6 +5,7 @@ Command line interface to dcmstack.
 """
 import os, sys, argparse, string
 from glob import glob
+import dicom
 from .dcmstack import parse_and_stack, DicomOrdering
 from . import extract
 
@@ -20,9 +21,16 @@ prog_epilog = """IT IS YOUR RESPONSIBILITY TO KNOW IF THERE IS PRIVATE HEALTH
 INFORMATION IN THE METADATA EXTRACTED BY THIS PROGRAM."""
     
 def parse_tags(opt_str):
-    return [int(token.strip(), 16)
-            for tag_str in opt_str.split()
-            for token in tag_str.split('_')]
+    tag_strs = opt_str.split(',')
+    tags = []
+    for tag_str in tag_strs:
+        tokens = tag_str.split('_')
+        if len(tokens) != 2:
+            raise ValueError('Invalid str format for tags')
+        tags.append(dicom.tag.Tag(int(tokens[0].strip(), 16), 
+                                  int(tokens[1].strip(), 16))
+                   )
+    return tags
             
 def sanitize_path_comp(path_comp):
     result = []
@@ -106,10 +114,16 @@ def main(argv=sys.argv):
                           help=('Disable the translators for the provided '
                           'tags. If the word "all" is provided, all '
                           'translators will be disabled.'))
-    meta_opt.add_argument('--include-private', default=None,
-                          help=('Include the given private tags. The word "all" '
-                          'can be used to include all private tags. Elements '
-                          'can still be filtered by the regular expressions.'))    
+    meta_opt.add_argument('--force-consider', default=None,
+                          help=('Force the consideration of the given tags. '
+                          'Either provide a comma seperated list of tags or '
+                          'the keywork "all" to consider all tags. '
+                          'Normally private tags, or tags with a value '
+                          'representation of OB, OW, or UN will not be '
+                          'considered for extraction (unless they are handled '
+                          'by a translator). Elements coming from the tags '
+                          'listed here may still be excluded by a regular '
+                          'expression.'))    
     meta_opt.add_argument('-i', '--include-regex', action='append',
                           help=('Include any meta data where the key matches '
                           'the provided regular expression. This will override '
@@ -161,21 +175,24 @@ def main(argv=sys.argv):
                     new_translators.append(translator)
             translators = new_translators
     
-    #Include private tags if requested
-    if args.include_private:
-        ignore_rules = [rule for rule in ignore_rules
-                        if not rule == extract.ignore_private]
-        if not args.include_private.lower() == 'all':
+    #Force the consideration of tags we usually ignore
+    if args.force_consider:
+        if args.force_consider.lower() == 'all':
+            ignore_rules = []
+        else:
             try:
-                include_tags = parse_tags(args.include_private)
+                force_tags = parse_tags(args.force_consider)
             except:
-                arg_parser.error('Invalid tag format to --include-private.')
-            def ignore_rule(elem):
-                if elem.tag in include_tags:
+                arg_parser.error('Invalid tag format to --force-consider.')
+            print force_tags
+            orig_ignore_rules = ignore_rules
+            def custom_ignore_rule(elem):
+                if elem.tag in force_tags:
                     return False
                 else:
-                    return extract.ignore_private(elem)
-            ignore_rules.append(ignore_rule)
+                    return any(ignore_rule(elem) 
+                               for ignore_rule in orig_ignore_rules)
+            ignore_rules = [custom_ignore_rule]
     
     extractor = extract.MetaExtractor(ignore_rules, translators)
     

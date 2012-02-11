@@ -4,7 +4,7 @@ Extract meta data from a DICOM data set.
 @author: moloney
 """
 import struct, re, warnings
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple, Counter
 import dicom
 from nibabel.nicom import csareader
 from nibabel.nicom.dicomwrappers import Wrapper
@@ -211,13 +211,10 @@ class MetaExtractor(object):
     def _get_elem_name(self, elem):
         '''Get an element name for any non-translated elements.'''
         name = elem.name
-        if name == '' or name == 'Unknown':
-            name = 'Unknown_%s' % tag_to_str(elem.tag)
-        elif name.startswith('[') and name.endswith(']'):
+        if name.startswith('[') and name.endswith(']'):
             name = name[1:-1]
         
-        tokens = [token[0].upper() + token[1:] for token in name.split()]
-        return ''.join(tokens)
+        return name
         
     def __call__(self, dcm):
         '''Convert a DICOM dataset to a dictionary where the keys are the
@@ -225,13 +222,13 @@ class MetaExtractor(object):
         nested dictionaries and elements can be ignored or parsed by a provided 
         translator. The combined meta data can then be filtered programatically.
         '''
-        result = OrderedDict()
-        trans_meta_dicts = {}
+        standard_meta = []
+        trans_meta_dicts = OrderedDict()
         for elem in dcm:
             if isinstance(elem.value, str) and elem.value.strip() == '':
                 continue
             
-            #Handle private tag names
+            #Take square brackets off private element names
             name = self._get_elem_name(elem)
             
             #If there is a translator for this element, use it
@@ -256,10 +253,18 @@ class MetaExtractor(object):
                 value = []
                 for val in elem.value:
                     value.append(self(val))
-                result[name] = value
+                standard_meta.append((name, value, elem.tag))
             #Otherwise just make sure the value is unpacked
             else:
-                result[name] = unpack_value(elem)
+                standard_meta.append((name, unpack_value(elem), elem.tag))
+                
+        #Handle name collisions
+        name_counts = Counter(elem[0] for elem in standard_meta)
+        result = OrderedDict()
+        for name, value, tag in standard_meta:
+            if name_counts[name] > 1:
+                name = name + ' ' + tag_to_str(tag)
+            result[name] = value
                     
         #Inject translator results
         for trans_name, meta in trans_meta_dicts.iteritems():
@@ -306,6 +311,7 @@ default_key_excl_res = ['Patient(?!(?:Orientation)|(?:Position))',
                         'Ethnic',
                         'Occupation',
                         'Unknown',
+                        'Pixel',
                        ]
 '''A list of regexes passed to make_key_regex_filter as exclude_res to create 
 the default_meta_filter.'''

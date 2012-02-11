@@ -16,7 +16,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from .extract import ExtractedDcmWrapper
 
-_meta_version = 0.4
+_meta_version = 0.5
 
 def closest_ortho_pat_axis(direction):
     '''Take a vector of three dimensions in DICOM patient space and return a 
