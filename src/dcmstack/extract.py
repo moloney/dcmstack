@@ -33,10 +33,14 @@ default_ignore_rules = (ignore_private,
 '''The default tuple of ignore rules for MetaExtractor.'''
 
 
-Translator = namedtuple('Translator', ['name', 'tag', 'trans_func'])
-'''A namedtuple for storing the three elements of a translator: a name, the 
-DICOM tag that can be translated, and the function which takes the DICOM 
-element and returns a dictionary.'''
+Translator = namedtuple('Translator', ['name', 
+                                       'tag', 
+                                       'priv_creator',
+                                       'trans_func']
+                       )
+'''A namedtuple for storing the four elements of a translator: a name, the 
+DICOM tag that can be translated, the private creator string, and the function 
+which takes the DICOM element and returns a dictionary.'''
 
 def simplify_csa_dict(csa_dict):
     '''Simplify the result of nibabel.nicom.csareader to a dictionary of key 
@@ -61,6 +65,7 @@ def csa_image_trans_func(elem):
     
 csa_image_trans = Translator('CsaImage', 
                              dicom.tag.Tag(0x29, 0x1010), 
+                             'SIEMENS CSA HEADER',
                              csa_image_trans_func)
 '''Translator for the CSA image sub header.'''
 
@@ -137,6 +142,7 @@ def csa_series_trans_func(elem):
 
 csa_series_trans = Translator('CsaSeries',
                               dicom.tag.Tag(0x29, 0x1020),
+                              'SIEMENS CSA HEADER',
                               csa_series_trans_func)
 '''Translator for parsing the CSA series sub header.'''
 
@@ -199,15 +205,7 @@ class MetaExtractor(object):
         else:
             self.translators = translators
         self.warn_on_trans_except = warn_on_trans_except
-        
-        #Make dict mapping tags to tranlators, make sure mapping is unique
-        self.trans_map = {}
-        for translator in self.translators:
-            if translator.tag in self.trans_map:
-                raise ValueError('More than one translator given for tag: %s' %
-                                 translator.tag)
-            self.trans_map[translator.tag] = translator
-            
+                
     def _get_elem_name(self, elem):
         '''Get an element name for any non-translated elements.'''
         name = elem.name
@@ -224,6 +222,17 @@ class MetaExtractor(object):
         '''
         standard_meta = []
         trans_meta_dicts = OrderedDict()
+        
+        #Make dict mapping tags to tranlators, initially just populate those 
+        #where the priv_creator attribute in None
+        trans_map = {}
+        for translator in self.translators:
+            if translator.priv_creator is None:
+                if translator.tag in trans_map:
+                    raise ValueError('More than one translator given for tag: '
+                                     '%s' % translator.tag)
+                trans_map[translator.tag] = translator
+        
         for elem in dcm:
             if isinstance(elem.value, str) and elem.value.strip() == '':
                 continue
@@ -231,20 +240,34 @@ class MetaExtractor(object):
             #Take square brackets off private element names
             name = self._get_elem_name(elem)
             
+            #If it is a private creator element, handle any corresponding 
+            #translators
+            if elem.name == "Private Creator":
+                for translator in self.translators:
+                    if translator.priv_creator == elem.value:
+                        new_tag = dicom.tag.Tag(elem.tag.group,
+                                                (elem.tag.elem * 16**2 | 
+                                                 translator.tag.elem)
+                                               )
+                        if new_tag in trans_map:
+                            raise ValueError('More than one translator given '
+                                             'for tag: %s' % translator.tag)
+                        trans_map[new_tag] = translator
+            
             #If there is a translator for this element, use it
-            if elem.tag in self.trans_map:
+            if elem.tag in trans_map:
                 try:
-                    meta = self.trans_map[elem.tag].trans_func(elem)
+                    meta = trans_map[elem.tag].trans_func(elem)
                 except Exception, e:
                     if self.warn_on_trans_except:
                         warnings.warn("Exception from translator %s: %s" % 
-                                      (self.trans_map[elem.tag].name,
+                                      (trans_map[elem.tag].name,
                                        str(e)))
                     else:
                         raise
                 else:
                     if meta:
-                        trans_meta_dicts[self.trans_map[elem.tag].name] = meta
+                        trans_meta_dicts[trans_map[elem.tag].name] = meta
             #Otherwise see if we are supposed to ignore the element
             elif any(rule(elem) for rule in self.ignore_rules):
                 continue
