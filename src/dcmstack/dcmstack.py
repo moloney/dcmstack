@@ -42,7 +42,7 @@ def closest_ortho_pat_axis(direction):
             return 'is'
 
 def reorder_voxels(vox_array, affine, voxel_order):
-    '''Reorder the given voxel array  and update the affine based on the 
+    '''Reorder the given voxel array and update the affine based on the 
     argument voxel_order. The affine should transform voxel indices to DICOM 
     patient space. Returns a tuple containing the updated voxel array, affine, 
     and a tuple of the permuted dimensions.

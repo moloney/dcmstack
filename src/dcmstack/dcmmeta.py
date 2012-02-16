@@ -116,7 +116,7 @@ class DcmMetaExtension(Nifti1Extension):
         if not result.is_valid():
             raise ValueError('The runtime representation is not valid.')
         return result
-
+        
 #Add our extension to nibabel
 nb.nifti1.extension_codes.add_codes(((dcm_meta_ecode, 
                                       "dcmmeta", 

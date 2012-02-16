@@ -39,8 +39,8 @@ Translator = namedtuple('Translator', ['name',
                                        'trans_func']
                        )
 '''A namedtuple for storing the four elements of a translator: a name, the 
-DICOM tag that can be translated, the private creator string, and the function 
-which takes the DICOM element and returns a dictionary.'''
+DICOM tag that can be translated, the private creator string (optional), and the 
+function which takes the DICOM element and returns a dictionary.'''
 
 def simplify_csa_dict(csa_dict):
     '''Simplify the result of nibabel.nicom.csareader to a dictionary of key 
@@ -218,7 +218,7 @@ class MetaExtractor(object):
         '''Convert a DICOM dataset to a dictionary where the keys are the
         element names instead of numerical tag values. Nested datasets become 
         nested dictionaries and elements can be ignored or parsed by a provided 
-        translator. The combined meta data can then be filtered programatically.
+        translator.
         '''
         standard_meta = []
         trans_meta_dicts = OrderedDict()
@@ -334,7 +334,6 @@ default_key_excl_res = ['Patient(?!(?:Orientation)|(?:Position))',
                         'Ethnic',
                         'Occupation',
                         'Unknown',
-                        'Pixel',
                        ]
 '''A list of regexes passed to make_key_regex_filter as exclude_res to create 
 the default_meta_filter.'''
