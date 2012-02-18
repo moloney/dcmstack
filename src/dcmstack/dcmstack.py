@@ -315,15 +315,10 @@ class DicomStack(object):
         if len(self._files_info) % slices_per_vol != 0:
             raise InvalidStackError("Number of files is not an even multiple "
                                     "of the number of unique slice positions.")
+        num_volumes = len(self._files_info) / slices_per_vol
         
-        #Perform an initial sort by vector/time/position tuple
+        #Sort the files
         self._files_info.sort(key=lambda x: x[1])
-        
-        #We still need to sort each volume by its slice position
-        num_vec_comps = len(self._vector_vals)
-        num_time_points = ((len(self._files_info) / num_vec_comps) / 
-                           slices_per_vol)
-        num_volumes = num_vec_comps * num_time_points
         for vol_idx in range(num_volumes):
             start_slice = vol_idx * slices_per_vol
             end_slice = start_slice + slices_per_vol
@@ -331,6 +326,15 @@ class DicomStack(object):
                 sorted(self._files_info[start_slice:end_slice], 
                        key=lambda x: x[1][-1])
         
+        #Figure out the number of vector components and time points
+        num_vec_comps = len(self._vector_vals)
+        if num_vec_comps > num_volumes:
+            raise InvalidStackError("Vector variable varies within volumes")
+        if num_volumes % num_vec_comps != 0:
+            raise InvalidStackError("Number of volumes not an even multiple "
+                                    "of the number of vector components.")
+        num_time_points = num_volumes / num_vec_comps
+       
         #Do a more thorough check for completeness
         slice_positions = sorted(list(self._slice_pos_vals))
         for vec_idx in xrange(num_vec_comps):
@@ -438,6 +442,11 @@ class DicomStack(object):
         slices_per_sample = shape[2]
         for i in xrange(3, lvl_idx):
             slices_per_sample *= shape[i]
+        
+        print lvl_idx
+        print shape
+        print num_samples
+        print slices_per_sample
         
         result = OrderedDict()
         #Iterate through the keys and value lists in the global 'slices' dict
