@@ -443,11 +443,6 @@ class DicomStack(object):
         for i in xrange(3, lvl_idx):
             slices_per_sample *= shape[i]
         
-        print lvl_idx
-        print shape
-        print num_samples
-        print slices_per_sample
-        
         result = OrderedDict()
         #Iterate through the keys and value lists in the global 'slices' dict
         for key, vals in meta['global']['slices'].iteritems():
