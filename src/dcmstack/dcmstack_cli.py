@@ -284,7 +284,9 @@ def main(argv=sys.argv):
                 meta_ext.to_json_file(meta_path)
                 
                 if not args.embed_meta:
-                    del nii.get_header().extensions[0]
+                    hdr = nii.get_header()
+                    del hdr.extensions[0]
+                    hdr['vox_offset'] = 352
                                  
             nii.to_filename(out_path)
                 

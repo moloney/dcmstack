@@ -9,7 +9,7 @@ import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
 
-dcm_meta_ecode = 19
+dcm_meta_ecode = 0
 
 class DcmMetaExtension(Nifti1Extension):
     '''Subclass on Nifti1Extension. Handles conversion to and from json, checks
