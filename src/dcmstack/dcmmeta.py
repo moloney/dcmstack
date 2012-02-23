@@ -5,11 +5,31 @@ the Nifti as an extension.
 @author: moloney
 """
 import json
+from copy import deepcopy
+from collections import OrderedDict
 import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
 
 dcm_meta_ecode = 0
+
+def is_constant(sequence):
+    '''Returns true if all elements in the sequence are equal.'''
+    return all(val == sequence[0] for val in sequence)
+    
+def is_repeating(sequence, period):
+    '''Returns true if the elements in the sequence repeat with the given 
+    period.'''
+    if len(sequence) % period != 0:
+        raise ValueError('The sequence length is not evenly divisible by the '
+                         'period length.')
+    for period_idx in range(1, len(sequence) / period):
+        start_idx = period_idx * period
+        end_idx = start_idx * period
+        if sequence[start_idx:end_idx] != sequence[:period]:
+            return False
+    
+    return True
 
 class DcmMetaExtension(Nifti1Extension):
     '''Subclass on Nifti1Extension. Handles conversion to and from json, checks
@@ -95,7 +115,164 @@ class DcmMetaExtension(Nifti1Extension):
     def get_version(self):
         '''Return the version of the meta data extension.'''
         return self._content['dcmmeta_version']
-    
+        
+    def get_subset(self, dim, idx):
+        '''Return a new DcmMetaExtension containing the subset of the meta data 
+        corresponding to the index 'idx' along the dimension 'dim'.  The 
+        dimension must be one of 'slice', 'time', or 'vector'.'''
+        shape = self.get_shape()
+        n_slices = self.get_n_slices()
+            
+        result = OrderedDict()
+        result['global'] = OrderedDict()
+        result['global']['const'] = deepcopy(self._content['global']['const'])
+        result['global']['slices'] = OrderedDict()
+        
+        if dim == 'slice':
+            #Per slice values become constant, everything else is the same
+            for key, vals in self._content['global']['slices'].iteritems():
+                result['global']['const'][key] = deepcopy(vals[idx])
+            
+            if 'time' in self._content:
+                time_slice = idx % shape[3]
+                for key, vals in self._content['time']['slices'].iteritems():
+                    result['global']['const'][key] = deepcopy(vals[time_slice])
+                result['time'] = OrderedDict()
+                result['time']['samples'] = \
+                    deepcopy(self._content['time']['samples'])
+                result['time']['slices'] = OrderedDict()
+            
+            if 'vector' in self._content:
+                vec_slice = idx % (shape[3] * shape[4])
+                for key, vals in self._content['vector']['slices'].iteritems():
+                    result['global']['const'][key] = deepcopy(vals[vec_slice])
+                result['vector'] = OrderedDict()
+                result['vector']['samples'] = \
+                    deepcopy(self._content['vector']['samples'])
+                result['vector']['slices'] = OrderedDict()                
+                    
+        elif dim == 'time':
+            #Per time sample values become constant
+            for key, vals in self._content['time']['samples'].iteritems():
+                result['global']['const'][key] = deepcopy(vals[idx])
+            
+            if 'vector' in self._content:
+                result['vector'] = OrderedDict()
+                
+                #Vector samples are left unchanged
+                result['vector']['samples'] = \
+                    deepcopy(self._content['vector']['samples'])
+                
+                result['vector']['slices'] = OrderedDict()
+                
+                #Need to take a subset of the global slices
+                slices_per_vec_comp = n_slices * shape[3]
+                for key, vals in self._content['global']['slices'].iteritems():
+                    subset_vals = []
+                    for vec_comp in shape[4]:
+                        start_idx = ((vec_comp * slices_per_vec_comp) + 
+                                     (idx * n_slices))
+                        end_idx = start_idx + n_slices
+                        subset_vals.append(deepcopy(vals[start_idx:end_idx]))
+                    if is_constant(subset_vals):
+                        result['global']['const'][key] = subset_vals[0]
+                    elif is_repeating(subset_vals, n_slices):
+                        result['vector']['slices'][key] = subset_vals[:n_slices]
+                    else:
+                        result['global']['slices'][key] = subset_vals
+                    
+                #Time point slices become vector slices
+                time_slices = deepcopy(self._content['time']['slices'])
+                result['vector']['slices'].update(time_slices)
+                
+                #Take a subset of vector slices, check if constant
+                for key, vals in self._content['vector']['slices'].iteritems():
+                    start_idx = idx * n_slices
+                    end_idx = start_idx + n_slices
+                    subset_vals = deepcopy(vals[start_idx:end_idx])
+                    if is_constant(subset_vals):
+                        result['global']['const'] = subset_vals[0]
+                    else:
+                        result['vector']['slices'][key] = subset_vals
+                        
+            else:
+                #Take subset of global slices, check if constant
+                for key, vals in self._content['global']['slices']:
+                    start_idx = idx * n_slices
+                    end_idx = start_idx + n_slices
+                    subset_vals = deepcopy(vals[start_idx:end_idx])
+                    if is_constant(subset_vals):
+                        result['global']['const'] = subset_vals[0]
+                    else:
+                        result['global']['slices'][key] = subset_vals
+
+                #Time point slices become global slices
+                time_slices = deepcopy(self._content['time']['slices'])
+                result['global']['slices'].update(time_slices)
+        
+        elif dim == 'vector':
+            #Per vector sample values become constant
+            for key, vals in self._content['vector']['samples'].iteritems():
+                result['global']['const'][key] = deepcopy(vals[idx])
+                
+            if 'time' in self._content:
+                result['time'] = OrderedDict()
+                
+                #Time samples and slices are left unchanged
+                result['time']['samples'] = \
+                    deepcopy(self._content['time']['samples'])
+                result['time']['slices'] = \
+                    deepcopy(self._content['time']['slices'])
+                
+                #Need to take a subset of the global slices
+                slices_per_vec_comp = n_slices * shape[3]
+                for key, vals in self._content['global']['slices'].iteritems():
+                    start_idx = slices_per_vec_comp * idx
+                    end_idx = start_idx + slices_per_vec_comp
+                    subset_vals = deepcopy(vals[start_idx:end_idx])
+                    if is_constant(subset_vals):
+                        result['global']['const'][key] = subset_vals[0]
+                    elif is_repeating(subset_vals, n_slices):
+                        result['time']['slices'][key] = subset_vals[:n_slices]
+                    else:
+                        result['global']['slices'][key] = subset_vals
+                        
+                #Vector component slices become global slices
+                vector_slices = deepcopy(self._content['vector']['slices'])
+                result['global']['slices'].update(vector_slices)
+                
+            else:
+                #Take subset of global slices, check if constant
+                for key, vals in self._content['global']['slices']:
+                    start_idx = idx * n_slices
+                    end_idx = start_idx + n_slices
+                    subset_vals = deepcopy(vals[start_idx:end_idx])
+                    if is_constant(subset_vals):
+                        result['global']['const'] = subset_vals[0]
+                    else:
+                        result['global']['slices'][key] = subset_vals
+                        
+                #Vector component slices become global slices
+                vector_slices = deepcopy(self._content['vector']['slices'])
+                result['global']['slices'].update(vector_slices)
+        else:
+            raise ValueError("The argument 'dim' must be one of 'slice', "
+                             "'time', or 'vector'.")
+        
+        #Set the "meta meta" data
+        result['dcmmeta_affine'] = deepcopy(self._content['dcmmeta_affine'])
+        result['dcmmeta_slice_dim'] = deepcopy(self._content['dcmmeta_slice_dim'])
+        result['dcmmeta_shape'] = deepcopy(self._content['dcmmeta_shape'])
+        if dim == 'slice':
+            result['dcmmeta_shape'][self.get_slice_dim] = 1
+        elif dim == 'time':
+            result['dcmmeta_shape'][3] = 1
+        elif dim == 'vector':
+            result['dcmmeta_shape'][4] = 1
+        result['dcmmeta_version'] = self.get_meta_version()
+        
+        return self.from_runtime_repr(result)
+
     def to_json(self):
         '''Return the JSON string representation of the extension.'''
         if not self.is_valid():
@@ -226,38 +403,61 @@ class NiftiWrapper(object):
         return default
     
     def split(self, dim_idx=None):
-        '''Split the meta data along the index 'dim_idx', returning a list of
-        NiftiWrapper objects. If 'dim_idx' is None it will prefer the vector, 
-        then time, then slice dimensions.
+        '''Split the array and meta data along the index 'dim_idx', returning a 
+        list of NiftiWrapper objects. If 'dim_idx' is None it will prefer the 
+        vector, then time, then slice dimensions.
         '''
-#        shape = self.nii_img.get_shape()
-#        slice_dim = self.nii_img.get_dim_info()[2]
-#        
-#        #If dim_idx is None, choose the vector/time/slice dim in that order
-#        if dim_idx is None:
-#            dim_idx = len(shape) - 1
-#        if dim_idx == 2:
-#            dim_idx = slice_dim
-#            
-#        data = self.nii_img.get_data()
-#        affine = self.nii_img.get_affine()
-#        header = self.nii_img.get_header()
-#        if dim_idx == slice_dim:
-#            header. #Need to unset slice specific bits of the header here.
-#        results = []
-#        slices = [slice(None)] * len(shape)
-#        for idx in shape[dim_idx]:
-#            slices[dim_idx] = idx
-#            split_data = data[slices].copy()
-#            results.append(nb.Nifti1Image(split_data, 
-#                                          affine.copy(), 
-#                                          header.copy()
-#                                         )
-#                          )
-#        
-#        return results
+        shape = self.nii_img.get_shape()
+        slice_dim = self.nii_img.get_dim_info()[2]
+        
+        #If dim_idx is None, choose the vector/time/slice dim in that order
+        if dim_idx is None:
+            dim_idx = len(shape) - 1
+        if dim_idx == 2:
+            dim_idx = slice_dim
             
-    
+        #Make a string representation of the dim_idx
+        dim_str = None
+        if dim_idx < 3:
+            dim_str = 'slice'
+        elif dim_idx == 3:
+            dim_str = 'time'
+        elif dim_idx == 4:
+            dim_str = 'vector'
+        
+        data = self.nii_img.get_data()
+        header = self.nii_img.get_header()
+        
+        results = []
+        slices = [slice(None)] * len(shape)
+        for idx in shape[dim_idx]:
+            #Create the initial Nifti1Image object
+            slices[dim_idx] = idx
+            split_data = data[slices].copy()
+            split_nii = nb.Nifti1Image(split_data, None)
+            split_hdr = split_nii.get_header()
+            
+            #Update the header
+            split_hdr.set_qform(header.get_qform(), header['qform_code'])
+            split_hdr.set_sform(header.get_sform(), header['sform_code'])
+            split_hdr.set_slope_inter(*header.get_slope_inter())
+            split_hdr.set_dim_info(*header.get_dim_info())
+            split_hdr.set_intent(*header.get_intent())
+            split_hdr.set_slice_duration(header.get_slice_duration())
+            split_hdr.set_xyzt_units(*header.get_xyzt_units())
+            split_hdr.set_xyzt_units(*header.get_xyzt_units())
+            
+            if dim_idx > 2:
+                split_hdr.set_slice_times(header.get_slice_times())
+                
+            #Insert the subset of meta data
+            split_meta = self._meta_ext.get_subset(dim_str, idx)
+            split_hdr.extensions.append(split_meta)
+            
+            results.append(split_nii)
+        
+        return results
+            
     def to_filename(self, out_path):
         if not self._meta_ext.is_valid:
             raise ValueError("Meta extension is not valid.")
