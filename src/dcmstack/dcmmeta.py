@@ -10,6 +10,7 @@ from collections import OrderedDict
 import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
+from nibabel.spatialimages import HeaderDataError
 
 dcm_meta_ecode = 0
 
@@ -118,8 +119,8 @@ class DcmMetaExtension(Nifti1Extension):
         
     def get_subset(self, dim, idx):
         '''Return a new DcmMetaExtension containing the subset of the meta data 
-        corresponding to the index 'idx' along the dimension 'dim'.  The 
-        dimension must be one of 'slice', 'time', or 'vector'.'''
+        corresponding to the index 'idx' along the dimension 'dim'.
+        '''
         shape = self.get_shape()
         n_slices = self.get_n_slices()
             
@@ -128,7 +129,17 @@ class DcmMetaExtension(Nifti1Extension):
         result['global']['const'] = deepcopy(self._content['global']['const'])
         result['global']['slices'] = OrderedDict()
         
-        if dim == 'slice':
+        if dim < 3 and dim != self.get_slice_dim():
+            #Preserve everything
+            result['global']['slices'] = \
+                deepcopy(self._content['global']['slices'])
+            
+            if 'time' in self._content:
+                result['time'] = deepcopy(self._content['time'])
+            
+            if 'vector' in self._content:
+                result['vector'] = deepcopy(self._content['vector'])
+        elif dim < 3:
             #Per slice values become constant, everything else is the same
             for key, vals in self._content['global']['slices'].iteritems():
                 result['global']['const'][key] = deepcopy(vals[idx])
@@ -150,8 +161,7 @@ class DcmMetaExtension(Nifti1Extension):
                 result['vector']['samples'] = \
                     deepcopy(self._content['vector']['samples'])
                 result['vector']['slices'] = OrderedDict()                
-                    
-        elif dim == 'time':
+        elif dim == 3:
             #Per time sample values become constant
             for key, vals in self._content['time']['samples'].iteritems():
                 result['global']['const'][key] = deepcopy(vals[idx])
@@ -197,7 +207,7 @@ class DcmMetaExtension(Nifti1Extension):
                         
             else:
                 #Take subset of global slices, check if constant
-                for key, vals in self._content['global']['slices']:
+                for key, vals in self._content['global']['slices'].iteritems():
                     start_idx = idx * n_slices
                     end_idx = start_idx + n_slices
                     subset_vals = deepcopy(vals[start_idx:end_idx])
@@ -210,7 +220,7 @@ class DcmMetaExtension(Nifti1Extension):
                 time_slices = deepcopy(self._content['time']['slices'])
                 result['global']['slices'].update(time_slices)
         
-        elif dim == 'vector':
+        elif dim == 4:
             #Per vector sample values become constant
             for key, vals in self._content['vector']['samples'].iteritems():
                 result['global']['const'][key] = deepcopy(vals[idx])
@@ -256,20 +266,17 @@ class DcmMetaExtension(Nifti1Extension):
                 vector_slices = deepcopy(self._content['vector']['slices'])
                 result['global']['slices'].update(vector_slices)
         else:
-            raise ValueError("The argument 'dim' must be one of 'slice', "
-                             "'time', or 'vector'.")
+            raise ValueError("The argument 'dim' must be in the range [0, 5).")
         
         #Set the "meta meta" data
         result['dcmmeta_affine'] = deepcopy(self._content['dcmmeta_affine'])
         result['dcmmeta_slice_dim'] = deepcopy(self._content['dcmmeta_slice_dim'])
-        result['dcmmeta_shape'] = deepcopy(self._content['dcmmeta_shape'])
-        if dim == 'slice':
-            result['dcmmeta_shape'][self.get_slice_dim] = 1
-        elif dim == 'time':
-            result['dcmmeta_shape'][3] = 1
-        elif dim == 'vector':
-            result['dcmmeta_shape'][4] = 1
-        result['dcmmeta_version'] = self.get_meta_version()
+        split_shape = deepcopy(self._content['dcmmeta_shape'])
+        split_shape[dim] = 1
+        while split_shape[-1] == 1 and len(split_shape) > 3:
+            split_shape = split_shape[:-1]
+        result['dcmmeta_shape'] = split_shape
+        result['dcmmeta_version'] = self.get_version()
         
         return self.from_runtime_repr(result)
 
@@ -402,44 +409,34 @@ class NiftiWrapper(object):
             
         return default
     
-    def split(self, dim_idx=None):
-        '''Split the array and meta data along the index 'dim_idx', returning a 
-        list of NiftiWrapper objects. If 'dim_idx' is None it will prefer the 
-        vector, then time, then slice dimensions.
+    def generate_splits(self, dim=None):
+        '''Generator method that splits the array and meta data along the 
+        dimension 'dim', yielding a NiftiWrapper object for each subset of the 
+        data. If 'dim' is None it will prefer the vector, then time, then slice 
+        dimensions.
         '''
         shape = self.nii_img.get_shape()
-        slice_dim = self.nii_img.get_dim_info()[2]
-        
-        #If dim_idx is None, choose the vector/time/slice dim in that order
-        if dim_idx is None:
-            dim_idx = len(shape) - 1
-        if dim_idx == 2:
-            dim_idx = slice_dim
-            
-        #Make a string representation of the dim_idx
-        dim_str = None
-        if dim_idx < 3:
-            dim_str = 'slice'
-        elif dim_idx == 3:
-            dim_str = 'time'
-        elif dim_idx == 4:
-            dim_str = 'vector'
-        
         data = self.nii_img.get_data()
         header = self.nii_img.get_header()
+        slice_dim = header.get_dim_info()[2]
         
-        results = []
+        #If dim is None, choose the vector/time/slice dim in that order
+        if dim is None:
+            dim = len(shape) - 1
+            if dim == 2:
+                dim = slice_dim
+        
         slices = [slice(None)] * len(shape)
-        for idx in shape[dim_idx]:
+        for idx in xrange(shape[dim]):
             #Create the initial Nifti1Image object
-            slices[dim_idx] = idx
+            slices[dim] = idx
             split_data = data[slices].copy()
             split_nii = nb.Nifti1Image(split_data, None)
             split_hdr = split_nii.get_header()
             
             #Update the header
-            split_hdr.set_qform(header.get_qform(), header['qform_code'])
-            split_hdr.set_sform(header.get_sform(), header['sform_code'])
+            split_hdr.set_qform(header.get_qform(), int(header['qform_code']))
+            split_hdr.set_sform(header.get_sform(), int(header['sform_code']))
             split_hdr.set_slope_inter(*header.get_slope_inter())
             split_hdr.set_dim_info(*header.get_dim_info())
             split_hdr.set_intent(*header.get_intent())
@@ -447,16 +444,22 @@ class NiftiWrapper(object):
             split_hdr.set_xyzt_units(*header.get_xyzt_units())
             split_hdr.set_xyzt_units(*header.get_xyzt_units())
             
-            if dim_idx > 2:
-                split_hdr.set_slice_times(header.get_slice_times())
+            if dim > 2:
+                try:
+                    split_hdr.set_slice_times(header.get_slice_times())
+                except HeaderDataError:
+                    pass
                 
             #Insert the subset of meta data
-            split_meta = self._meta_ext.get_subset(dim_str, idx)
+            split_meta = self._meta_ext.get_subset(dim, idx)
             split_hdr.extensions.append(split_meta)
             
-            results.append(split_nii)
-        
-        return results
+            yield split_nii
+    
+    def split(self, dim=None):
+        '''Convienance method, returns a list containing the results from 
+        'generate_splits'.'''
+        return list(self.generate_splits(dim))
             
     def to_filename(self, out_path):
         if not self._meta_ext.is_valid:
@@ -468,8 +471,9 @@ class NiftiWrapper(object):
         return klass(nb.load(path))
         
     @classmethod
-    def from_sequence(klass, others, dim_idx=None):
+    def from_sequence(klass, others, dim=None):
         '''Create a NiftiWrapper from a sequence of other NiftiWrappers objects.
-        The Nifti volumes are stacked along dim_idx in the given order.
+        The Nifti volumes are stacked along the dimension 'dim' in the given 
+        order.
         '''
             
