@@ -604,7 +604,9 @@ class DicomStack(object):
         if len(data.shape) > 3:
             n_vols *= data.shape[3]
         if len(data.shape) > 4:
-            n_vols *= data.shape[3]
+            n_vols *= data.shape[4]
+            
+        slices_per_vol = data.shape[2]
         
         #Reorder the voxel data if requested
         permutation = (0, 1, 2)
@@ -620,8 +622,8 @@ class DicomStack(object):
         new_slice_dir = dps_affine[:3, permutation.index(2)]
         if np.allclose(-orig_slice_dir, new_slice_dir):
             for vol_idx in xrange(n_vols):
-                start = vol_idx * data.shape[2]
-                stop = start + data.shape[2]
+                start = vol_idx * slices_per_vol
+                stop = start + slices_per_vol
                 self._files_info[start:stop] = [self._files_info[idx] 
                                                 for idx in xrange(stop - 1, 
                                                                   start - 1, 
