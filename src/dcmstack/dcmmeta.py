@@ -31,7 +31,8 @@ class DcmMetaExtension(Nifti1Extension):
         return json.dumps(value, indent=4)
     
     def is_valid(self):
-        '''Check if the extension is valid.'''
+        '''Return True if the extension is valid. Checks for the required 
+        dictionaries and makes sure lists of values have the correct length.'''
         #Check for the required base keys in the json
         if not self._req_base_keys <= set(self._content):
             return False
@@ -76,41 +77,42 @@ class DcmMetaExtension(Nifti1Extension):
         return True
     
     def get_affine(self):
+        '''Return the affine associated with the meta data.'''
         return np.array(self._content['dcmmeta_affine'])
         
     def get_slice_dim(self):
+        '''Get the index of the slice dimension.'''
         return self._content['dcmmeta_slice_dim']
 
     def get_shape(self):
+        '''Returns the shape of the data associated with the meta data'''
         return tuple(self._content['dcmmeta_shape'])
         
     def get_n_slices(self):
+        '''Returns the number of slices in each spatial volume.'''
         return self.get_shape()[self.get_slice_dim()]
         
     def get_version(self):
+        '''Return the version of the meta data extension.'''
         return self._content['dcmmeta_version']
     
-    def to_json_file(self, path):
-        '''Write out a JSON formatted text file with the extensions contents.'''
+    def to_json(self):
+        '''Return the JSON string representation of the extension.'''
         if not self.is_valid():
             raise ValueError('The content dictionary is not valid.')
-        out_file = open(path, 'w')
-        out_file.write(self._mangle(self._content))
-        out_file.close()
+        return self._mangle(self._content)
         
     @classmethod
-    def from_json_file(klass, path):
-        '''Read in a JSON formatted text file with the extensions contents.'''
-        in_file = open(path)
-        content = in_file.read()
-        in_file.close()
-        result = klass(dcm_meta_ecode, content)
+    def from_json(klass, json_str):
+        '''Create an extension from the JSON string representation.'''
+        result = klass(dcm_meta_ecode, json_str)
         if not result.is_valid():
             raise ValueError('The JSON is not valid.')
         return result
         
     @classmethod
     def from_runtime_repr(klass, runtime_repr):
+        '''Create an extension from the Python runtime representation.'''
         result = klass(dcm_meta_ecode, '{}')
         result._content = runtime_repr
         if not result.is_valid():

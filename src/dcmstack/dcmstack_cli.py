@@ -281,7 +281,9 @@ def main(argv=sys.argv):
                 if path_tokens[-1] == 'nii':
                     path_tokens = path_tokens[:-1]
                 meta_path = '.'.join(path_tokens + ['json'])
-                meta_ext.to_json_file(meta_path)
+                out_file = open(meta_path, 'w')
+                out_file.writemeta_ext.to_json()()
+                out_file.close()
                 
                 if not args.embed_meta:
                     hdr = nii.get_header()
