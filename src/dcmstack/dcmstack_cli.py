@@ -282,7 +282,7 @@ def main(argv=sys.argv):
                     path_tokens = path_tokens[:-1]
                 meta_path = '.'.join(path_tokens + ['json'])
                 out_file = open(meta_path, 'w')
-                out_file.writemeta_ext.to_json()()
+                out_file.write(meta_ext.to_json())
                 out_file.close()
                 
                 if not args.embed_meta:
