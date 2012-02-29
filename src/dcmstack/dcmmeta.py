@@ -1,6 +1,6 @@
 """
-Nifti wrapper that includes addtional meta data. The meta data is embedded into
-the Nifti as an extension.
+Nifti extension for embedding additional meta data and a NiftiWrapper class for
+providing access to the meta data and related functionality.
 
 @author: moloney
 """
@@ -319,6 +319,7 @@ class NiftiWrapper(object):
         self.nii_img = nii_img
         self._meta_ext = None
         for extension in nii_img.get_header().extensions:
+            #TODO: update this since we are now using the generic ecode of 0
             if extension.get_code() == dcm_meta_ecode:
                 if self._meta_ext:
                     raise ValueError("More than one DcmMetaExtension found")
@@ -331,7 +332,7 @@ class NiftiWrapper(object):
     def samples_valid(self):
         '''Check if the meta data corresponding to individual time or vector 
         samples appears to be valid for the wrapped nifti image.'''
-        #Check if the slice/time/vector dimensions match
+        #Check if the time/vector dimensions match
         img_shape = self.nii_img.get_shape()
         meta_shape = self._meta_ext.get_shape()
         return meta_shape[3:] == img_shape[3:]
@@ -428,9 +429,14 @@ class NiftiWrapper(object):
         
         slices = [slice(None)] * len(shape)
         for idx in xrange(shape[dim]):
-            #Create the initial Nifti1Image object
-            slices[dim] = idx
+            #Grab the split data, keeping singular spatial dimensions
+            if dim < 3:
+                slices[dim] = slice(idx, idx+1)
+            else:
+                slices[dim] = idx
             split_data = data[slices].copy()
+            
+            #Create the initial Nifti1Image object
             split_nii = nb.Nifti1Image(split_data, None)
             split_hdr = split_nii.get_header()
             
@@ -454,7 +460,7 @@ class NiftiWrapper(object):
             split_meta = self._meta_ext.get_subset(dim, idx)
             split_hdr.extensions.append(split_meta)
             
-            yield split_nii
+            yield NiftiWrapper(split_nii)
     
     def split(self, dim=None):
         '''Convienance method, returns a list containing the results from 
@@ -471,9 +477,48 @@ class NiftiWrapper(object):
         return klass(nb.load(path))
         
     @classmethod
-    def from_sequence(klass, others, dim=None):
-        '''Create a NiftiWrapper from a sequence of other NiftiWrappers objects.
+    def from_sequence(klass, seq, dim=None):
+        '''Create a NiftiWrapper from a sequence of other NiftiWrapper objects.
         The Nifti volumes are stacked along the dimension 'dim' in the given 
-        order.
+        order. If 'dim' is None then 2D inputs will become 3D, 3D inputs will
+        be stacked along the fourth (time) dimension, and 4D inputs will be 
+        stacked along the fifth (vector) dimension.
         '''
-            
+
+        if dim < 0 or dim > 4:
+            raise ValueError("The argument 'dim' must be in the range [0, 5).")
+        
+        n_inputs = len(seq)
+        first_input = seq[0]
+        shape = first_input.nii_img.get_shape()
+        affine = first_input.nii_img.get_affine()
+        data = first_input.nii_img.get_data()
+        
+        #If dim is None, choose a sane default
+        if dim is None:
+            if len(shape) == 3: 
+                singular_dim = None
+                for dim_size in shape:
+                    if dim_size == 1:
+                        singular_dim = dim_size
+                if singular_dim is None:
+                    dim = 3
+                else:
+                    dim = singular_dim
+            if len(shape) == 4:
+                dim = 4
+        else:
+            if dim < len(shape) and shape[dim] != 1:
+                raise ValueError('The dimension must be singular or not exist')
+                
+        #Determine the shape of the result data array and create it
+        result_shape = list(shape)
+        while dim >= len(result_shape):
+            result_shape.append(1)
+        result_shape[dim] = n_inputs
+        
+        result_data = np.empty(result_shape)
+        
+        #Fill the data array
+        for input_wrp in seq:
+            pass
