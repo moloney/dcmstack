@@ -502,7 +502,20 @@ class DcmMetaExtension(Nifti1Extension):
         return self._mangle(self._content)
         
     def __eq__(self, other):
-        return self._content == other._content
+        if not np.allclose(self.get_affine(), other.get_affine()):
+            return False
+        if self.get_shape() != other.get_shape():
+            return False
+        if self.get_slice_dim() != other.get_slice_dim():
+            return False
+        if self.get_version() != other.get_version():
+            return False
+        for classes in self.get_valid_classes():
+            if (dict(self.get_class_dict(classes)) != 
+               dict(other.get_class_dict(classes))):
+                return False
+                
+        return True
 
     _req_base_keys = set(('dcmmeta_affine', 
                           'dcmmeta_slice_dim',
