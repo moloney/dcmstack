@@ -10,13 +10,11 @@ from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
 import numpy as np
 from collections import OrderedDict
-from .dcmmeta import DcmMetaExtension, NiftiWrapper
+from .dcmmeta import DcmMetaExtension, NiftiWrapper, _meta_version
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from .extract import ExtractedDcmWrapper
-
-_meta_version = 0.5
 
 def closest_ortho_pat_axis(direction):
     '''Take a vector of three dimensions in DICOM patient space and return a 
@@ -634,6 +632,8 @@ class DicomStack(object):
         nps_affine = np.dot(np.diag([-1., -1., 1., 1.]), dps_affine)
         
         #Create the nifti image using the data array
+        #TODO: Nibabel 1.2 will allow us to set the affine here without wiping 
+        #out the qform and the the qform code
         nifti_image = nb.Nifti1Image(data, None)
         nifti_header = nifti_image.get_header()
         
