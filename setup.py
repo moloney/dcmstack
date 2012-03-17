@@ -9,6 +9,8 @@ setup(name='dcmstack',
       package_dir = {'':'src'},
       install_requires=['pydicom', 'nibabel'],
       entry_points = {'console_scripts' : \
-                          ['dcmstack = dcmstack.dcmstack_cli:main'],
+                          ['dcmstack = dcmstack.dcmstack_cli:main',
+                           'nitool = dcmstack.nitool_cli:main',
+                          ],
                      }
      )

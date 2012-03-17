@@ -97,8 +97,10 @@ class DcmMetaExtension(Nifti1Extension):
         #Check the orientation/shape/version
         if self.get_affine().shape != (4, 4):
             raise InvalidExtensionError('Affine has incorrect shape')
-        if not (0 <= self.get_slice_dim() < 3):
-            raise InvalidExtensionError('Slice dimension is not valid')
+        slice_dim = self.get_slice_dim()
+        if slice_dim != None:
+            if not (0 <= slice_dim < 3):
+                raise InvalidExtensionError('Slice dimension is not valid')
         if not (3 <= len(self.get_shape()) < 6):
             raise InvalidExtensionError('Shape is not valid')
             
@@ -399,7 +401,7 @@ class DcmMetaExtension(Nifti1Extension):
         return self.from_runtime_repr(result)
         
     @classmethod
-    def make_empty(klass, shape, affine, slice_dim):
+    def make_empty(klass, shape, affine, slice_dim=None):
         result = klass(dcm_meta_ecode, '{}')
         result._content['global'] = OrderedDict()
         result._content['global']['const'] = OrderedDict()
@@ -737,17 +739,30 @@ class NiftiWrapper(object):
     Allows the Nifti to be split into sub volumes or joined with others, while
     also updating the meta data appropriately.'''
 
-    def __init__(self, nii_img):
+    def __init__(self, nii_img, make_empty=False):
         self.nii_img = nii_img
+        hdr = nii_img.get_header()
         self._meta_ext = None
-        for extension in nii_img.get_header().extensions:
-            #TODO: update this since we are now using the generic ecode of 0
+        for extension in hdr.extensions:
             if extension.get_code() == dcm_meta_ecode:
-                if self._meta_ext:
-                    raise ValueError("More than one DcmMetaExtension found")
-                self._meta_ext = extension
+                try:
+                    extension.check_valid()
+                except InvalidExtensionError:
+                    pass
+                else:
+                    if not self._meta_ext is None:
+                        raise ValueError('More than one valid DcmMeta '
+                                         'extension found.')
+                    self._meta_ext = extension
         if not self._meta_ext:
-            raise ValueError("No DcmMetaExtension found.")
+            if make_empty:
+                _, _, slice_dim = hdr.get_dim_info()
+                self._meta_ext = \
+                    DcmMetaExtension.make_empty(self.nii_img.shape, 
+                                                self.nii_img.get_affine(),
+                                                slice_dim)
+            else:
+                raise ValueError("No DcmMeta extension found.")
         self._meta_ext.check_valid()
     
     def samples_valid(self):
