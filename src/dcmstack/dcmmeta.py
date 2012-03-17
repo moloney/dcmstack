@@ -493,7 +493,7 @@ class DcmMetaExtension(Nifti1Extension):
             result.set_shape(shape)
             
         #Try simplifying any keys in global slices
-        for key in result.get_class_dict(('global', 'slices')):
+        for key in result.get_class_dict(('global', 'slices')).keys():
             result._simplify(key)
             
         return result
@@ -560,7 +560,7 @@ class DcmMetaExtension(Nifti1Extension):
                          )
     
     def _unmangle(self, value):
-        return json.loads(value)
+        return json.loads(value, object_hook=OrderedDict)
     
     def _mangle(self, value):
         return json.dumps(value, indent=4)
@@ -890,8 +890,7 @@ class NiftiWrapper(object):
         return list(self.generate_splits(dim))
             
     def to_filename(self, out_path):
-        if not self._meta_ext.is_valid:
-            raise ValueError("Meta extension is not valid.")
+        self._meta_ext.check_valid()
         self.nii_img.to_filename(out_path)
     
     @classmethod
