@@ -18,7 +18,7 @@ _meta_version = 0.5
 
 def is_constant(sequence, period=None):
     '''Returns true if all elements in the sequence are equal. If period is not
-    None then each non-overlapping subsequence of that length is checked.'''
+    None then each subsequence of that length is checked.'''
     if period is None:
         return all(val == sequence[0] for val in sequence)
     else:
@@ -127,19 +127,21 @@ class DcmMetaExtension(Nifti1Extension):
                         raise InvalidExtensionError(msg)
     
     def get_affine(self):
-        '''Return the affine associated with the meta data.'''
+        '''Return the affine associated with the per-slice meta data.'''
         return np.array(self._content['dcmmeta_affine'])
         
     def set_affine(self, affine):
-        '''Set the affine associated with the meta data.'''
+        '''Set the affine associated with the per-slice meta data.'''
         self._content['dcmmeta_affine'] = affine.tolist()
         
     def get_slice_dim(self):
-        '''Get the index of the slice dimension.'''
+        '''Get the index of the slice dimension associated with the per-slice 
+        meta data.'''
         return self._content['dcmmeta_slice_dim']
         
     def set_slice_dim(self, dim):
-        '''Set the index of the slice dimension.'''
+        '''Set the index of the slice dimension associated with the per-slice 
+        meta data.'''
         self._content['dcmmeta_slice_dim'] = dim
     
     def get_shape(self):
@@ -170,17 +172,15 @@ class DcmMetaExtension(Nifti1Extension):
     def get_keys(self):
         '''Get a list of all the meta data keys that are available.'''
         keys = []
-        for base_class, sub_class in self.classifications:
-            if base_class in self._content:
-                keys += self._content[base_class][sub_class].keys()
+        for base_class, sub_class in self.get_valid_classes():
+            keys += self._content[base_class][sub_class].keys()
         return keys
 
     def get_classification(self, key):
         '''Return the classification tuple for the provided key or None if the
         key is not found.'''
-        for base_class, sub_class in self.classifications:
-            if base_class in self._content:
-                if key in self._content[base_class][sub_class]:
+        for base_class, sub_class in self.get_valid_classes():
+            if key in self._content[base_class][sub_class]:
                     return (base_class, sub_class)
                     
         return None
@@ -207,8 +207,8 @@ class DcmMetaExtension(Nifti1Extension):
         
     def clear_slice_meta(self):
         '''Clear all meta data that is per slice.'''
-        for base_class, sub_class in self.classifications:
-            if base_class in self._content and sub_class == 'slices':
+        for base_class, sub_class in self.get_valid_classes():
+            if sub_class == 'slices':
                 self.get_class_dict((base_class, sub_class)).clear()
     
     def get_multiplicity(self, classification):
@@ -251,17 +251,7 @@ class DcmMetaExtension(Nifti1Extension):
         result['global']['const'] = deepcopy(self._content['global']['const'])
         result['global']['slices'] = OrderedDict()
         
-        if dim < 3 and dim != self.get_slice_dim():
-            #Preserve everything
-            result['global']['slices'] = \
-                deepcopy(self._content['global']['slices'])
-            
-            if 'time' in self._content:
-                result['time'] = deepcopy(self._content['time'])
-            
-            if 'vector' in self._content:
-                result['vector'] = deepcopy(self._content['vector'])
-        elif dim < 3:
+        if dim == self.get_slice_dim():
             #Per slice values become constant, everything else is the same
             for key, vals in self._content['global']['slices'].iteritems():
                 result['global']['const'][key] = deepcopy(vals[idx])
@@ -282,7 +272,17 @@ class DcmMetaExtension(Nifti1Extension):
                 result['vector'] = OrderedDict()
                 result['vector']['samples'] = \
                     deepcopy(self._content['vector']['samples'])
-                result['vector']['slices'] = OrderedDict()                
+                result['vector']['slices'] = OrderedDict()
+        elif dim < 3:
+            #Preserve everything
+            result['global']['slices'] = \
+                deepcopy(self._content['global']['slices'])
+            
+            if 'time' in self._content:
+                result['time'] = deepcopy(self._content['time'])
+            
+            if 'vector' in self._content:
+                result['vector'] = deepcopy(self._content['vector'])
         elif dim == 3:
             #Per time sample values become constant
             for key, vals in self._content['time']['samples'].iteritems():
@@ -742,7 +742,7 @@ class NiftiWrapper(object):
     def __init__(self, nii_img, make_empty=False):
         self.nii_img = nii_img
         hdr = nii_img.get_header()
-        self._meta_ext = None
+        self.meta_ext = None
         for extension in hdr.extensions:
             if extension.get_code() == dcm_meta_ecode:
                 try:
@@ -750,40 +750,40 @@ class NiftiWrapper(object):
                 except InvalidExtensionError:
                     pass
                 else:
-                    if not self._meta_ext is None:
+                    if not self.meta_ext is None:
                         raise ValueError('More than one valid DcmMeta '
                                          'extension found.')
-                    self._meta_ext = extension
-        if not self._meta_ext:
+                    self.meta_ext = extension
+        if not self.meta_ext:
             if make_empty:
                 _, _, slice_dim = hdr.get_dim_info()
-                self._meta_ext = \
+                self.meta_ext = \
                     DcmMetaExtension.make_empty(self.nii_img.shape, 
                                                 self.nii_img.get_affine(),
                                                 slice_dim)
             else:
                 raise ValueError("No DcmMeta extension found.")
-        self._meta_ext.check_valid()
+        self.meta_ext.check_valid()
     
     def samples_valid(self):
         '''Check if the meta data corresponding to individual time or vector 
         samples appears to be valid for the wrapped nifti image.'''
         #Check if the time/vector dimensions match
         img_shape = self.nii_img.get_shape()
-        meta_shape = self._meta_ext.get_shape()
+        meta_shape = self.meta_ext.get_shape()
         return meta_shape[3:] == img_shape[3:]
     
     def slices_valid(self):
         '''Check if the meta data corresponding to individual slices appears to 
         be valid for the wrapped nifti image.'''
 
-        if (self._meta_ext.get_n_slices() != 
+        if (self.meta_ext.get_n_slices() != 
            self.nii_img.get_header().get_n_slices()):
             return False
         
         #Check that the affines match
         return np.allclose(self.nii_img.get_header().get_best_affine(), 
-                           self._meta_ext.get_affine())
+                           self.meta_ext.get_affine())
     
     def get_meta(self, key, index=None, default=None):
         '''Return the meta data value for the provided 'key', or 'default' if 
@@ -797,7 +797,7 @@ class NiftiWrapper(object):
         True.'''
         
         #Pull out the meta dictionary
-        meta_dict = self._meta_ext._content
+        meta_dict = self.meta_ext._content
         
         #First check the constant values
         if key in meta_dict['global']['const']:
@@ -824,7 +824,7 @@ class NiftiWrapper(object):
                 
             #Finally, if aligned, try per-slice values
             if self.slices_valid():
-                slice_dim = self._meta_ext.get_slice_dim()
+                slice_dim = self.meta_ext.get_slice_dim()
                 if key in meta_dict['global']['slices']:
                     val_idx = index[slice_dim]
                     slices_per_sample = shape[slice_dim]
@@ -894,7 +894,7 @@ class NiftiWrapper(object):
                     pass
                 
             #Insert the subset of meta data
-            split_meta = self._meta_ext.get_subset(dim, idx)
+            split_meta = self.meta_ext.get_subset(dim, idx)
             split_hdr.extensions.append(split_meta)
             
             yield NiftiWrapper(split_nii)
@@ -905,7 +905,7 @@ class NiftiWrapper(object):
         return list(self.generate_splits(dim))
             
     def to_filename(self, out_path):
-        self._meta_ext.check_valid()
+        self.meta_ext.check_valid()
         self.nii_img.to_filename(out_path)
     
     @classmethod
@@ -1033,7 +1033,7 @@ class NiftiWrapper(object):
         #    result_hdr.set_slice_times(hdr_info['slice_times'])
         
         #Create the meta data extension and insert it
-        seq_exts = [elem._meta_ext for elem in seq]
+        seq_exts = [elem.meta_ext for elem in seq]
         result_ext = DcmMetaExtension.from_sequence(seq_exts, dim, affine,
                                                     slice_dim)
         result_hdr.extensions.append(result_ext)
