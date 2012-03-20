@@ -76,20 +76,25 @@ class DcmMetaExtension(Nifti1Extension):
     def get_valid_classes(self):
         '''Return the tuples of meta data classifications that are valid for 
         this extension's shape.'''
-        n_dims = len(self.get_shape())
+        shape = self.get_shape()
+        n_dims = len(shape)
         if n_dims == 3:
             return self.classifications[:2]
         elif n_dims == 4:
             return self.classifications[:4]
         elif n_dims == 5:
-            return self.classifications
+            if shape[3] != 1:
+                return self.classifications
+            else:
+                return self.classifications[:2] + self.classifications[-2:]
         else:
             raise ValueError("There must be 3 to 5 dimensions.")
     
     def check_valid(self):
-        '''Raise and exception if the extension is not valid. Checks for the 
-        required dictionaries and makes sure different classifications of meta 
-        data have the correct number of values (multiplicity) for each key.'''
+        '''Raise an InvalidExtensionError if the extension is not valid. Checks 
+        for the required elements and makes sure different classifications of 
+        meta data have the correct number of values (multiplicity) for each key.
+        '''
         #Check for the required base keys in the json data
         if not self._req_base_keys <= set(self._content):
             raise InvalidExtensionError('Missing one or more required keys')
@@ -157,7 +162,7 @@ class DcmMetaExtension(Nifti1Extension):
         return self._content['dcmmeta_version']
         
     def set_version(self, version_number):
-        '''Return the version of the meta data extension.'''
+        '''Set the version of the meta data extension.'''
         self._content['dcmmeta_version'] = version_number
         
     def get_slice_dir(self):
@@ -244,161 +249,40 @@ class DcmMetaExtension(Nifti1Extension):
             raise ValueError("The argument 'dim' must be in the range [0, 5).")
         
         shape = self.get_shape()
-        n_slices = self.get_n_slices()
-            
-        result = OrderedDict()
-        result['global'] = OrderedDict()
-        result['global']['const'] = deepcopy(self._content['global']['const'])
-        result['global']['slices'] = OrderedDict()
+        valid_classes = self.get_valid_classes()
         
-        if dim == self.get_slice_dim():
-            #Per slice values become constant, everything else is the same
-            for key, vals in self._content['global']['slices'].iteritems():
-                result['global']['const'][key] = deepcopy(vals[idx])
+        #Make an empty extension for the result
+        result_shape = list(shape)
+        result_shape[dim] = 1
+        while result_shape[-1] == 1 and len(result_shape) > 3:
+            result_shape = result_shape[:-1]
+        result = self.make_empty(result_shape, 
+                                 self.get_affine(), 
+                                 self.get_slice_dim()
+                                )
+        
+        for src_class in valid_classes:
+            #Constants remain constant
+            if src_class == ('global', 'const'):
+                for key, val in self.get_class_dict(src_class).iteritems():
+                    result.get_class_dict(src_class)[key] = deepcopy(val)
+                continue
             
-            if 'time' in self._content:
-                time_slice = idx % shape[3]
-                for key, vals in self._content['time']['slices'].iteritems():
-                    result['global']['const'][key] = deepcopy(vals[time_slice])
-                result['time'] = OrderedDict()
-                result['time']['samples'] = \
-                    deepcopy(self._content['time']['samples'])
-                result['time']['slices'] = OrderedDict()
-            
-            if 'vector' in self._content:
-                vec_slice = idx % (shape[3] * shape[4])
-                for key, vals in self._content['vector']['slices'].iteritems():
-                    result['global']['const'][key] = deepcopy(vals[vec_slice])
-                result['vector'] = OrderedDict()
-                result['vector']['samples'] = \
-                    deepcopy(self._content['vector']['samples'])
-                result['vector']['slices'] = OrderedDict()
-        elif dim < 3:
-            #Preserve everything
-            result['global']['slices'] = \
-                deepcopy(self._content['global']['slices'])
-            
-            if 'time' in self._content:
-                result['time'] = deepcopy(self._content['time'])
-            
-            if 'vector' in self._content:
-                result['vector'] = deepcopy(self._content['vector'])
-        elif dim == 3:
-            #Per time sample values become constant
-            for key, vals in self._content['time']['samples'].iteritems():
-                result['global']['const'][key] = deepcopy(vals[idx])
-            
-            if 'vector' in self._content:
-                result['vector'] = OrderedDict()
-                
-                #Vector samples are left unchanged
-                result['vector']['samples'] = \
-                    deepcopy(self._content['vector']['samples'])
-                
-                result['vector']['slices'] = OrderedDict()
-                
-                #Need to take a subset of the global slices
-                slices_per_vec_comp = n_slices * shape[3]
-                for key, vals in self._content['global']['slices'].iteritems():
-                    subset_vals = []
-                    for vec_comp in shape[4]:
-                        start_idx = ((vec_comp * slices_per_vec_comp) + 
-                                     (idx * n_slices))
-                        end_idx = start_idx + n_slices
-                        subset_vals.append(deepcopy(vals[start_idx:end_idx]))
-                    if is_constant(subset_vals):
-                        result['global']['const'][key] = subset_vals[0]
-                    elif is_repeating(subset_vals, n_slices):
-                        result['vector']['slices'][key] = subset_vals[:n_slices]
-                    else:
-                        result['global']['slices'][key] = subset_vals
-                    
-                #Time point slices become vector slices
-                time_slices = deepcopy(self._content['time']['slices'])
-                result['vector']['slices'].update(time_slices)
-                
-                #Take a subset of vector slices, check if constant
-                for key, vals in self._content['vector']['slices'].iteritems():
-                    start_idx = idx * n_slices
-                    end_idx = start_idx + n_slices
-                    subset_vals = deepcopy(vals[start_idx:end_idx])
-                    if is_constant(subset_vals):
-                        result['global']['const'] = subset_vals[0]
-                    else:
-                        result['vector']['slices'][key] = subset_vals
-                        
+            if dim == self.get_slice_dim():
+                if src_class[1] != 'slices':
+                    for key, vals in self.get_class_dict(src_class).iteritems():
+                        result.get_class_dict(src_class)[key] = deepcopy(vals)
+                else:
+                    result._copy_slice(self, src_class, idx)
+            elif dim < 3:
+                for key, vals in self.get_class_dict(src_class).iteritems():
+                    result.get_class_dict(src_class)[key] = deepcopy(vals)
+            elif dim == 3:
+                result._copy_sample(self, src_class, 'time', idx)
             else:
-                #Take subset of global slices, check if constant
-                for key, vals in self._content['global']['slices'].iteritems():
-                    start_idx = idx * n_slices
-                    end_idx = start_idx + n_slices
-                    subset_vals = deepcopy(vals[start_idx:end_idx])
-                    if is_constant(subset_vals):
-                        result['global']['const'] = subset_vals[0]
-                    else:
-                        result['global']['slices'][key] = subset_vals
-
-                #Time point slices become global slices
-                time_slices = deepcopy(self._content['time']['slices'])
-                result['global']['slices'].update(time_slices)
-        
-        elif dim == 4:
-            #Per vector sample values become constant
-            for key, vals in self._content['vector']['samples'].iteritems():
-                result['global']['const'][key] = deepcopy(vals[idx])
+                result._copy_sample(self, src_class, 'vector', idx)
                 
-            if 'time' in self._content:
-                result['time'] = OrderedDict()
-                
-                #Time samples and slices are left unchanged
-                result['time']['samples'] = \
-                    deepcopy(self._content['time']['samples'])
-                result['time']['slices'] = \
-                    deepcopy(self._content['time']['slices'])
-                
-                #Need to take a subset of the global slices
-                slices_per_vec_comp = n_slices * shape[3]
-                for key, vals in self._content['global']['slices'].iteritems():
-                    start_idx = slices_per_vec_comp * idx
-                    end_idx = start_idx + slices_per_vec_comp
-                    subset_vals = deepcopy(vals[start_idx:end_idx])
-                    if is_constant(subset_vals):
-                        result['global']['const'][key] = subset_vals[0]
-                    elif is_repeating(subset_vals, n_slices):
-                        result['time']['slices'][key] = subset_vals[:n_slices]
-                    else:
-                        result['global']['slices'][key] = subset_vals
-                        
-                #Vector component slices become global slices
-                vector_slices = deepcopy(self._content['vector']['slices'])
-                result['global']['slices'].update(vector_slices)
-                
-            else:
-                #Take subset of global slices, check if constant
-                for key, vals in self._content['global']['slices']:
-                    start_idx = idx * n_slices
-                    end_idx = start_idx + n_slices
-                    subset_vals = deepcopy(vals[start_idx:end_idx])
-                    if is_constant(subset_vals):
-                        result['global']['const'] = subset_vals[0]
-                    else:
-                        result['global']['slices'][key] = subset_vals
-                        
-                #Vector component slices become global slices
-                vector_slices = deepcopy(self._content['vector']['slices'])
-                result['global']['slices'].update(vector_slices)
-        
-        #Set the "meta meta" data
-        result['dcmmeta_affine'] = deepcopy(self._content['dcmmeta_affine'])
-        result['dcmmeta_slice_dim'] = deepcopy(self._content['dcmmeta_slice_dim'])
-        split_shape = deepcopy(self._content['dcmmeta_shape'])
-        split_shape[dim] = 1
-        while split_shape[-1] == 1 and len(split_shape) > 3:
-            split_shape = split_shape[:-1]
-        result['dcmmeta_shape'] = split_shape
-        result['dcmmeta_version'] = self.get_version()
-        
-        return self.from_runtime_repr(result)
+        return result
         
     @classmethod
     def make_empty(klass, shape, affine, slice_dim=None):
@@ -637,7 +521,96 @@ class DcmMetaExtension(Nifti1Extension):
             
         del self.get_class_dict(curr_class)[key]
         return True
-        
+    
+    def _copy_slice(self, other, src_class, idx):
+        if src_class[0] == 'global':
+            for classes in (('time', 'samples'),
+                            ('vector', 'samples'),
+                            ('global', 'const')):
+                if classes in self.get_valid_classes():
+                    dest_class = classes
+                    break
+        elif src_class[0] == 'vector':
+            for classes in (('time', 'samples'),
+                            ('global', 'const')):
+                if classes in self.get_valid_classes():
+                    dest_class = classes
+                    break
+        else:
+            dest_class = ('global', 'const')
+            
+        stride = other.get_n_slices()
+        for key, vals in other.get_class_dict(src_class).iteritems():
+            subset_vals = vals[idx::stride]
+            if len(subset_vals) == 1:
+                subset_vals = subset_vals[0]
+            self.get_class_dict(dest_class)[key] = deepcopy(subset_vals)
+            self._simplify(key)
+
+    def _global_slice_subset(self, key, sample_base, idx):
+        n_slices = self.get_n_slices()
+        shape = self.get_shape()
+        src_dict = self.get_class_dict(('global', 'slices'))
+        if sample_base == 'vector':
+            slices_per_vec = n_slices * shape[3]
+            start_idx = idx * slices_per_vec
+            end_idx = start_idx + slices_per_vec
+            return src_dict[key][start_idx:end_idx]
+        else:
+            if not ('vector', 'samples') in self.get_valid_classes():
+                start_idx = idx * n_slices
+                end_idx = start_idx + n_slices
+                return src_dict[key][start_idx:end_idx]
+            else:
+                result = []
+                slices_per_vec = n_slices * shape[3]
+                for vec_idx in shape[4]:
+                    start_idx = (vec_idx * slices_per_vec) + (idx * n_slices)
+                    end_idx = start_idx + n_slices
+                    result.extend(src_dict[key][start_idx:end_idx])
+                return result
+    
+    def _copy_sample(self, other, src_class, sample_base, idx):
+        src_dict = other.get_class_dict(src_class)
+        if src_class[1] == 'samples':
+            if src_class[0] == sample_base:
+                for key, vals in src_dict.iteritems():
+                    self.get_class_dict(('global', 'const'))[key] = \
+                        deepcopy(vals[idx])
+            else:
+                for key, vals in src_dict.iteritems():
+                    self.get_class_dict(src_class)[key] = deepcopy(vals)
+        else:
+            if src_class[0] == sample_base:
+                best_dest = None
+                for dest_class in self._preserving_changes[src_class]:
+                    if dest_class in self.get_valid_classes():
+                        best_dest = dest_class
+                        break     
+                for key, vals in src_dict.iteritems():
+                    self.get_class_dict(best_dest)[key] = deepcopy(vals)
+            elif src_class[0] != 'global':
+                if sample_base == 'time':
+                    #Take a subset of vector slices
+                    n_slices = self.get_n_slices()
+                    start_idx = idx * n_slices
+                    end_idx = start_idx + n_slices
+                    for key, vals in src_dict.iteritems():
+                        self.get_class_dict(src_class)[key] = \
+                            deepcopy(vals[start_idx:end_idx])
+                        self._simplify(key)
+                else:
+                    #Time slices are unchanged
+                    for key, vals in src_dict.iteritems():
+                        self.get_class_dict(src_class)[key] = deepcopy(vals)
+            else:
+                #Take a subset of global slices
+                for key, vals in src_dict.iteritems():
+                    subset_vals = \
+                        other._global_slice_subset(key, sample_base, idx)
+                    self.get_class_dict(src_class)[key] = deepcopy(subset_vals)
+                    self._simplify(key)
+    
     def _insert(self, dim, other):
         use_slices = np.allclose(other.get_slice_dir(), self.get_slice_dir())
         missing_keys = list(set(self.get_keys()) - set(other.get_keys()))

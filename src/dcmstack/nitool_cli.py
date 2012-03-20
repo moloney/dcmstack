@@ -22,7 +22,7 @@ def main(argv=sys.argv):
                                           "dimension.")
                                          )
     split_parser.add_argument('src_nii', nargs=1)
-    split_parser.add_argument('-d', '--dimension', default=None,
+    split_parser.add_argument('-d', '--dimension', default=None, type=int,
                               help=("The dimension to split along"))
     split_parser.add_argument('-o', '--output-format', default=None,
                               help=("Format string used to create the output "
@@ -101,11 +101,10 @@ def split(args):
     for split_idx, split in enumerate(src_wrp.generate_splits(args.dimension)):
         if args.output_format:
             out_name = (args.output_format % 
-                        split._meta_ext.get_class_dict(('global', 'const'))
+                        split.meta_ext.get_class_dict(('global', 'const'))
                        )
         else:
             out_name = os.path.join(src_dir, '%d-%s' % (split_idx, src_fn))
-        print out_name
         nb.save(split, out_name)
     
 def make_key_func(meta_key, index=None):
@@ -126,10 +125,10 @@ def merge(args):
     result_wrp = NiftiWrapper.from_sequence(src_wrps, args.dimension)
     
     if args.clear_slices:
-        result_wrp._meta_ext.clear_slice_meta()
+        result_wrp.meta_ext.clear_slice_meta()
         
     out_name = (args.output[0] % 
-                result_wrp._meta_ext.get_class_dict(('global', 'const')))
+                result_wrp.meta_ext.get_class_dict(('global', 'const')))
     result_wrp.to_filename(out_name)    
 
 def delete_ext(hdr, meta_ext):
@@ -144,13 +143,13 @@ def delete_ext(hdr, meta_ext):
 def dump(args):
     src_nii = nb.load(args.src_nii[0])
     src_wrp = NiftiWrapper(src_nii, args.make_empty)
-    meta_str = src_wrp._meta_ext.to_json()
+    meta_str = src_wrp.meta_ext.to_json()
     args.dest_json.write(meta_str)
     args.dest_json.write('\n')
     
     if args.remove:
         hdr = src_wrp.nii_img.get_header()
-        delete_ext(hdr, src_wrp._meta_ext)
+        delete_ext(hdr, src_wrp.meta_ext)
         src_wrp.to_filename(args.src_nii[0])
                 
 def check_overwrite():
@@ -171,7 +170,7 @@ def embed(args):
         if not args.force_overwrite:
             if not check_overwrite():
                 return
-        delete_ext(hdr, src_wrp._meta_ext)
+        delete_ext(hdr, src_wrp.meta_ext)
     
     hdr.extensions.append(DcmMetaExtension.from_json(args.src_json.read()))
     nb.save(dest_nii, args.dest_nii[0])
