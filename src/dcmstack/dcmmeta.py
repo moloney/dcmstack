@@ -490,6 +490,7 @@ class DcmMetaExtension(Nifti1Extension):
     
     def _simplify(self, key):
         values, curr_class = self.get_values_and_class(key)
+        curr_mult = self.get_multiplicity(curr_class)
         
         #If the class is global const then just delete it if the value is None
         if curr_class == ('global', 'const'):
@@ -498,16 +499,17 @@ class DcmMetaExtension(Nifti1Extension):
                 return True
             return False
         
-        #Test of the values are constant with some period
+        #Test if the values are constant with some period
         for classes in self._const_test_order:
-            if classes[0] in self._content:
+            if classes != curr_class and classes[0] in self._content:
                 mult = self.get_multiplicity(classes)
+                reduce_factor = curr_mult / mult
                 if mult == 1:
                     if is_constant(values):
                         self.get_class_dict(classes)[key] = values[0]
                         break
-                elif is_constant(values, mult):
-                    self.get_class_dict(classes)[key] = values[::mult]
+                elif is_constant(values, reduce_factor):
+                    self.get_class_dict(classes)[key] = values[::reduce_factor]
                     break
         else: #Otherwise test if they are repeating with some period
             for classes in self._repeat_test_order:
@@ -653,11 +655,12 @@ class DcmMetaExtension(Nifti1Extension):
                     self._insert_sample(key, other, 'time')
                 elif dim == 4:
                     self._insert_sample(key, other, 'vector')
-                    
+               
     def _insert_slice(self, key, other):
         local_vals, classes = self.get_values_and_class(key)
         other_vals = other._get_changed_class(key, classes)
 
+        #Handle some common / simple insertions with special cases
         if classes == ('global', 'const'):
             if local_vals != other_vals:
                 for dest_base in ('time', 'vector', 'global'):
@@ -669,12 +672,33 @@ class DcmMetaExtension(Nifti1Extension):
                                                              )
                         self.get_values(key).extend(other_vals)
                         break
-        elif classes[1] == 'slices':
-            self.get_values(key).extend(other_vals)
+        elif classes == ('time', 'slices'):
+            local_vals.extend(other_vals)
         else:
-            self._change_class(key, ('global', 'slices'))
-            other_vals = other._get_changed_class(key, ('global', 'slices'))
-            self.get_values(key).extend(other_vals)
+            #Default to putting in global slices and simplifying later
+            if classes != ('global', 'slices'):
+                self._change_class(key, ('global', 'slices'))
+                local_vals = self.get_class_dict(('global', 'slices'))[key]
+                other_vals = other._get_changed_class(key, ('global', 'slices'))
+            
+            #Need to interleave slices from different volumes
+            n_slices = self.get_n_slices()
+            other_n_slices = other.get_n_slices()
+            shape = self.get_shape()
+            n_vols = 1
+            for dim_size in shape[3:]:
+                n_vols *= dim_size
+            
+            intlv = []
+            loc_start = 0
+            oth_start = 0
+            for vol_idx in xrange(n_vols):
+                intlv += local_vals[loc_start:loc_start + n_slices]
+                intlv += other_vals[oth_start:oth_start + other_n_slices]
+                loc_start += n_slices
+                oth_start += other_n_slices
+                
+            self.get_class_dict(('global', 'slices'))[key] = intlv
             
     def _insert_non_slice(self, key, other):
         local_vals, classes = self.get_values_and_class(key)
@@ -690,17 +714,41 @@ class DcmMetaExtension(Nifti1Extension):
         if classes == ('global', 'const'):
             if local_vals != other_vals:
                 self._change_class(key, (sample_base, 'samples'))
+                local_vals = self.get_values(key)
                 other_vals = other._get_changed_class(key, (sample_base, 
                                                             'samples')
                                                      )
-                self.get_values(key).extend(other_vals)
+                local_vals.extend(other_vals)
         elif classes == (sample_base, 'samples'):
-            self.get_values(key).extend(other_vals)
+            local_vals.extend(other_vals)
         else:
-            self._change_class(key, ('global', 'slices'))
-            other_vals = other._get_changed_class(key, ('global', 'slices'))
-            self.get_values(key).extend(other_vals)
-        
+            if classes != ('global', 'slices'):
+                self._change_class(key, ('global', 'slices'))
+                local_vals = self.get_values(key)
+                other_vals = other._get_changed_class(key, ('global', 'slices'))
+            
+            shape = self.get_shape()
+            n_dims = len(shape)
+            if sample_base == 'time' and n_dims == 5:
+                #Need to interleave values from the time points in each vector 
+                #component
+                n_slices = self.get_n_slices()
+                slices_per_vec = n_slices * shape[3]
+                oth_slc_per_vec = n_slices * other.get_shape()[3]
+                
+                intlv = []
+                loc_start = 0
+                oth_start = 0
+                for vec_idx in xrange(shape[4]):
+                    intlv += local_vals[loc_start:loc_start+slices_per_vec]
+                    intlv += other_vals[oth_start:oth_start+oth_slc_per_vec]
+                    loc_start += slices_per_vec
+                    oth_start += oth_slc_per_vec
+                    
+                self.get_class_dict(('global', 'slices'))[key] = intlv
+            else:
+                local_vals.extend(other_vals)
+            
 #Add our extension to nibabel
 nb.nifti1.extension_codes.add_codes(((dcm_meta_ecode, 
                                       "dcmmeta", 
