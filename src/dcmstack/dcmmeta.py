@@ -657,7 +657,7 @@ class DcmMetaExtension(Nifti1Extension):
     def _insert_slice(self, key, other):
         local_vals, classes = self.get_values_and_class(key)
         other_vals = other._get_changed_class(key, classes)
-        
+
         if classes == ('global', 'const'):
             if local_vals != other_vals:
                 for dest_base in ('time', 'vector', 'global'):
@@ -668,6 +668,7 @@ class DcmMetaExtension(Nifti1Extension):
                                                                'slices')
                                                              )
                         self.get_values(key).extend(other_vals)
+                        break
         elif classes[1] == 'slices':
             self.get_values(key).extend(other_vals)
         else:
@@ -720,8 +721,8 @@ class NiftiWrapper(object):
             if extension.get_code() == dcm_meta_ecode:
                 try:
                     extension.check_valid()
-                except InvalidExtensionError:
-                    pass
+                except InvalidExtensionError, e:
+                    print "Found candidate extension, but invalid: %s" % e
                 else:
                     if not self.meta_ext is None:
                         raise ValueError('More than one valid DcmMeta '

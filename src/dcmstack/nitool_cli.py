@@ -38,7 +38,7 @@ def main(argv=sys.argv):
                                          )
     merge_parser.add_argument('output', nargs=1)
     merge_parser.add_argument('src_niis', nargs='+')
-    merge_parser.add_argument('-d', '--dimension', default=None, 
+    merge_parser.add_argument('-d', '--dimension', default=None, type=int,
                               help=("The dimension to split along. Must be "
                                     "in range [0, 5)")
                              )
@@ -104,7 +104,7 @@ def split(args):
                         split.meta_ext.get_class_dict(('global', 'const'))
                        )
         else:
-            out_name = os.path.join(src_dir, '%d-%s' % (split_idx, src_fn))
+            out_name = os.path.join(src_dir, '%03d-%s' % (split_idx, src_fn))
         nb.save(split, out_name)
     
 def make_key_func(meta_key, index=None):
