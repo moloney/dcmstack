@@ -291,7 +291,7 @@ class DcmMetaExtension(Nifti1Extension):
         result._content['global']['const'] = OrderedDict()
         result._content['global']['slices'] = OrderedDict()
         
-        if len(shape) > 3:
+        if len(shape) > 3 and shape[3] != 1:
             result._content['time'] = OrderedDict()
             result._content['time']['samples'] = OrderedDict()
             result._content['time']['slices'] = OrderedDict()
@@ -993,6 +993,9 @@ class NiftiWrapper(object):
         #Fill the data array, check header consistency
         slice_dim = None
         data_slices = [slice(None)] * len(result_shape)
+        for dim_idx, dim_size in enumerate(result_shape):
+            if dim_size == 1:
+                data_slices[dim_idx] = 0
         for input_idx in range(n_inputs):
             
             input_wrp = seq[input_idx]
