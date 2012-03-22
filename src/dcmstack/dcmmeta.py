@@ -332,9 +332,9 @@ class DcmMetaExtension(Nifti1Extension):
     @classmethod
     def from_sequence(klass, seq, dim, affine=None, slice_dim=None):
         '''Create an extension from the sequence of extensions 'seq' by joining
-        them along the dimension index 'dim'. The affine and slice dimension to
-        use in the result can optionally be provided, otherwise they will be 
-        taken from the first extension in the sequence. '''
+        them along the dimension with index 'dim'. The affine and slice 
+        dimension to use in the result can optionally be provided, otherwise 
+        they will be taken from the first extension in the sequence. '''
         if not 0 <= dim < 5:
             raise ValueError("The argument 'dim' must be in the range [0, 5).")
         
@@ -798,14 +798,16 @@ class NiftiWrapper(object):
     def slices_valid(self):
         '''Check if the meta data corresponding to individual slices appears to 
         be valid for the wrapped nifti image.'''
-
+        #Check if the number of slices and slice directions match
         if (self.meta_ext.get_n_slices() != 
            self.nii_img.get_header().get_n_slices()):
             return False
         
-        #Check that the affines match
-        return np.allclose(self.nii_img.get_header().get_best_affine(), 
-                           self.meta_ext.get_affine())
+        hdr = self.nii_img.get_header()
+        slice_dim = hdr.get_dim_info()[2]
+        slice_dir = hdr.get_best_affine()[slice_dim, :3]
+        return np.allclose(slice_dir, 
+                           self.meta_ext.get_slice_dir())
     
     def get_meta(self, key, index=None, default=None):
         '''Return the meta data value for the provided 'key', or 'default' if 

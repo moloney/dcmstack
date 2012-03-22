@@ -177,7 +177,9 @@ def embed(args):
     
 def lookup(args):
     src_wrp = NiftiWrapper.from_filename(args.src_nii[0])
-    index = tuple(int(idx.strip()) for idx in args.index.split(','))
+    index = None
+    if args.index:
+        index = tuple(int(idx.strip()) for idx in args.index.split(','))
     meta = src_wrp.get_meta(args.key[0], index)
     if not meta is None:
         print meta
