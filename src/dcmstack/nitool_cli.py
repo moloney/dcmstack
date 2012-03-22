@@ -130,15 +130,6 @@ def merge(args):
     out_name = (args.output[0] % 
                 result_wrp.meta_ext.get_class_dict(('global', 'const')))
     result_wrp.to_filename(out_name)    
-
-def delete_ext(hdr, meta_ext):
-    target_idx = None
-    for idx, ext in enumerate(hdr.extensions):
-        if id(ext) == id(meta_ext):
-            target_idx = idx
-            break
-    del hdr.extensions[target_idx]
-    hdr['vox_offset'] = 352
     
 def dump(args):
     src_nii = nb.load(args.src_nii[0])
@@ -148,8 +139,7 @@ def dump(args):
     args.dest_json.write('\n')
     
     if args.remove:
-        hdr = src_wrp.nii_img.get_header()
-        delete_ext(hdr, src_wrp.meta_ext)
+        src_wrp.remove_extension()
         src_wrp.to_filename(args.src_nii[0])
                 
 def check_overwrite():
@@ -170,7 +160,7 @@ def embed(args):
         if not args.force_overwrite:
             if not check_overwrite():
                 return
-        delete_ext(hdr, src_wrp.meta_ext)
+        src_wrp.remove_extension()
     
     hdr.extensions.append(DcmMetaExtension.from_json(args.src_json.read()))
     nb.save(dest_nii, args.dest_nii[0])

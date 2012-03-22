@@ -7,6 +7,7 @@ import os, sys, argparse, string
 from glob import glob
 import dicom
 from .dcmstack import parse_and_stack, DicomOrdering
+from .dcmmeta import NiftiWrapper
 from . import extract
 
 
@@ -274,7 +275,7 @@ def main(argv=sys.argv):
                                  args.embed_meta or args.dump_meta)
             
             if args.dump_meta:
-                meta_ext = nii.get_header().extensions[0]
+                nii_wrp = NiftiWrapper(nii)
                 path_tokens = out_path.split('.')
                 if path_tokens[-1] == 'gz':
                     path_tokens = path_tokens[:-1]
@@ -282,13 +283,11 @@ def main(argv=sys.argv):
                     path_tokens = path_tokens[:-1]
                 meta_path = '.'.join(path_tokens + ['json'])
                 out_file = open(meta_path, 'w')
-                out_file.write(meta_ext.to_json())
+                out_file.write(nii_wrp.meta_ext.to_json())
                 out_file.close()
                 
                 if not args.embed_meta:
-                    hdr = nii.get_header()
-                    del hdr.extensions[0]
-                    hdr['vox_offset'] = 352
+                    nii_wrp.remove_extension()
                                  
             nii.to_filename(out_path)
                 
