@@ -1068,7 +1068,7 @@ class NiftiWrapper(object):
         if hdr_info['dim_info'] != None:
             result_hdr.set_dim_info(*hdr_info['dim_info'])
         if hdr_info['intent'] != None:
-            result_hdr.set_intent(hdr_info['intent'][0])
+            result_hdr.set_intent(*hdr_info['intent'])
         if hdr_info['xyzt_units'] != None:
             result_hdr.set_xyzt_units(*hdr_info['xyzt_units'])
         if hdr_info['slice_duration'] != None:
