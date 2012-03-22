@@ -3,9 +3,10 @@ Extract meta data from a DICOM data set.
 
 @author: moloney
 """
-import struct, re, warnings
+import struct, warnings
 from collections import OrderedDict, namedtuple, Counter
 import dicom
+from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
 from nibabel.nicom.dicomwrappers import Wrapper
 
@@ -15,21 +16,16 @@ def ignore_private(elem):
         return True
     return False
     
-def ignore_bytes_vr(elem):
-    '''Ignore any DICOM element with 'OW', 'OB', or 'OW/OB' VR.'''
-    if elem.VR in ('OW', 'OB', 'OW/OB'):
-        return True
-    return False
-
-def ignore_unknown_vr(elem):
-    '''Ignore any DICOM element with 'UN' VR.'''
-    if elem.VR == 'UN':
-        return True
+def ignore_non_ascii_bytes(elem):
+    '''Ignore elements with VR of 'OW', 'OB', or 'UN' if the byte string has
+    non ASCII characters.'''
+    if elem.VR in ('OW', 'OB', 'OW or OB', 'UN'):
+        if not all(' ' <= c <= '~' for c in elem.value):
+            return True
     return False
 
 default_ignore_rules = (ignore_private,
-                        ignore_bytes_vr,
-                        ignore_unknown_vr)
+                        ignore_non_ascii_bytes)
 '''The default tuple of ignore rules for MetaExtractor.'''
 
 
@@ -174,9 +170,19 @@ def unpack_value(elem):
             return list(struct.unpack(unpack_vr_map[elem.VR], elem.value))
             
     if elem.VM == 1:
-        return elem.value
+        if elem.VR == 'DS':
+            return float(elem.value)
+        elif elem.VR == 'IS':
+            return int(elem.value)
+        else:
+            return elem.value
     else:
-        return elem.value[:]
+        if elem.VR == 'DS':
+            return [float(val) for val in elem.value]
+        elif elem.VR == 'IS':
+            return [int(val) for val in elem.value]
+        else:
+            return elem.value[:]
 
 def tag_to_str(tag):
     '''Convert a DICOM tag to a string representation using the group and 
@@ -208,9 +214,17 @@ class MetaExtractor(object):
                 
     def _get_elem_name(self, elem):
         '''Get an element name for any non-translated elements.'''
-        name = elem.name
-        if name.startswith('[') and name.endswith(']'):
-            name = name[1:-1]
+        #Use standard DICOM keywords if possible
+        name = keyword_for_tag(elem.tag)
+        
+        #For private tags we take elem.name and convert to camel case
+        if name == '':
+            name = elem.name
+            if name.startswith('[') and name.endswith(']'):
+                name = name[1:-1]
+            tokens = [token[0].upper() + token[1:] 
+                      for token in name.split()]
+            name = ''.join(tokens)
         
         return name
         
@@ -286,7 +300,7 @@ class MetaExtractor(object):
         result = OrderedDict()
         for name, value, tag in standard_meta:
             if name_counts[name] > 1:
-                name = name + ' ' + tag_to_str(tag)
+                name = name + '_' + tag_to_str(tag)
             result[name] = value
                     
         #Inject translator results
@@ -296,50 +310,6 @@ class MetaExtractor(object):
                 result[name] = value
                     
         return result
-
-def make_key_regex_filter(exclude_res, force_include_res=None):
-    '''Make a regex filter that will exlude meta items where the key matches any
-    of the regexes in exclude_res, unless it matches one of the regexes in 
-    force_include_res.'''
-    exclude_re = re.compile('|'.join(['(?:' + regex + ')' 
-                                      for regex in exclude_res])
-                           )
-    include_re = None
-    if force_include_res:
-        include_re = re.compile('|'.join(['(?:' + regex + ')' 
-                                          for regex in force_include_res])
-                               )
-    def key_regex_filter(key, value):
-        return (exclude_re.search(key) and 
-                not (include_re and include_re.search(key)))
-    return key_regex_filter
-
-default_key_excl_res = ['Patient(?!(?:Orientation)|(?:Position))',
-                        'Physician',
-                        'Operator',
-                        'Date', 
-                        'Birth',
-                        'Address',
-                        'Institution',
-                        'SiteName',
-                        'Age',
-                        'Comment',
-                        'Phone',
-                        'Telephone',
-                        'Insurance',
-                        'Religious',
-                        'Language',
-                        'Military',
-                        'MedicalRecord',
-                        'Ethnic',
-                        'Occupation',
-                        'Unknown',
-                       ]
-'''A list of regexes passed to make_key_regex_filter as exclude_res to create 
-the default_meta_filter.'''
-                        
-default_meta_filter = make_key_regex_filter(default_key_excl_res)
-'''Default meta_filter for ExractedDcmWrapper.'''
 
 class ExtractedDcmWrapper(Wrapper):
     '''Extends a nibabel.nicom.dicom_wrappers.Wrapper with an additional 
@@ -373,7 +343,7 @@ class ExtractedDcmWrapper(Wrapper):
             return True
             
     @classmethod
-    def from_dicom(klass, dcm, extractor=None, meta_filter=None):
+    def from_dicom(klass, dcm, extractor=None):
         '''Make a wrapper from a dicom using the callables 'extractor' and 
         'meta_filter'. The extractor should take the dicom and return the 
         dictionary to be used as the 'ext_meta' attribute of the wrapper. The 
@@ -387,13 +357,5 @@ class ExtractedDcmWrapper(Wrapper):
         '''
         if extractor is None:
             extractor = MetaExtractor()
-        if meta_filter is None:
-            meta_filter = default_meta_filter
-            
-        ext_meta = extractor(dcm)
-        filtered = OrderedDict()
-        for key, val in ext_meta.iteritems():
-            if not meta_filter(key, val):
-                filtered[key] = val
         
-        return klass(dcm, filtered)
+        return klass(dcm, extractor(dcm))

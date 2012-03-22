@@ -4,7 +4,7 @@ providing access to the meta data and related functionality.
 
 @author: moloney
 """
-import json
+import json, re
 from copy import deepcopy
 from collections import OrderedDict
 import numpy as np
@@ -209,6 +209,16 @@ class DcmMetaExtension(Nifti1Extension):
         if classification is None:
             return (None, None)
         return (self.get_class_dict(classification)[key], classification)
+        
+    def filter_meta(self, filter_func):
+        for classes in self.get_valid_classes():
+            filtered = []
+            curr_dict = self.get_class_dict(classes)
+            for key, values in curr_dict.iteritems():
+                if filter_func(key, values):
+                    filtered.append(key)
+            for key in filtered:
+                del curr_dict[key]
         
     def clear_slice_meta(self):
         '''Clear all meta data that is per slice.'''

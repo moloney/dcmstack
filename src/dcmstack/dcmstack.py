@@ -3,8 +3,7 @@ Stack DICOM datasets into volumes.
 
 @author: moloney
 """
-import warnings
-import dicom
+import warnings, re, dicom
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
@@ -15,6 +14,57 @@ from .dcmmeta import DcmMetaExtension, NiftiWrapper, _meta_version
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from .extract import ExtractedDcmWrapper
+
+def make_key_regex_filter(exclude_res, force_include_res=None):
+    '''Make a regex filter that will exlude meta items where the key matches any
+    of the regexes in exclude_res, unless it matches one of the regexes in 
+    force_include_res.'''
+    exclude_re = re.compile('|'.join(['(?:' + regex + ')' 
+                                      for regex in exclude_res])
+                           )
+    include_re = None
+    if force_include_res:
+        include_re = re.compile('|'.join(['(?:' + regex + ')' 
+                                          for regex in force_include_res])
+                               )
+
+    def key_regex_filter(key, value):
+        return (exclude_re.search(key) and 
+                not (include_re and include_re.search(key)))
+    return key_regex_filter
+
+default_key_excl_res = ['Patient',
+                        'Physician',
+                        'Operator',
+                        'Date', 
+                        'Birth',
+                        'Address',
+                        'Institution',
+                        'SiteName',
+                        'Age',
+                        'Comment',
+                        'Phone',
+                        'Telephone',
+                        'Insurance',
+                        'Religious',
+                        'Language',
+                        'Military',
+                        'MedicalRecord',
+                        'Ethnic',
+                        'Occupation',
+                        'Unknown',
+                        'PrivateTagData',
+                       ]
+'''A list of regexes passed to make_key_regex_filter as exclude_res to create 
+the default_meta_filter.'''
+                        
+default_key_incl_res = ['ImageOrientationPatient',
+                        'ImagePositionPatient',
+                       ]                        
+                        
+default_meta_filter = make_key_regex_filter(default_key_excl_res,
+                                            default_key_incl_res)
+'''Default meta_filter for DicomStack.to_nifti method.'''
 
 def closest_ortho_pat_axis(direction):
     '''Take a vector of three dimensions in DICOM patient space and return a 
@@ -181,7 +231,7 @@ class DicomStack(object):
     '''     
     
     def __init__(self, time_order='AcquisitionTime', vector_order=None, 
-                 allow_dummies=False):
+                 allow_dummies=False, meta_filter=None):
         '''Initialize a DicomStack, optionally providing DicomOrdering objects 
         for ordering the time and vector dimensions. If the time order is None
         then 'AcquisitionTime' will be used.
@@ -196,6 +246,10 @@ class DicomStack(object):
             self._vector_order = vector_order
         self._allow_dummies = allow_dummies
         self._num_dummies = 0
+        if meta_filter is None:
+            self._meta_filter = default_meta_filter
+        else:
+            self._meta_filter = meta_filter
         
         self._slice_pos_vals = set()
         self._time_vals = set()
@@ -686,12 +740,12 @@ class DicomStack(object):
                 
         #Embed the meta data extension if requested
         if embed_meta:
-            nifti_header.extensions = \
-                Nifti1Extensions([self._get_dcm_meta_ext(nps_affine,
-                                                         data.shape,
-                                                         permutation.index(2))
-                                 ]
-                                )
+            meta_ext = self._get_dcm_meta_ext(nps_affine, 
+                                              data.shape,
+                                              permutation.index(2))
+            
+            meta_ext.filter_meta(self._meta_filter)
+            nifti_header.extensions = Nifti1Extensions([meta_ext])
 
         nifti_image.update_header()
         return nifti_image
@@ -713,15 +767,14 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
     for dcm_path in src_paths:
         try:
             dcm = dicom.read_file(dcm_path, force=force)
-            wrp_dcm = ExtractedDcmWrapper.from_dicom(dcm, 
-                                                     extractor, 
-                                                     meta_filter)
+            wrp_dcm = ExtractedDcmWrapper.from_dicom(dcm, extractor)
             stack_key = key_format % wrp_dcm
             
             if not stack_key in results:
                 results[stack_key] = DicomStack(time_order, 
                                                 vector_order, 
-                                                allow_dummies)
+                                                allow_dummies, 
+                                                meta_filter)
             results[stack_key].add_dcm(wrp_dcm)
         except Exception, e:
             if warn_on_except:

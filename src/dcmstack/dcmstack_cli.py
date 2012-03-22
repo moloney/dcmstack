@@ -6,6 +6,7 @@ Command line interface to dcmstack.
 import os, sys, argparse, string
 from glob import glob
 import dicom
+from . import dcmstack
 from .dcmstack import parse_and_stack, DicomOrdering
 from .dcmmeta import NiftiWrapper
 from . import extract
@@ -107,7 +108,8 @@ def main(argv=sys.argv):
                            'used as the vector variable. This option is rarely '
                            'needed.'))
     
-    meta_opt = arg_parser.add_argument_group('Meta Extraction Options')
+    meta_opt = arg_parser.add_argument_group('Meta Extraction and Filtering '
+                                             'Options')
     meta_opt.add_argument('-l', '--list-translators', default=False, 
                           action='store_true', help=('List enabled translators '
                           'and exit'))
@@ -115,16 +117,13 @@ def main(argv=sys.argv):
                           help=('Disable the translators for the provided '
                           'tags. If the word "all" is provided, all '
                           'translators will be disabled.'))
-    meta_opt.add_argument('--force-consider', default=None,
-                          help=('Force the consideration of the given tags. '
-                          'Either provide a comma seperated list of tags or '
-                          'the keywork "all" to consider all tags. '
-                          'Normally private tags, or tags with a value '
-                          'representation of OB, OW, or UN will not be '
-                          'considered for extraction (unless they are handled '
-                          'by a translator). Elements coming from the tags '
-                          'listed here may still be excluded by a regular '
-                          'expression.'))    
+    meta_opt.add_argument('--extract-private', default=False, 
+                          action='store_true',
+                          help=('Extract meta data from private elements, even '
+                          'if there is no translator. If the value for the '
+                          'element contains non-ascii bytes it will still be '
+                          'ignored. The extracted meta data may still be '
+                          'filtered out by the regular expressions.'))
     meta_opt.add_argument('-i', '--include-regex', action='append',
                           help=('Include any meta data where the key matches '
                           'the provided regular expression. This will override '
@@ -134,9 +133,10 @@ def main(argv=sys.argv):
                           'the provided regular expression. This will '
                           'supplement the default exclude expressions. Applies '
                           'to all meta data.'))                          
-    meta_opt.add_argument('--show-excludes', default=False, action='store_true',
-                          help=('Print the list of default exclude regular '
-                          'expressions and exit.'))
+    meta_opt.add_argument('--default-regexes', default=False, 
+                          action='store_true',
+                          help=('Print the list of default include and exclude '
+                          'regular expressions and exit.'))
                           
     gen_opt = arg_parser.add_argument_group('General Options')
     gen_opt.add_argument('-v', '--verbose',  default=False, action='store_true',
@@ -155,9 +155,12 @@ def main(argv=sys.argv):
         return 0
     
     #Check if we are just listing the default exclude regular expressions
-    if args.show_excludes:
+    if args.default_regexes:
         print 'Default exclude regular expressions:'
-        for regex in extract.default_key_excl_res:
+        for regex in dcmstack.default_key_excl_res:
+            print '\t' + regex
+        print 'Default include regular expressions:'
+        for regex in dcmstack.default_key_incl_res:
             print '\t' + regex
         return 0
     
@@ -176,37 +179,21 @@ def main(argv=sys.argv):
                     new_translators.append(translator)
             translators = new_translators
     
-    #Force the consideration of tags we usually ignore
-    if args.force_consider:
-        if args.force_consider.lower() == 'all':
-            ignore_rules = []
-        else:
-            try:
-                force_tags = parse_tags(args.force_consider)
-            except:
-                arg_parser.error('Invalid tag format to --force-consider.')
-            print force_tags
-            orig_ignore_rules = ignore_rules
-            def custom_ignore_rule(elem):
-                if elem.tag in force_tags:
-                    return False
-                else:
-                    return any(ignore_rule(elem) 
-                               for ignore_rule in orig_ignore_rules)
-            ignore_rules = [custom_ignore_rule]
+    #Include non-translated private elements if requested
+    if args.extract_private:
+        ignore_rules = [extract.ignore_non_ascii_bytes]
     
     extractor = extract.MetaExtractor(ignore_rules, translators)
     
     #Add include/exclude regexes to meta filter
+    include_regexes = dcmstack.default_key_incl_res
     if args.include_regex:
-        include_regexes = args.include_regex
-    else:
-        include_regexes = None
-    exclude_regexes = extract.default_key_excl_res
+        include_regexes += args.include_regex
+    exclude_regexes = dcmstack.default_key_excl_res
     if args.exclude_regex:
         exclude_regexes += args.exclude_regex
-    meta_filter = extract.make_key_regex_filter(exclude_regexes, 
-                                                include_regexes)   
+    meta_filter = dcmstack.make_key_regex_filter(exclude_regexes, 
+                                                 include_regexes)   
     
     #Figure out time and vector ordering
     if args.time_var:
