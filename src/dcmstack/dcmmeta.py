@@ -456,7 +456,7 @@ class DcmMetaExtension(Nifti1Extension):
                          )
     
     def _unmangle(self, value):
-        return json.loads(value, object_hook=OrderedDict)
+        return json.loads(value, object_pairs_hook=OrderedDict)
     
     def _mangle(self, value):
         return json.dumps(value, indent=4)
