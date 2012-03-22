@@ -757,11 +757,15 @@ nb.nifti1.extension_codes.add_codes(((dcm_meta_ecode,
 
 class NiftiWrapper(object):
     '''Wraps a nibabel.Nifti1Image object containing a DcmMetaExtension header 
-    extension. Provides transparent access to the meta data through 'get_meta'.
-    Allows the Nifti to be split into sub volumes or joined with others, while
+    extension. Provides access to the meta data through the method 'get_meta'. 
+    Allows the Nifti to be split into sub volumes or merged with others, while 
     also updating the meta data appropriately.'''
 
     def __init__(self, nii_img, make_empty=False):
+        '''Initialize wrapper from Nifti1Image object. Looks for a valid dcmmeta
+        extension. If no extension is found a ValueError will be raised unless
+        'make_empty' is True, in which case an empty extension will be created.
+        '''
         self.nii_img = nii_img
         hdr = nii_img.get_header()
         self.meta_ext = None
@@ -790,7 +794,6 @@ class NiftiWrapper(object):
     def samples_valid(self):
         '''Check if the meta data corresponding to individual time or vector 
         samples appears to be valid for the wrapped nifti image.'''
-        #Check if the time/vector dimensions match
         img_shape = self.nii_img.get_shape()
         meta_shape = self.meta_ext.get_shape()
         return meta_shape[3:] == img_shape[3:]
@@ -798,12 +801,10 @@ class NiftiWrapper(object):
     def slices_valid(self):
         '''Check if the meta data corresponding to individual slices appears to 
         be valid for the wrapped nifti image.'''
-        #Check if the number of slices and slice directions match
-        if (self.meta_ext.get_n_slices() != 
-           self.nii_img.get_header().get_n_slices()):
+        hdr = self.nii_img.get_header()
+        if self.meta_ext.get_n_slices() != hdr.get_n_slices():
             return False
         
-        hdr = self.nii_img.get_header()
         slice_dim = hdr.get_dim_info()[2]
         slice_dir = hdr.get_best_affine()[slice_dim, :3]
         return np.allclose(slice_dir, 
@@ -815,17 +816,19 @@ class NiftiWrapper(object):
         
         If 'index' is not provided, only meta data values that are constant 
         across the entire data set will be considered. If 'index' is provided it 
-        must be a valid index for the nifti voxel data, and all of the meta data 
-        that is applicable to that index will be considered. The per-slice meta 
-        data will only be considered if the object's 'is_aligned' method returns 
-        True.'''
+        must be a valid index for the nifti voxel data. All of the meta data 
+        that is applicable to that index will be considered. The per-slice and 
+        per-sample meta data will only be considered if the object's 
+        'slices_valid' and 'samples_valid' methods (respectively) return True.
+        '''
+        #Get the value(s) and classification for the key
+        values, classes = self.meta_ext.get_values_and_class(key)
+        if classes is None:
+            return default
         
-        #Pull out the meta dictionary
-        meta_dict = self.meta_ext._content
-        
-        #First check the constant values
-        if key in meta_dict['global']['const']:
-            return meta_dict['global']['const'][key]
+        #Check if the value is constant
+        if classes == ('global', 'const'):
+            return values
         
         #If an index is provided check the varying values
         if not index is None:
@@ -839,34 +842,30 @@ class NiftiWrapper(object):
             
             #First try per time/vector sample values
             if self.samples_valid():
-                if (len(shape) > 3 and shape[3] > 1 and 
-                   key in meta_dict['time']['samples']):
-                    return meta_dict['time']['samples'][key][index[3]]
-                if (len(shape) > 4 and shape[4] > 1 and 
-                   key in meta_dict['vector']['samples']):
-                    return meta_dict['vector']['samples'][key][index[4]]
+                if classes == ('time', 'samples'):
+                    return values[index[3]]
+                if classes == ('vector', 'samples'):
+                    return values[index[4]]
                 
             #Finally, if aligned, try per-slice values
             if self.slices_valid():
-                slice_dim = self.meta_ext.get_slice_dim()
-                if key in meta_dict['global']['slices']:
+                slice_dim = self.nii_img.get_header().get_dim_info()[2]
+                n_slices = shape[slice_dim]
+                if classes == ('global', 'slices'):
                     val_idx = index[slice_dim]
-                    slices_per_sample = shape[slice_dim]
                     for count, idx_val in enumerate(index[3:]):
-                        val_idx += idx_val * slices_per_sample
-                        slices_per_sample *= shape[count+3]
-                    return meta_dict['global']['slices'][key][val_idx]
-                    
+                        val_idx += idx_val * n_slices
+                        n_slices *= shape[count+3]
+                    return values[val_idx]    
+                
                 if self.samples_valid():
-                    if (len(shape) > 3 and shape[3] > 1 and 
-                          key in meta_dict['time']['slices']):
+                    if classes == ('time', 'slices'):
                         val_idx = index[slice_dim]
-                        return meta_dict['time']['slices'][key][val_idx]
-                    elif (len(shape) > 4 and shape[4] > 1 and 
-                          key in meta_dict['vector']['slices']):
+                        return values[val_idx]
+                    if classes == ('vector', 'slices'):
                         val_idx = index[slice_dim]
-                        val_idx += index[3]*shape[slice_dim]
-                        return meta_dict['vector']['slices'][key][val_idx]
+                        val_idx += index[3]*n_slices
+                        return values[val_idx]
             
         return default
     
