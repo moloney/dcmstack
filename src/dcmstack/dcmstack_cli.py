@@ -72,6 +72,10 @@ def main(argv=sys.argv):
                             'filenames based on DICOM tags. Files mapping to '
                             'the same filename will be put in the same stack. '
                             'Default: %(default)s'))
+    output_opt.add_argument('--opt-suffix', default='TE_%(EchoTime).3f', 
+                            help=("Python format string determining optional "
+                            "suffix for the output name. Only used if it "
+                            "varies between inputs. Default: %(default)s"))
     output_opt.add_argument('--output-ext', default='.nii.gz', 
                             help=('The extension for the output file type. '
                             'Default: %(default)s'))
@@ -220,8 +224,6 @@ def main(argv=sys.argv):
     if len(args.src_dirs) == 0:
         arg_parser.error('No source directories were provided.')
         
-    key_format = args.output_name + args.output_ext
-    
     #Handle each source directory individually
     for src_dir in args.src_dirs:
         if not os.path.isdir(src_dir):
@@ -240,16 +242,16 @@ def main(argv=sys.argv):
             print "Found %d source files in the directory" % len(src_paths)
         
         #Build the stacks for this directory
-        stacks = parse_and_stack(src_paths, key_format, time_order, 
-                                 vector_order, args.allow_dummies, extractor,
-                                 meta_filter, args.force_read, True)
+        stacks = parse_and_stack(src_paths, args.output_name, args.opt_suffix,
+                                 time_order, vector_order, args.allow_dummies, 
+                                 extractor, meta_filter, args.force_read, True)
         
         if args.verbose:
             print "Created %d stacks of DICOM images" % len(stacks)
         
         #Write out the stacks
         for out_fn, stack in stacks.iteritems():
-            out_fn = sanitize_path_comp(out_fn)
+            out_fn = sanitize_path_comp(out_fn) + args.output_ext
             if args.dest_dir:
                 out_path = os.path.join(args.dest_dir, out_fn)
             else:
