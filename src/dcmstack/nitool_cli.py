@@ -40,7 +40,7 @@ def main(argv=sys.argv):
     merge_parser.add_argument('-s', '--sort', default=None,
                               help=("Sort the source files using the provided "
                               "meta data key before merging"))
-    merge_parser.add_argument('-c', '--clear-slices', default=False, 
+    merge_parser.add_argument('-c', '--clear-slices', action='store_true',
                               help="Clear all per slice meta data")
     merge_parser.set_defaults(func=merge)
     
@@ -65,7 +65,7 @@ def main(argv=sys.argv):
     embed_parser.add_argument('src_json', nargs='?', type=argparse.FileType('r'),
                               default=sys.stdin)
     embed_parser.add_argument('dest_nii', nargs=1)
-    embed_parser.add_argument('-f', '--force-overwrite', 
+    embed_parser.add_argument('-f', '--force-overwrite', action='store_true',
                               help="Overwrite any existing dcmmeta extension")
     embed_parser.set_defaults(func=embed)
     
