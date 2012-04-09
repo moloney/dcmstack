@@ -159,7 +159,7 @@ def embed(args):
     hdr = dest_nii.get_header()
     try:
         src_wrp = NiftiWrapper(dest_nii, False)
-    except ValueError:
+    except MissingExtensionError:
         pass
     else:
         if not args.force_overwrite:
