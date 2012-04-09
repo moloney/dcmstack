@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(name='dcmstack',
       description='Stack DICOM images into volumes',
-      version='0.5',
+      version='0.5.1',
       author='Brendan Moloney',
       author_email='moloney@ohsu.edu',
       packages=find_packages('src'),
