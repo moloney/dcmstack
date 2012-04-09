@@ -15,77 +15,69 @@ def main(argv=sys.argv):
     sub_parsers = arg_parser.add_subparsers(title="Subcommands")
     
     #Split command 
-    split_parser = sub_parsers.add_parser('split', 
-                                          help=("Split src_nii file along a "
-                                          "dimension. Defaults to the slice "
-                                          "dimension if 3D, otherwise the last"
-                                          "dimension.")
-                                         )
+    split_help = ("Split src_nii file along a dimension. Defaults to the slice "
+                  "dimension if 3D, otherwise the last dimension.")
+    split_parser = sub_parsers.add_parser('split', help=split_help)
     split_parser.add_argument('src_nii', nargs=1)
     split_parser.add_argument('-d', '--dimension', default=None, type=int,
-                              help=("The dimension to split along"))
+                              help=("The dimension to split along. Must be in "
+                              "the range [0, 5)"))
     split_parser.add_argument('-o', '--output-format', default=None,
                               help=("Format string used to create the output "
-                              "file names."))
+                              "file names. Default is to prepend the index "
+                              "number to the src_nii filename."))
     split_parser.set_defaults(func=split)
                               
     #Merge Command
-    merge_parser = sub_parsers.add_parser('merge',
-                                          help=("Merge the provided Nifti "
-                                                "files along a dimension. "
-                                                "Defaults to slice, then time, "
-                                                "and then vector.")
-                                         )
+    merge_help = ("Merge the provided Nifti files along a dimension. Defaults "
+                  "to slice, then time, and then vector.")
+    merge_parser = sub_parsers.add_parser('merge', help=merge_help)
     merge_parser.add_argument('output', nargs=1)
     merge_parser.add_argument('src_niis', nargs='+')
     merge_parser.add_argument('-d', '--dimension', default=None, type=int,
-                              help=("The dimension to split along. Must be "
-                                    "in range [0, 5)")
-                             )
+                              help=("The dimension to merge along. Must be "
+                              "in the range [0, 5)"))
     merge_parser.add_argument('-s', '--sort', default=None,
                               help=("Sort the source files using the provided "
-                              "meta data key before merging.")
-                             )
+                              "meta data key before merging"))
     merge_parser.add_argument('-c', '--clear-slices', default=False, 
-                              help=("Clear all per slice meta data"))
+                              help="Clear all per slice meta data")
     merge_parser.set_defaults(func=merge)
     
     #Dump Command
-    dump_parser = sub_parsers.add_parser('dump', 
-                                         help=("Dump the JSON meta data "
-                                         "extension from the provided Nifti")
-                                        )
+    dump_help = "Dump the JSON meta data extension from the provided Nifti."
+    dump_parser = sub_parsers.add_parser('dump', help=dump_help)
     dump_parser.add_argument('src_nii', nargs=1)
-    dump_parser.add_argument('dest_json', nargs='?', type=argparse.FileType('w'),
+    dump_parser.add_argument('dest_json', nargs='?', 
+                             type=argparse.FileType('w'),
                              default=sys.stdout)
     dump_parser.add_argument('-m', '--make-empty', default=False, 
                              action='store_true',
-                             help=("Make an empty extension of none exists"))
+                             help="Make an empty extension if none exists")
     dump_parser.add_argument('-r', '--remove', default=False, 
                              action='store_true',
                              help="Remove the extension from the Nifti file")
     dump_parser.set_defaults(func=dump)
                              
     #Embed Command
-    embed_parser = sub_parsers.add_parser('embed', 
-                                          help=("Embed a JSON extension into "
-                                                "the Nifti file"))
+    embed_help = "Embed a JSON extension into the Nifti file."
+    embed_parser = sub_parsers.add_parser('embed', help=embed_help)
     embed_parser.add_argument('src_json', nargs='?', type=argparse.FileType('r'),
                               default=sys.stdin)
     embed_parser.add_argument('dest_nii', nargs=1)
-    embed_parser.add_argument('-c', '--console', 
-                              help="Read from stdin instead of a file")
     embed_parser.add_argument('-f', '--force-overwrite', 
                               help="Overwrite any existing dcmmeta extension")
     embed_parser.set_defaults(func=embed)
-                              
-    lookup_parser = sub_parsers.add_parser('lookup', 
-                                           help=("Lookup the value for the "
-                                                 "given meta data key"))
+    
+    #Lookup command
+    lookup_help = "Lookup the value for the given meta data key."
+    lookup_parser = sub_parsers.add_parser('lookup', help=lookup_help)
     lookup_parser.add_argument('key', nargs=1)
     lookup_parser.add_argument('src_nii', nargs=1)
     lookup_parser.add_argument('-i', '--index',
-                               help=("Use the given voxel index"))
+                               help=("Use the given voxel index. The index "
+                               "must be provided as a comma seperated list of "
+                               "integers (one for each dimension)."))
     lookup_parser.set_defaults(func=lookup)
     
     #Parse the arguments and call the appropriate funciton
