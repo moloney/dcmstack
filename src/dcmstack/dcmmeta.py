@@ -121,7 +121,10 @@ class DcmMetaExtension(Nifti1Extension):
                                              'classification %s') % classes)
             cls_meta = self.get_class_dict(classes)
             cls_mult = self.get_multiplicity(classes)
-            if cls_mult > 1:
+            if cls_mult == 0 and len(cls_meta) != 0:
+                raise InvalidExtensionError('Slice dim is None but per-slice '
+                                            'meta data is present')
+            elif cls_mult > 1:
                 for key, vals in cls_meta.iteritems():
                     n_vals = len(vals)
                     if n_vals != cls_mult:
@@ -168,11 +171,16 @@ class DcmMetaExtension(Nifti1Extension):
     def get_slice_dir(self):
         '''Return the slice direction vector.'''
         slice_dim = self.get_slice_dim()
+        if slice_dim is None:
+            return None
         return np.array(self._content['dcmmeta_affine'][slice_dim][:3])
         
     def get_n_slices(self):
         '''Returns the number of slices in each spatial volume.'''
-        return self.get_shape()[self.get_slice_dim()]
+        slice_dim = self.get_slice_dim()
+        if slice_dim is None:
+            return None
+        return self.get_shape()[slice_dim]
         
     def get_keys(self):
         '''Get a list of all the meta data keys that are available.'''
@@ -238,6 +246,8 @@ class DcmMetaExtension(Nifti1Extension):
         n_vals = 1
         if sub == 'slices':
             n_vals = self.get_n_slices()
+            if n_vals is None:
+                return 0
             if base == 'vector':
                 n_vals *= shape[3]
             elif base == 'global':
@@ -823,6 +833,8 @@ class NiftiWrapper(object):
             return False
         
         slice_dim = hdr.get_dim_info()[2]
+        if slice_dim is None:
+            return False
         slice_dir = hdr.get_best_affine()[slice_dim, :3]
         return np.allclose(slice_dir, 
                            self.meta_ext.get_slice_dir())
@@ -924,6 +936,8 @@ class NiftiWrapper(object):
         if dim is None:
             dim = len(shape) - 1
             if dim == 2:
+                if slice_dim is None:
+                    raise ValueError("Slice dimension is not known")
                 dim = slice_dim
         
         split_hdr = header.copy()
