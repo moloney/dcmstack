@@ -5,7 +5,7 @@ Command line interface for nitool.
 """
 import os, sys, argparse
 import nibabel as nb
-from .dcmmeta import NiftiWrapper, DcmMetaExtension
+from .dcmmeta import NiftiWrapper, DcmMetaExtension, MissingExtensionError
 
 prog_descrip = """Work with extended Nifti files created by dcmstack"""
 
@@ -89,7 +89,12 @@ def split(args):
     src_fn = os.path.basename(src_path)
     src_dir = os.path.dirname(src_path)
     
-    src_wrp = NiftiWrapper.from_filename(src_path)
+    src_nii = nb.load(src_path)
+    try:
+        src_wrp = NiftiWrapper(src_nii)
+    except MissingExtensionError:
+        print "No dcmmeta extension found, making empty one..."
+        src_wrp = NiftiWrapper(src_nii, make_empty=True)
     for split_idx, split in enumerate(src_wrp.generate_splits(args.dimension)):
         if args.output_format:
             out_name = (args.output_format % 
@@ -109,8 +114,16 @@ def make_key_func(meta_key, index=None):
     return key_func
     
 def merge(args):
-    src_wrps = [NiftiWrapper.from_filename(src_path) 
-                for src_path in args.src_niis]
+    src_wrps = []
+    for src_path in args.src_niis:
+        src_nii = nb.load(src_path)
+        try:
+            src_wrp = NiftiWrapper(src_nii)
+        except MissingExtensionError:
+            print "No dcmmeta extension found, making empty one..."
+            src_wrp = NiftiWrapper(src_nii, make_empty=True)
+        src_wrps.append(src_wrp)
+                
     if args.sort:
         src_wrps.sort(key=make_key_func(args.sort))
     

@@ -765,6 +765,10 @@ nb.nifti1.extension_codes.add_codes(((dcm_meta_ecode,
                                       DcmMetaExtension),)
                                    )
 
+class MissingExtensionError(Exception):
+    def __str__(self):
+        return 'No dcmmeta extension found.'
+
 class NiftiWrapper(object):
     '''Wraps a nibabel.Nifti1Image object containing a DcmMetaExtension header 
     extension. Provides access to the meta data through the method 'get_meta'. 
@@ -773,8 +777,10 @@ class NiftiWrapper(object):
 
     def __init__(self, nii_img, make_empty=False):
         '''Initialize wrapper from Nifti1Image object. Looks for a valid dcmmeta
-        extension. If no extension is found a ValueError will be raised unless
-        'make_empty' is True, in which case an empty extension will be created.
+        extension. If no extension is found a MissingExtensionError will be 
+        raised unless 'make_empty' is True, in which case an empty extension 
+        will be created. If more than one valid extension is found a ValueError
+        will be raised.
         '''
         self.nii_img = nii_img
         hdr = nii_img.get_header()
@@ -797,8 +803,9 @@ class NiftiWrapper(object):
                     DcmMetaExtension.make_empty(self.nii_img.shape, 
                                                 self.nii_img.get_affine(),
                                                 slice_dim)
+                hdr.extensions.append(self.meta_ext)
             else:
-                raise ValueError("No DcmMeta extension found.")
+                raise MissingExtensionError
         self.meta_ext.check_valid()
     
     def samples_valid(self):
