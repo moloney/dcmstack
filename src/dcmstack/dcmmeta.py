@@ -4,13 +4,17 @@ providing access to the meta data and related functionality.
 
 @author: moloney
 """
-import json, re
+import json, warnings
 from copy import deepcopy
 from collections import OrderedDict
 import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
 from nibabel.spatialimages import HeaderDataError
+
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    from nibabel.nicom.dicomwrappers import wrapper_from_data
 
 dcm_meta_ecode = 0
 
@@ -778,6 +782,28 @@ nb.nifti1.extension_codes.add_codes(((dcm_meta_ecode,
 class MissingExtensionError(Exception):
     def __str__(self):
         return 'No dcmmeta extension found.'
+                                   
+def patch_dcm_ds_is(dcm):
+    '''Convert all elements with VR of 'DS' or 'IS' to floats and ints. This is 
+    a hackish work around for the backwards incompatability of pydicom 0.9.7 
+    and should not be needed once nibabel is updated. 
+    '''
+    for elem in dcm:
+        if elem.VM == 1:
+            if elem.VR == 'DS':
+                elem.VR = 'FD'
+                elem.value = float(elem.value)
+            elif elem.VR == 'IS':
+                elem.VR = 'SL'
+                elem.value = int(elem.value)
+        else:
+            if elem.VR == 'DS':
+                elem.VR = 'FD'
+                elem.value = [float(val) for val in elem.value]
+            elif elem.VR == 'IS':
+                elem.VR = 'SL'
+                elem.value = [int(val) for val in elem.value]
+    
 
 class NiftiWrapper(object):
     '''Wraps a nibabel.Nifti1Image object containing a DcmMetaExtension header 
@@ -817,6 +843,12 @@ class NiftiWrapper(object):
             else:
                 raise MissingExtensionError
         self.meta_ext.check_valid()
+    
+    def __getitem__(self, key):
+        '''Get the value for the given meta data key. Only considers meta data 
+        that is globally constant. To access varying meta data you must use the 
+        method 'get_meta'.'''
+        return self.meta_ext.get_class_dict(('global', 'const'))[key]
     
     def samples_valid(self):
         '''Check if the meta data corresponding to individual time or vector 
@@ -977,6 +1009,50 @@ class NiftiWrapper(object):
     @classmethod
     def from_filename(klass, path):
         return klass(nb.load(path))
+        
+    @classmethod
+    def from_dicom(klass, dcm_data, meta_dict=None):
+        '''Create a NiftiWrapper from the DICOM data set 'dcm_data'. 
+        
+        A meta data dict 'meta_dict' can be provided to embed into the dcmmeta 
+        extension. To generate such a dict refer to the module dcmstack.extract.
+        
+        Use dcmstack.parse_and_stack to convert a collection of DICOM images.'''
+        #Work around until nibabel supports pydicom >= 0.9.7
+        patch_dcm_ds_is(dcm_data)
+        
+        dcm_wrp = wrapper_from_data(dcm_data)
+        data = dcm_wrp.get_data()
+        
+        #Make 2D data 3D
+        if len(data.shape) == 2:
+            data = data.reshape(data.shape + (1,))
+        
+        #Create the nifti image and set header data
+        nii_img = nb.nifti1.Nifti1Image(data, None)
+        hdr = nii_img.get_header()
+        hdr.set_qform(dcm_wrp.get_affine(), 'scanner')
+        nii_img._affine = hdr.get_best_affine()
+        hdr.set_xyzt_units('mm', 'sec')
+        dim_info = {'freq' : None, 
+                    'phase' : None, 
+                    'slice' : 2
+                   }
+        if hasattr(dcm_wrp.dcm_data, 'InplanePhaseEncodingDirection'):
+            if dcm_wrp['InplanePhaseEncodingDirection'] == 'ROW':
+                dim_info['phase'] = 1
+                dim_info['freq'] = 0
+            else:
+                dim_info['phase'] = 0
+                dim_info['freq'] = 1
+        hdr.set_dim_info(**dim_info)
+        
+        #Embed the meta data extension
+        result = klass(nii_img, make_empty=True)
+        if meta_dict:
+            result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
+        
+        return result
         
     @classmethod
     def from_sequence(klass, seq, dim=None):
