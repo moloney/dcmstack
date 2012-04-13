@@ -542,7 +542,7 @@ class DicomStack(object):
         
     def get_affine(self):
         '''Return the affine transform for mapping row/column/slice indices 
-        to Nifti patient space.'''
+        to Nifti (RAS) patient space.'''
         #Figure out the number of three (or two) dimensional volumes
         shape = self.get_shape()
         n_vols = 1
@@ -554,17 +554,20 @@ class DicomStack(object):
         #Figure out the number of files in each volume
         files_per_vol = len(self._files_info) / n_vols
         
-        #Pull the affine from the first input
-        aff = self._files_info[0][0].nii_img.get_affine()
+        #Pull the DICOM Patient Space affine from the first input
+        dps_aff = self._files_info[0][0].nii_img.get_affine()
         
         #If there is more than one file per volume, we need to fix slice scaling
         if files_per_vol > 1:
-            first_offset = aff[:3, 3]
+            first_offset = dps_aff[:3, 3]
             second_offset = self._files_info[1][0].nii_img.get_affine()[:3,3]
             scaled_slc_dir = second_offset - first_offset
-            aff[:3, 2] = scaled_slc_dir
+            dps_aff[:3, 2] = scaled_slc_dir
+            
+        #The Nifti patient space flips the x and y directions
+        nps_aff = np.dot(np.diag([-1., -1., 1., 1.]), dps_aff)
         
-        return aff
+        return nps_aff
         
     def to_nifti(self, voxel_order='rpi', embed_meta=False):
         '''Combines the slices into a single Nifti1Image
@@ -619,8 +622,6 @@ class DicomStack(object):
         #Stick the affine in the q_form with 'scanner' code
         nifti_header.set_qform(affine, 'scanner')
         nifti_image._affine = nifti_header.get_best_affine()
-        print affine
-        print nifti_image.get_affine()
         
         #Set the units and dimension info
         nifti_header.set_xyzt_units('mm', 'msec')
