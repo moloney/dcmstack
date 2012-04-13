@@ -1171,4 +1171,3 @@ class NiftiWrapper(object):
         result_hdr.extensions.append(result_ext)
         
         return NiftiWrapper(result_nii)
-        
