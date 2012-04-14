@@ -628,7 +628,8 @@ class DicomStack(object):
         nifti_header.set_xyzt_units('mm', 'msec')
         if len(self._repetition_times) == 1 and not None in self._repetition_times:
             nifti_header['pixdim'][4] = self._repetition_times.pop()
-        dim_info = {'freq' : None, 'phase' : None, 'slice' : permutation.index(2)}
+        slice_dim = permutation.index(2)
+        dim_info = {'freq' : None, 'phase' : None, 'slice' : slice_dim}
         if len(self._phase_enc_dirs) == 1 and not None in self._phase_enc_dirs:
             phase_dir = self._phase_enc_dirs.pop()
             if phase_dir == 'ROW':
@@ -638,13 +639,13 @@ class DicomStack(object):
                 dim_info['phase'] = permutation.index(0)
                 dim_info['freq'] = permutation.index(1)
         nifti_header.set_dim_info(**dim_info)
+        n_slices = data.shape[slice_dim]
         
         #Set the slice timing header info
         has_acq_time = (self._files_info[0][0].get_meta('AcquisitionTime') != 
                         None)
         if files_per_vol > 1 and has_acq_time:
             #Pull out the relative slice times for the first volume
-            n_slices = data.shape[dim_info['slice']]
             slice_times = np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime']) 
                                     for file_info in self._files_info[:n_slices]]
                                   )
@@ -675,10 +676,43 @@ class DicomStack(object):
                 
         #Embed the meta data extension if requested
         if embed_meta:
-            meta_ext = self._get_dcm_meta_ext(affine, 
-                                              data.shape,
-                                              permutation.index(2))
-            
+            #Build meta data for each volume if needed
+            vol_meta = []
+            if files_per_vol > 1:
+                for vol_idx in xrange(n_vols):
+                    start_slice = vol_idx * n_slices
+                    end_slice = start_slice + n_slices
+                    exts = [file_info[0].meta_ext
+                            for file_info in self._files_info[start_slice:end_slice]]
+                    meta = DcmMetaExtension.from_sequence(exts, 2)
+                    meta.set_shape(data.shape[:3])
+                    meta.set_slice_dim(slice_dim)
+                    meta.set_affine(affine)
+                    vol_meta.append(meta)
+            else:
+                vol_meta = [file_info[0].meta_ext 
+                            for file_info in self._files_info]
+                            
+            #Build meta data for each time point / vector component
+            if len(data.shape) == 5:
+                if data.shape[3] != 1:
+                    vec_meta = []
+                    for vec_idx in xrange(data.shape[4]):
+                        start_idx = vec_idx * data.shape[3]
+                        end_idx = start_idx + data.shape[3]
+                        meta = DcmMetaExtension.from_sequence(\
+                            vol_meta[start_idx:end_idx], 3)
+                        vec_meta.append(meta)
+                else:
+                    vec_meta = vol_meta
+                        
+                meta_ext = DcmMetaExtension.from_sequence(vec_meta, 4)
+            elif len(data.shape) == 4:
+                meta_ext = DcmMetaExtension.from_sequence(vol_meta, 3)
+            else:
+                meta_ext = vol_meta[0]
+                    
+            #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)
             nifti_header.extensions = Nifti1Extensions([meta_ext])
 
