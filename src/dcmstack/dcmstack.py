@@ -521,8 +521,7 @@ class DicomStack(object):
         for vec_idx in range(stack_shape[4]):
             for time_idx in range(stack_shape[3]):
                 if files_per_vol == 1 and file_shape[2] != 1:
-                    file_idx = (vec_idx*(stack_shape[3]*stack_shape[2]) + 
-                                time_idx*(stack_shape[2]))
+                    file_idx = vec_idx*(stack_shape[3]) + time_idx
                     vox_array[:, :, :, time_idx, vec_idx] = \
                         self._files_info[file_idx][0].nii_img.get_data()
                 else:
