@@ -244,7 +244,7 @@ def main(argv=sys.argv):
         #Build the stacks for this directory
         stacks = parse_and_stack(src_paths, args.output_name, args.opt_suffix,
                                  time_order, vector_order, args.allow_dummies, 
-                                 extractor, meta_filter, args.force_read, False)
+                                 extractor, meta_filter, args.force_read, True)
         
         if args.verbose:
             print "Created %d stacks of DICOM images" % len(stacks)
