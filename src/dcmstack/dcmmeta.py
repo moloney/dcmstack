@@ -367,7 +367,7 @@ class DcmMetaExtension(Nifti1Extension):
         input_shape = first_input.get_shape()
         
         if len(input_shape) > dim and input_shape[dim] != 1:
-            raise ValueError("The dim must be singular or not exist for the"
+            raise ValueError("The dim must be singular or not exist for the "
                              "inputs.")
         
         output_shape = list(input_shape)
