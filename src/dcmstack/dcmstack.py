@@ -368,9 +368,12 @@ class DicomStack(object):
         self._repetition_times.add(meta.get('RepetitionTime'))
         
         #Pull the info used for sorting
-        slice_dir = np.cross(meta['ImageOrientationPatient'][3:],
-                             meta['ImageOrientationPatient'][:3],
-                            )
+        if 'CsaImage.SliceNormalVector' in meta:
+            slice_dir = np.array(meta['CsaImage.SliceNormalVector'])
+        else:
+            slice_dir = np.cross(meta['ImageOrientationPatient'][:3],
+                                 meta['ImageOrientationPatient'][3:],
+                                )
         slice_pos = np.dot(slice_dir, 
                            np.array(meta['ImagePositionPatient']))
         self._slice_pos_vals.add(slice_pos)
@@ -562,10 +565,7 @@ class DicomStack(object):
             second_offset = self._files_info[1][0].nii_img.get_header().get_best_affine()[:3,3]
             scaled_slc_dir = second_offset - first_offset
             dps_aff[:3, 2] = scaled_slc_dir
-        else:
-            #The nibabel dicomwrapper returns a left handed coordinate system
-            dps_aff[:3, 2] = -dps_aff[:3, 2]
-            
+       
         #The Nifti patient space flips the x and y directions
         nps_aff = np.dot(np.diag([-1., -1., 1., 1.]), dps_aff)
         
