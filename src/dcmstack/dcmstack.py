@@ -73,15 +73,15 @@ def closest_ortho_pat_axis(direction):
     if (abs(direction[0]) >= abs(direction[1]) and 
         abs(direction[0]) >= abs(direction[2])):
         if direction[0] < 0.0:
-            return 'lr'
-        else:
             return 'rl'
+        else:
+            return 'lr'
     elif (abs(direction[1]) >= abs(direction[0]) and 
           abs(direction[1]) >= abs(direction[2])):
         if direction[1] < 0.0:
-            return 'pa'
-        else:
             return 'ap'
+        else:
+            return 'pa'
     elif (abs(direction[2]) >= abs(direction[0]) and 
           abs(direction[2]) >= abs(direction[1])):
         if direction[2] < 0.0:
@@ -91,7 +91,7 @@ def closest_ortho_pat_axis(direction):
 
 def reorder_voxels(vox_array, affine, voxel_order):
     '''Reorder the given voxel array and update the affine based on the 
-    argument voxel_order. The affine should transform voxel indices to DICOM 
+    argument voxel_order. The affine should transform voxel indices to Nifti 
     patient space. Returns a tuple containing the updated voxel array, affine, 
     and a tuple of the permuted dimensions.
     
