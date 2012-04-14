@@ -11,6 +11,12 @@ import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
 from nibabel.spatialimages import HeaderDataError
+import dicom
+
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    from .extract import default_extractor
+    from nibabel.nicom.dicomwrappers import wrapper_from_data
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
