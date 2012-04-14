@@ -790,20 +790,26 @@ def patch_dcm_ds_is(dcm):
     '''
     for elem in dcm:
         if elem.VM == 1:
-            if elem.VR == 'DS':
-                elem.VR = 'FD'
-                elem.value = float(elem.value)
-            elif elem.VR == 'IS':
-                elem.VR = 'SL'
-                elem.value = int(elem.value)
+            if elem.VR in ('DS', 'IS'):
+                if elem.value == '':
+                    continue
+                if elem.VR == 'DS':
+                    elem.VR = 'FD'
+                    elem.value = float(elem.value)
+                else:
+                    elem.VR = 'SL'
+                    elem.value = int(elem.value)
         else:
-            if elem.VR == 'DS':
-                elem.VR = 'FD'
-                elem.value = [float(val) for val in elem.value]
-            elif elem.VR == 'IS':
-                elem.VR = 'SL'
-                elem.value = [int(val) for val in elem.value]
-    
+            if elem.VR in ('DS', 'IS'):
+                if elem.value == '':
+                    continue
+                if elem.VR == 'DS':
+                    elem.VR = 'FD'
+                    elem.value = [float(val) for val in elem.value]
+                else:
+                    elem.VR = 'SL'
+                    elem.value = [int(val) for val in elem.value]
+        
 
 class NiftiWrapper(object):
     '''Wraps a nibabel.Nifti1Image object containing a DcmMetaExtension header 
@@ -837,7 +843,7 @@ class NiftiWrapper(object):
                 slice_dim = hdr.get_dim_info()[2]
                 self.meta_ext = \
                     DcmMetaExtension.make_empty(self.nii_img.shape, 
-                                                self.nii_img.get_affine(),
+                                                hdr.get_best_affine(),
                                                 slice_dim)
                 hdr.extensions.append(self.meta_ext)
             else:
@@ -1032,7 +1038,6 @@ class NiftiWrapper(object):
         nii_img = nb.nifti1.Nifti1Image(data, None)
         hdr = nii_img.get_header()
         hdr.set_qform(dcm_wrp.get_affine(), 'scanner')
-        nii_img._affine = hdr.get_best_affine()
         hdr.set_xyzt_units('mm', 'sec')
         dim_info = {'freq' : None, 
                     'phase' : None, 
