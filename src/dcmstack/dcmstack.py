@@ -231,8 +231,6 @@ def make_dummy(reference, meta):
     #Create the dummy data array filled with largest representable value
     data = np.empty_like(reference.nii_img.get_data())
     data[...] = np.iinfo(data.dtype).max
-    print np.iinfo(data.dtype).max
-    print data.dtype
     
     #Create the nifti image and set header data
     nii_img = nb.nifti1.Nifti1Image(data, None)

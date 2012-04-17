@@ -441,7 +441,8 @@ class DcmMetaExtension(Nifti1Extension):
                          )
                         )
 
-    _preserving_changes = {None : (('vector', 'samples'),
+    _preserving_changes = {None : (('global', 'const'),
+                                   ('vector', 'samples'),
                                    ('time', 'samples'),
                                    ('time', 'slices'),
                                    ('vector', 'slices'),
@@ -689,6 +690,7 @@ class DcmMetaExtension(Nifti1Extension):
     def _insert_slice(self, key, other):
         local_vals, classes = self.get_values_and_class(key)
         other_vals = other._get_changed_class(key, classes)
+
 
         #Handle some common / simple insertions with special cases
         if classes == ('global', 'const'):
