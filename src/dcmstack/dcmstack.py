@@ -231,11 +231,14 @@ def make_dummy(reference, meta):
     #Create the dummy data array filled with largest representable value
     data = np.empty_like(reference.nii_img.get_data())
     data[...] = np.iinfo(data.dtype).max
+    print np.iinfo(data.dtype).max
+    print data.dtype
     
     #Create the nifti image and set header data
     nii_img = nb.nifti1.Nifti1Image(data, None)
     hdr = nii_img.get_header()
-    hdr.set_qform(reference.nii_img.get_affine(), 'scanner')
+    aff = reference.nii_img.get_header().get_best_affine()
+    hdr.set_qform(aff, 'scanner')
     nii_img._affine = hdr.get_best_affine()
     hdr.set_xyzt_units('mm', 'sec')
     dim_info = {'freq' : None, 
@@ -337,11 +340,11 @@ class DicomStack(object):
             if not is_dummy:
                 self._chk_equal(('Rows', 'Columns'), meta, self._ref_input)
         elif len(self._dummies) != 0:
-            self._chk_consitency(('PixelSpacing', 
-                                  'ImageOrientationPatient'), 
-                                 meta, 
-                                 self._dummies[0]
-                                )
+            self._chk_equal(('PixelSpacing', 
+                             'ImageOrientationPatient'), 
+                            meta, 
+                            self._dummies[0][0]
+                           )
         return is_dummy
             
     
