@@ -365,7 +365,7 @@ class DicomStack(object):
 
         is_dummy = self._chk_congruent(meta)
         
-        self._phase_enc_dirs.add(meta.get('InplanePhaseEncodingDirection'))
+        self._phase_enc_dirs.add(meta.get('InPlanePhaseEncodingDirection'))
         self._repetition_times.add(meta.get('RepetitionTime'))
         
         #Pull the info used for sorting
