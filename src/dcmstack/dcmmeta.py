@@ -505,6 +505,10 @@ class DcmMetaExtension(Nifti1Extension):
         result = []
         for value in values:
             result.extend([deepcopy(value)] * mult_fact)
+            
+        if new_class == ('global', 'const'):
+            result = result[0]
+            
         return result
         
         
