@@ -4,6 +4,7 @@ Stack DICOM datasets into volumes.
 @author: moloney
 """
 import warnings, re, dicom
+from copy import deepcopy
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
@@ -686,9 +687,6 @@ class DicomStack(object):
                     exts = [file_info[0].meta_ext
                             for file_info in self._files_info[start_slice:end_slice]]
                     meta = DcmMetaExtension.from_sequence(exts, 2)
-                    meta.set_shape(data.shape[:3])
-                    meta.set_slice_dim(slice_dim)
-                    meta.set_affine(affine)
                     vol_meta.append(meta)
             else:
                 vol_meta = [file_info[0].meta_ext 
@@ -712,6 +710,12 @@ class DicomStack(object):
                 meta_ext = DcmMetaExtension.from_sequence(vol_meta, 3)
             else:
                 meta_ext = vol_meta[0]
+                if meta_ext is file_info[0].meta_ext:
+                    meta_ext = deepcopy(meta_ext)
+                    
+            meta_ext.set_shape(data.shape)
+            meta_ext.set_slice_dim(slice_dim)
+            meta_ext.set_affine(affine)
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)
