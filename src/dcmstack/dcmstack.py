@@ -715,7 +715,7 @@ class DicomStack(object):
                     
             meta_ext.set_shape(data.shape)
             meta_ext.set_slice_dim(slice_dim)
-            meta_ext.set_affine(affine)
+            meta_ext.set_affine(nifti_header.get_best_affine())
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)

@@ -886,8 +886,10 @@ class NiftiWrapper(object):
         if slice_dim is None:
             return False
         slice_dir = hdr.get_best_affine()[slice_dim, :3]
+        
         return np.allclose(slice_dir, 
-                           self.meta_ext.get_slice_dir())
+                           self.meta_ext.get_slice_dir(),
+                           atol=1e-6)
     
     def get_meta(self, key, index=None, default=None):
         '''Return the meta data value for the provided 'key', or 'default' if 
