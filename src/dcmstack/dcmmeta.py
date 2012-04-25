@@ -1,8 +1,5 @@
 """
-Nifti extension for embedding additional meta data and a NiftiWrapper class for
-providing access to the meta data and related functionality.
-
-@author: moloney
+DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
 import json, warnings
 from copy import deepcopy

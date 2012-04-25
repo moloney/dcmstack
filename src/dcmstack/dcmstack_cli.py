@@ -145,6 +145,9 @@ def main(argv=sys.argv):
     gen_opt = arg_parser.add_argument_group('General Options')
     gen_opt.add_argument('-v', '--verbose',  default=False, action='store_true',
                          help=('Print additional information.'))
+    gen_opt.add_argument('--strict', default=False, action='store_true', 
+                         help=('Fail on the first exception instead of '
+                         'showing a warning.'))
     
     args = arg_parser.parse_args(argv[1:])
     
@@ -243,8 +246,11 @@ def main(argv=sys.argv):
         
         #Build the stacks for this directory
         stacks = parse_and_stack(src_paths, args.output_name, args.opt_suffix,
-                                 time_order, vector_order, args.allow_dummies, 
-                                 extractor, meta_filter, args.force_read, False)
+                                 extractor, args.force_read, not args.strict, 
+                                 time_order=time_order, 
+                                 vector_order=vector_order, 
+                                 allow_dummies=args.allow_dummies, 
+                                 meta_filter=meta_filter)
         
         if args.verbose:
             print "Created %d stacks of DICOM images" % len(stacks)
