@@ -97,7 +97,8 @@ mentioned above, these can be created directly from a *DicomStack*.
     900.0
 
 They can also be created by passing a *Nifti1Image* to the *NiftiWrapper* 
-constructor or by passing the path to a Nifti to *NiftiWrapper.from_filename*. 
+constructor or by passing the path to a Nifti file to 
+*NiftiWrapper.from_filename*. 
 
 Using NiftiWrapper Objects
 --------------------------
