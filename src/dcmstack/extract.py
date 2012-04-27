@@ -6,17 +6,17 @@ from collections import OrderedDict, namedtuple, Counter
 import dicom
 from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
-from nibabel.nicom.dicomwrappers import Wrapper
 
 def ignore_private(elem):
-    '''Ignore private DICOM elements (odd group number).'''
+    '''Ignore rule for `MetaExtractor` to skip private DICOM elements (odd 
+    group number).'''
     if elem.tag.group % 2 == 1:
         return True
     return False
     
 def ignore_non_ascii_bytes(elem):
-    '''Ignore elements with VR of 'OW', 'OB', or 'UN' if the byte string has
-    non ASCII characters.'''
+    '''Ignore rule for `MetaExtractor` to skip elements with VR of 'OW', 'OB', 
+    or 'UN' if the byte string contains non ASCII characters.'''
     if elem.VR in ('OW', 'OB', 'OW or OB', 'UN'):
         if not all(' ' <= c <= '~' for c in elem.value):
             return True
@@ -24,7 +24,7 @@ def ignore_non_ascii_bytes(elem):
 
 default_ignore_rules = (ignore_private,
                         ignore_non_ascii_bytes)
-'''The default tuple of ignore rules for MetaExtractor.'''
+'''The default tuple of ignore rules for `MetaExtractor`.'''
 
 
 Translator = namedtuple('Translator', ['name', 
@@ -33,12 +33,24 @@ Translator = namedtuple('Translator', ['name',
                                        'trans_func']
                        )
 '''A namedtuple for storing the four elements of a translator: a name, the 
-DICOM tag that can be translated, the private creator string (optional), and the 
-function which takes the DICOM element and returns a dictionary.'''
+dicom.tag.Tag that can be translated, the private creator string (optional), and 
+the function which takes the DICOM element and returns a dictionary.'''
 
 def simplify_csa_dict(csa_dict):
-    '''Simplify the result of nibabel.nicom.csareader to a dictionary of key 
-    value pairs'''
+    '''Simplify the result of nibabel.nicom.csareader.
+    
+    Parameters
+    ----------
+    csa_dict : dict
+        The result from nibabel.nicom.csareader
+        
+    Returns
+    -------
+    result : OrderedDict
+        Result where the keys come from the 'tags' sub dictionary of `csa_dict`. 
+        The values come from the 'items' within that tags sub sub dictionary. 
+        If items has only one element it will be unpacked from the list.
+    '''
     if csa_dict is None:
         return None
     
@@ -105,8 +117,18 @@ def _parse_phoenix_line(line):
         raise ValueError('Unable to parse phoenix protocol line: %s' % line)
 
 def parse_phoenix_prot(prot_str):
-    '''Parse the MrPheonixProtocol string into a dictionary of key value pairs,
-    pulled from the ASCCONV section.'''
+    '''Parse the MrPheonixProtocol string.
+
+    Parameters
+    ----------
+    prot_str : str
+        The MrPheonixProtocol string.
+        
+    Returns
+    -------
+    prot_dict : dict
+        Meta data pulled from the ASCCONV section.
+    '''
     ascconv_start = prot_str.find('### ASCCONV BEGIN ###')
     ascconv_end = prot_str.find('### ASCCONV END ###')
     ascconv = prot_str[ascconv_start:ascconv_end].split('\n')[1:-1]
@@ -144,7 +166,12 @@ csa_series_trans = Translator('CsaSeries',
 default_translators = (csa_image_trans, 
                        csa_series_trans,
                       )
-'''Default translators for MetaExtractor'''
+'''Default translators for MetaExtractor.'''
+                
+def tag_to_str(tag):
+    '''Convert a DICOM tag to a string representation using the group and 
+    element hex values seprated by an underscore.'''
+    return '%#X_%#X' % (tag.group, tag.elem)
 
 unpack_vr_map = {'SL' : 'i',
                  'UL' : 'I',
@@ -154,51 +181,31 @@ unpack_vr_map = {'SL' : 'i',
                  'US' : 'H',
                  'US or SS' : 'H',
                  }
-'''Dictionary mapping value representations to corresponding format 
-strings for the struct.unpack function.'''
-                
-def unpack_value(elem):
-    '''Unpack DICOM element values that are stings, while the value 
-    representation indicates they should be numeric. List values that do not 
-    need to be unpacked will return a copy of the list.'''
-    if elem.VR in unpack_vr_map and isinstance(elem.value, str):
-        if elem.VM == 1:
-            return struct.unpack(unpack_vr_map[elem.VR], elem.value)[0]
-        else:
-            return list(struct.unpack(unpack_vr_map[elem.VR], elem.value))
-            
-    if elem.VM == 1:
-        if elem.VR == 'DS':
-            return float(elem.value)
-        elif elem.VR == 'IS':
-            return int(elem.value)
-        else:
-            return elem.value
-    else:
-        if elem.VR == 'DS':
-            return [float(val) for val in elem.value]
-        elif elem.VR == 'IS':
-            return [int(val) for val in elem.value]
-        else:
-            return elem.value[:]
-
-def tag_to_str(tag):
-    '''Convert a DICOM tag to a string representation using the group and 
-    element hex values seprated by an underscore.'''
-    return '%#X_%#X' % (tag.group, tag.elem)
+'''Dictionary mapping value representations to corresponding format strings for 
+the struct.unpack function.'''
     
 class MetaExtractor(object):
     '''Callable object for extracting meta data from a dicom dataset'''
+    
     def __init__(self, ignore_rules=None, translators=None, 
                  warn_on_trans_except=True):
-        '''Initialize the object with a set of ignore rules and translators. If 
-        any of these are 'None' they will be set to the module defaults. You 
-        must pass an empty iterable for 'ignore_rules' and 'translators' if you 
-        want to do nothing.
-
-        If 'warn_on_trans_except' is True, exceptions generated in translators
-        will become warnings (allowing the rest of the parsed meta dict to be
-        returned).
+        '''Initialize a `MetaExtractor` with a set of ignore rules and 
+        translators. 
+        
+        Parameters
+        ----------
+        ignore_rules : sequence
+            A sequence of callables, each of which should take a DICOM element 
+            and return True if it should be ignored. If None the module 
+            default is used.
+            
+        translators : sequence
+            A sequence of `Translator` objects each of which can convert a 
+            DICOM element into a dictionary. Overrides any ignore rules. If 
+            None the module default is used.
+            
+        warn_on_trans_except : bool
+            Convert any exceptions from translators into warnings.
         '''
         if ignore_rules is None:
             self.ignore_rules = default_ignore_rules
@@ -210,8 +217,8 @@ class MetaExtractor(object):
             self.translators = translators
         self.warn_on_trans_except = warn_on_trans_except
                 
-    def _get_elem_name(self, elem):
-        '''Get an element name for any non-translated elements.'''
+    def _get_elem_key(self, elem):
+        '''Get the key for any non-translated elements.'''
         #Use standard DICOM keywords if possible
         name = keyword_for_tag(elem.tag)
         
@@ -226,11 +233,49 @@ class MetaExtractor(object):
         
         return name
         
+    def _get_elem_value(self, elem):
+        '''Get the value for any non-translated elements'''
+        if elem.VR in unpack_vr_map and isinstance(elem.value, str):
+            if elem.VM == 1:
+                return struct.unpack(unpack_vr_map[elem.VR], elem.value)[0]
+            else:
+                return list(struct.unpack(unpack_vr_map[elem.VR], elem.value))
+                
+        if elem.VM == 1:
+            if elem.VR == 'DS':
+                return float(elem.value)
+            elif elem.VR == 'IS':
+                return int(elem.value)
+            else:
+                return elem.value
+        else:
+            if elem.VR == 'DS':
+                return [float(val) for val in elem.value]
+            elif elem.VR == 'IS':
+                return [int(val) for val in elem.value]
+            else:
+                return elem.value[:]
+        
     def __call__(self, dcm):
-        '''Convert a DICOM dataset to a dictionary where the keys are the
-        element names instead of numerical tag values. Nested datasets become 
-        nested dictionaries and elements can be ignored or parsed by a provided 
-        translator.
+        '''Extract the meta data from a DICOM dataset.
+        
+        Parameters
+        ----------
+        dcm : dicom.dataset.Dataset
+            The DICOM dataset to extract the meta data from.
+        
+        Returns
+        -------
+        meta : dict
+            A dictionary of extracted meta data.
+            
+        Notes
+        -----
+        Non-private tags use the DICOM keywords as keys. Translators have their 
+        name, followed by a dot, prepended to the keys of any meta elements 
+        they produce. Values are unchanged, except when the value 
+        representation is 'DS' or 'IS' (decimal/integer strings) they are 
+        converted to float and int types.
         '''
         standard_meta = []
         trans_meta_dicts = OrderedDict()
@@ -291,7 +336,11 @@ class MetaExtractor(object):
                 standard_meta.append((name, value, elem.tag))
             #Otherwise just make sure the value is unpacked
             else:
-                standard_meta.append((name, unpack_value(elem), elem.tag))
+                standard_meta.append((name, 
+                                      self._get_elem_value(elem), 
+                                      elem.tag
+                                     )
+                                    )
                 
         #Handle name collisions
         name_counts = Counter(elem[0] for elem in standard_meta)
@@ -310,3 +359,4 @@ class MetaExtractor(object):
         return result
 
 default_extractor = MetaExtractor()
+'''The default `MetaExtractor`.'''

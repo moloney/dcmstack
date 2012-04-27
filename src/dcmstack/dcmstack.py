@@ -8,8 +8,7 @@ import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
 import numpy as np
-from collections import OrderedDict
-from .dcmmeta import DcmMetaExtension, NiftiWrapper, _meta_version
+from .dcmmeta import DcmMetaExtension, NiftiWrapper
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
