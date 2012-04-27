@@ -294,8 +294,8 @@ class MetaExtractor(object):
             if isinstance(elem.value, str) and elem.value.strip() == '':
                 continue
             
-            #Take square brackets off private element names
-            name = self._get_elem_name(elem)
+            #Get the name for non-translated elements
+            name = self._get_elem_key(elem)
             
             #If it is a private creator element, handle any corresponding 
             #translators
