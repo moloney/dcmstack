@@ -120,8 +120,19 @@ the voxel array in order to provide access to varying meta data.
     ...     my_stack.add_dcm(src_dcm)
     ...
     >>> nii_wrp = my_stack.to_nifti_wrapper()
-    >>> nii_wrp['InversonTime']
+    >>> nii_wrp['InversionTime']
     900.0
     >>> nii_wrp.get_meta('InversionTime')
     900.0
+    >>> nii_wrp['InstanceNumber']
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+      File "build/bdist.linux-x86_64/egg/dcmstack/dcmmeta.py", line 1026, in __getitem__
+    KeyError: 'InstanceNumber'
+    >>> nii_wrp.get_meta('InstanceNumber')
+    >>> nii_wrp.get_meta('InstanceNumber', index=(0,0,0))
+    1
+    >>> nii_wrp.get_meta('InstanceNumber', index=(0,0,1))
+    2
+
     
