@@ -9,8 +9,11 @@ setup(name='dcmstack',
       package_dir = {'':'src'},
       install_requires=['pydicom >= 0.9.7', 
                         'nibabel',
-                        'nose',
                        ],
+      extras_require = {
+                        'doc':  ["sphinx"],
+                        'test': ["nose"],
+                       },
       entry_points = {'console_scripts' : \
                           ['dcmstack = dcmstack.dcmstack_cli:main',
                            'nitool = dcmstack.nitool_cli:main',
