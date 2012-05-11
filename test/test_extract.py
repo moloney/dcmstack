@@ -2,7 +2,12 @@
 Tests for dcmstack.extract
 """
 import sys
-sys.path.insert(0, '../src')
+from os import path
+
+test_dir = path.dirname(__file__)
+src_dir = path.normpath(path.join(test_dir, '../src'))
+sys.path.insert(0, src_dir)
+
 from nose.tools import ok_, eq_, assert_raises
 import dicom
 from nibabel.nicom import csareader
@@ -10,7 +15,7 @@ from dcmstack import extract
 
 class TestCsa(object):
     def setUp(self):
-        data_fn = './data/extract/csa_test.dcm'
+        data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
         self.data = dicom.read_file(data_fn)
         
     def tearDown(self):
