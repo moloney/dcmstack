@@ -190,7 +190,7 @@ def csa_series_trans_func(elem):
         phx_src = 'MrPhoenixProtocol'
     elif 'MrProtocol' in csa_dict:
         phx_src = 'MrProtocol'
-    print phx_src
+        
     if not phx_src is None:
         phoenix_dict = parse_phoenix_prot(phx_src, csa_dict[phx_src])
         del csa_dict[phx_src]
