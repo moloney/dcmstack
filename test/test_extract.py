@@ -97,3 +97,16 @@ class TestMetaExtractor(object):
                 else:
                     ok_(not any(isinstance(val, str) for val in value))
             
+    def test_dup_trans(self):
+        translators = [extract.csa_image_trans, extract.csa_image_trans]
+        extractor = extract.MetaExtractor(translators=translators)
+        assert_raises(ValueError, extractor, self.data)
+        
+    def test_reloc_private(self):
+        extractor = extract.MetaExtractor()
+        self.data[(0x29, 0x10)].tag = dicom.tag.Tag((0x29, 0x20))
+        self.data[(0x29, 0x1010)].tag = dicom.tag.Tag((0x29, 0x2010))
+        self.data[(0x29, 0x1020)].tag = dicom.tag.Tag((0x29, 0x2020))
+        meta_dict = extractor(self.data)
+        eq_(meta_dict["CsaImage.EchoLinePosition"], 64)
+        ok_(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)

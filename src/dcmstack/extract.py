@@ -324,15 +324,13 @@ class MetaExtractor(object):
         standard_meta = []
         trans_meta_dicts = OrderedDict()
         
-        #Make dict mapping tags to tranlators, initially just populate those 
-        #where the priv_creator attribute in None
+        #Make dict mapping tags to tranlators
         trans_map = {}
         for translator in self.translators:
-            if translator.priv_creator is None:
-                if translator.tag in trans_map:
-                    raise ValueError('More than one translator given for tag: '
-                                     '%s' % translator.tag)
-                trans_map[translator.tag] = translator
+            if translator.tag in trans_map:
+                raise ValueError('More than one translator given for tag: '
+                                 '%s' % translator.tag)
+            trans_map[translator.tag] = translator
         
         for elem in dcm:
             if isinstance(elem.value, str) and elem.value.strip() == '':
@@ -344,16 +342,20 @@ class MetaExtractor(object):
             #If it is a private creator element, handle any corresponding 
             #translators
             if elem.name == "Private Creator":
-                for translator in self.translators:
+                moves = []
+                for curr_tag, translator in trans_map.iteritems():
                     if translator.priv_creator == elem.value:
-                        new_tag = dicom.tag.Tag(elem.tag.group,
-                                                (elem.tag.elem * 16**2 | 
-                                                 translator.tag.elem)
-                                               )
+                        new_elem = ((translator.tag.elem & 0xff) | 
+                                    (elem.tag.elem * 16**2))
+                        new_tag = dicom.tag.Tag(elem.tag.group, new_elem)
                         if new_tag in trans_map:
                             raise ValueError('More than one translator given '
                                              'for tag: %s' % translator.tag)
-                        trans_map[new_tag] = translator
+                        moves.append((curr_tag, new_tag))
+                for curr_tag, new_tag in moves:
+                    print 'move: %s -> %s' % (curr_tag, new_tag)
+                    trans_map[new_tag] = trans_map[curr_tag]
+                    del trans_map[curr_tag]
             
             #If there is a translator for this element, use it
             if elem.tag in trans_map:
