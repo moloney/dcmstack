@@ -264,18 +264,18 @@ class MetaExtractor(object):
     def _get_elem_key(self, elem):
         '''Get the key for any non-translated elements.'''
         #Use standard DICOM keywords if possible
-        name = keyword_for_tag(elem.tag)
+        key = keyword_for_tag(elem.tag)
         
         #For private tags we take elem.name and convert to camel case
-        if name == '':
-            name = elem.name
-            if name.startswith('[') and name.endswith(']'):
-                name = name[1:-1]
+        if key == '':
+            key = elem.name
+            if key.startswith('[') and key.endswith(']'):
+                key = key[1:-1]
             tokens = [token[0].upper() + token[1:] 
-                      for token in name.split()]
-            name = ''.join(tokens)
+                      for token in key.split()]
+            key = ''.join(tokens)
         
-        return name
+        return key
         
     def _get_elem_value(self, elem):
         '''Get the value for any non-translated elements'''

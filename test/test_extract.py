@@ -5,7 +5,6 @@ import sys, warnings
 from os import path
 from nose.tools import ok_, eq_, assert_raises
 
-
 test_dir = path.dirname(__file__)
 src_dir = path.normpath(path.join(test_dir, '../src'))
 sys.path.insert(0, src_dir)
@@ -67,3 +66,34 @@ class TestCsa(object):
     def test_csa_series_trans(self): 
         csa_dict = extract.csa_series_trans_func(self.data[(0x29, 0x1020)])
         eq_(csa_dict['MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)
+
+class TestMetaExtractor(object):
+    def setUp(self):
+        data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
+        self.data = dicom.read_file(data_fn)
+        
+    def tearDown(self):
+        del self.data
+        
+    def test_get_elem_key(self):
+        ignore_rules = (extract.ignore_non_ascii_bytes,)
+        extractor = extract.MetaExtractor(ignore_rules=ignore_rules)
+        for elem in self.data:
+            key = extractor._get_elem_key(elem)
+            ok_(key.strip() != '')
+            ok_(key[0].isalpha())
+            ok_(key[-1].isalnum())
+            
+    def test_get_elem_value(self):
+        ignore_rules = (extract.ignore_non_ascii_bytes,)
+        extractor = extract.MetaExtractor(ignore_rules=ignore_rules)
+        for elem in self.data:
+            value = extractor._get_elem_value(elem)
+            if elem.VM > 1:
+                ok_(isinstance(value, list))
+            if elem.VR in extract.unpack_vr_map.keys() + ['DS', 'IS']:
+                if elem.VM == 1:
+                    ok_(not isinstance(value, str))
+                else:
+                    ok_(not any(isinstance(val, str) for val in value))
+            
