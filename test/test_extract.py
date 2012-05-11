@@ -1,17 +1,18 @@
 """
 Tests for dcmstack.extract
 """
-import sys
+import sys, warnings
 from os import path
+from nose.tools import ok_, eq_, assert_raises
+
 
 test_dir = path.dirname(__file__)
 src_dir = path.normpath(path.join(test_dir, '../src'))
 sys.path.insert(0, src_dir)
-
-from nose.tools import ok_, eq_, assert_raises
-import dicom
-from nibabel.nicom import csareader
-from dcmstack import extract
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    from dcmstack import extract
+dicom, csareader = extract.dicom, extract.csareader
 
 class TestCsa(object):
     def setUp(self):
@@ -33,6 +34,10 @@ class TestCsa(object):
                 eq_(simp_dict[tag], items[0])
             else:
                 eq_(simp_dict[tag], items)
+                
+    def test_csa_image_trans(self):
+        csa_dict = extract.csa_series_trans_func(self.data[(0x29, 0x1010)])
+        eq_(csa_dict["EchoLinePosition"], 64)
                 
     def test_parse_phx_line(self):
         ok_(extract._parse_phoenix_line("") is None)
