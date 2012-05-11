@@ -2,6 +2,31 @@
 dcmstack
 ========
 
-This package provides DICOM to Nifti conversion with the added ability to 
-extract meta data from the source DICOMs and inject it into a Nifti header 
-extension or write it out as a JSON formatted text file.
+This package provides DICOM to Nifti conversion with the added ability 
+to extract meta data from the source DICOMs and inject it into a Nifti 
+header extension or write it out as a JSON formatted text file.
+
+Documentation
+-------------
+
+You can build the documentation with:
+
+$ python setup.py build_sphinx
+
+An then view doc/_build/html/index.html with a web browser.
+
+
+Running Tests
+-------------
+
+You can run the automated tests with:
+
+$ python setup.py test
+
+
+Installing
+----------
+
+You can install this package with:
+
+$ python setup.py install
