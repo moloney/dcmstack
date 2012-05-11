@@ -110,3 +110,9 @@ class TestMetaExtractor(object):
         meta_dict = extractor(self.data)
         eq_(meta_dict["CsaImage.EchoLinePosition"], 64)
         ok_(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)
+        
+    def test_non_reloc_private(self):
+        extractor = extract.MetaExtractor()
+        meta_dict = extractor(self.data)
+        eq_(meta_dict["CsaImage.EchoLinePosition"], 64)
+        ok_(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)

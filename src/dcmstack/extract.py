@@ -348,12 +348,14 @@ class MetaExtractor(object):
                         new_elem = ((translator.tag.elem & 0xff) | 
                                     (elem.tag.elem * 16**2))
                         new_tag = dicom.tag.Tag(elem.tag.group, new_elem)
-                        if new_tag in trans_map:
-                            raise ValueError('More than one translator given '
-                                             'for tag: %s' % translator.tag)
-                        moves.append((curr_tag, new_tag))
+                        if new_tag != curr_tag:
+                            if (new_tag in trans_map or 
+                                any(new_tag == move[0] for move in moves)
+                               ):
+                                raise ValueError('More than one translator '
+                                                 'for tag: %s' % new_tag)
+                            moves.append((curr_tag, new_tag))
                 for curr_tag, new_tag in moves:
-                    print 'move: %s -> %s' % (curr_tag, new_tag)
                     trans_map[new_tag] = trans_map[curr_tag]
                     del trans_map[curr_tag]
             
