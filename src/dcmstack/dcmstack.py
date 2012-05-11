@@ -764,11 +764,11 @@ class DicomStack(object):
         #Set the units and dimension info
         nifti_header.set_xyzt_units('mm', 'msec')
         if len(self._repetition_times) == 1 and not None in self._repetition_times:
-            nifti_header['pixdim'][4] = self._repetition_times.pop()
+            nifti_header['pixdim'][4] = list(self._repetition_times)[0]
         slice_dim = permutation.index(2)
         dim_info = {'freq' : None, 'phase' : None, 'slice' : slice_dim}
         if len(self._phase_enc_dirs) == 1 and not None in self._phase_enc_dirs:
-            phase_dir = self._phase_enc_dirs.pop()
+            phase_dir = list(self._phase_enc_dirs)[0]
             if phase_dir == 'ROW':
                 dim_info['phase'] = permutation.index(1)
                 dim_info['freq'] = permutation.index(0)
