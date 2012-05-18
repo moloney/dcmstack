@@ -7,6 +7,10 @@ import dicom
 from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
 
+#This is needed to allow extraction on files with invalid values (e.g. too 
+#long of a decimal string)
+dicom.config.enforce_valid_values = False
+
 def ignore_private(elem):
     '''Ignore rule for `MetaExtractor` to skip private DICOM elements (odd 
     group number).'''
