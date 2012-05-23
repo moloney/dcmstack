@@ -133,9 +133,14 @@ def reorder_voxels(vox_array, affine, voxel_order):
 
     Returns
     -------
+    out_vox : array
+        An updated view of vox_array
     A tuple containing the updated voxel array, affine, and a tuple of the 
     permuted dimension indices.
     '''
+    #Take a copy of affine so that we return a new array even when nothing is 
+    #changed
+    affine = affine.copy()
     
     #Check if voxel_order is valid
     voxel_order = voxel_order.lower()
