@@ -288,13 +288,15 @@ class DicomOrdering(object):
         self.abs_ordering = abs_ordering
         self.abs_as_str = abs_as_str
         
-    def get_ordinate(self, dcm):
+    def get_ordinate(self, ds):
         '''Get the ordinate for the given DICOM data set.
         
         Parameters
         ----------
-        dcm : dicom.dataset.Dataset
-            The DICOM data set we want the ordinate of.
+        ds : dict like
+            The DICOM data set we want the ordinate of. Should allow 
+            dict like access where DICOM keywords return the corresponing 
+            value.
             
         Returns
         -------
@@ -303,7 +305,7 @@ class DicomOrdering(object):
         integer.        
         '''
         try:
-            val = dcm[self.key]
+            val = ds[self.key]
         except KeyError:
             return None
             
