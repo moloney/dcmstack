@@ -82,6 +82,7 @@ class TestReorderVoxels(object):
         ok_((vox_array == self.vox_array).all())
         ok_((affine == self.affine).all())
         eq_(perm, (0, 1, 2))
+        eq_(np.may_share_memory(affine, self.affine), False)
         
 def test_dcm_time_to_sec():
     eq_(dcmstack.dcm_time_to_sec('100235.123456'), 36155.123456)
