@@ -126,10 +126,9 @@ def reorder_voxels(vox_array, affine, voxel_order):
         The affine for mapping voxel indices to Nifti patient space
     
     voxel_order : str
-        An empty string or a three character code specifing the desired 
-        starting point for rows, columns, and slices in terms of the orthogonal 
-        axes of patient space: (l)eft, (r)ight, (a)nterior, (p)osterior, 
-        (s)uperior, and (i)nferior.
+        A three character code specifing the desired starting point for rows, 
+        columns, and slices in terms of the orthogonal axes of patient space: 
+        (l)eft, (r)ight, (a)nterior, (p)osterior, (s)uperior, and (i)nferior.
 
     Returns
     -------
