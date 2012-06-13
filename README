@@ -15,7 +15,7 @@ You can build the documentation with:
 
 $ python setup.py build_sphinx
 
-An then view doc/_build/html/index.html with a web browser.
+And then view doc/_build/html/index.html with a web browser.
 
 Running Tests
 -------------
