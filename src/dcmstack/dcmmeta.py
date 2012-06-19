@@ -3,11 +3,15 @@ DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
 import json, warnings
 from copy import deepcopy
-from collections import OrderedDict
 import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
 from nibabel.spatialimages import HeaderDataError
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')

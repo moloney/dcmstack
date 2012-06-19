@@ -2,10 +2,15 @@
 Extract meta data from a DICOM data set.
 """
 import struct, warnings
-from collections import OrderedDict, namedtuple, Counter
+from collections import namedtuple, defaultdict
 import dicom
 from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 #This is needed to allow extraction on files with invalid values (e.g. too 
 #long of a decimal string)
@@ -395,7 +400,9 @@ class MetaExtractor(object):
                                     )
                 
         #Handle name collisions
-        name_counts = Counter(elem[0] for elem in standard_meta)
+        name_counts = defaultdict(int)
+        for elem in standard_meta:
+            name_counts[elem[0]] += 1
         result = OrderedDict()
         for name, value, tag in standard_meta:
             if name_counts[name] > 1:
