@@ -1,6 +1,7 @@
 """
 DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
+import sys
 import json, warnings
 from copy import deepcopy
 import numpy as np
@@ -625,7 +626,11 @@ class DcmMetaExtension(Nifti1Extension):
                          )
     
     def _unmangle(self, value):
-        return json.loads(value, object_pairs_hook=OrderedDict)
+        #Its not possible to preserve order while loading with python 2.6
+        kwargs = {}
+        if sys.version_info >= (2, 7):
+            kwargs['object_pairs_hook'] = OrderedDict
+        return json.loads(value, **kwargs)
     
     def _mangle(self, value):
         return json.dumps(value, indent=4)
