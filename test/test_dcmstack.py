@@ -187,6 +187,7 @@ class TestInvalidStack(object):
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_60_SlcPos_-23.207628249046.dcm',
+                                  'TE_20_SlcPos_-2.2076272953718.dcm'
                                   )
                       ]
     
@@ -201,18 +202,24 @@ class TestInvalidStack(object):
                       self.stack.to_nifti)
     
     def test_empty(self):
-        self.stack = dcmstack.DicomStack(time_order='EchoTime')
+        self.stack = dcmstack.DicomStack()
         self._chk()
         
     def test_only_dummy(self):
-        self.stack = dcmstack.DicomStack(time_order='EchoTime', 
-                                         allow_dummies=True)
+        self.stack = dcmstack.DicomStack(allow_dummies=True)
         del self.inputs[0].Rows
         del self.inputs[0].Columns
         del self.inputs[1].Rows
         del self.inputs[1].Columns
         self.stack.add_dcm(self.inputs[0])
         self.stack.add_dcm(self.inputs[1])
+        self._chk()
+        
+    def test_missing_slice(self):
+        self.stack = dcmstack.DicomStack()
+        self.stack.add_dcm(self.inputs[0])
+        self.stack.add_dcm(self.inputs[1])
+        self.stack.add_dcm(self.inputs[4])
         self._chk()
         
     def test_wrong_number_of_files(self):

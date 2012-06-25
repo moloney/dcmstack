@@ -557,6 +557,16 @@ class DicomStack(object):
         #Figure out number of files and slices per volume
         files_per_vol = len(self._slice_pos_vals)
         
+        #If more than one file per volume, check that slice spacing is equal
+        if files_per_vol > 1:
+            positions = sorted(list(self._slice_pos_vals))
+            spacings = []
+            for idx in xrange(files_per_vol - 1):
+                spacings.append(positions[idx+1] - positions[idx])
+            spacings = np.array(spacings)
+            if not np.allclose(spacings - spacings[0], 0.):
+                raise InvalidStackError("Slice spacings are not consistent")
+        
         #Simple check for an incomplete stack
         if len(self._files_info) % files_per_vol != 0:
             raise InvalidStackError("Number of files is not an even multiple "
