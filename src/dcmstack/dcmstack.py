@@ -652,7 +652,7 @@ class DicomStack(object):
                           )
                 if len(vals) == num_volumes or len(vals) == len(self._files_info):
                     possible_orders.append(key)
-            if len(possible_orders) is None:
+            if len(possible_orders) == 0:
                 raise InvalidStackError("Unable to guess key for sorting the "
                                         "fourth dimension")
             
