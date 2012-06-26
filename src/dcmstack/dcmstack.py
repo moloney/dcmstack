@@ -564,7 +564,8 @@ class DicomStack(object):
             for idx in xrange(files_per_vol - 1):
                 spacings.append(positions[idx+1] - positions[idx])
             spacings = np.array(spacings)
-            if not np.allclose(spacings - spacings[0], 0.):
+            avg_spacing = np.mean(spacings)
+            if not np.allclose(avg_spacing, spacings, rtol=4e-2):
                 raise InvalidStackError("Slice spacings are not consistent")
         
         #Simple check for an incomplete stack
