@@ -134,7 +134,7 @@ def test_image_collision():
                          '2D_16Echo_qT2', 
                          'TE_20_SlcPos_-33.707626341697.dcm')
     dcm = dicom.read_file(dcm_path)
-    stack = dcmstack.DicomStack()
+    stack = dcmstack.DicomStack('EchoTime')
     stack.add_dcm(dcm)
     assert_raises(dcmstack.ImageCollisionError,
                   stack.add_dcm,
