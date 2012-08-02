@@ -80,9 +80,22 @@ def main(argv=sys.argv):
                                "integers (one for each dimension)."))
     lookup_parser.set_defaults(func=lookup)
     
+    #Inject command
+    inject_help = "Inject meta data into the JSON extension."
+    inject_parser = sub_parsers.add_parser('inject', help=inject_help)
+    inject_parser.add_argument('dest_nii', nargs=1)
+    inject_parser.add_argument('classification', nargs=2)
+    inject_parser.add_argument('key', nargs=1)
+    inject_parser.add_argument('values', nargs='+')
+    inject_parser.add_argument('-f', '--force-overwrite', 
+                               action='store_true',
+                               help=("Overwrite any existing values "
+                               "for the key"))
+    inject_parser.set_defaults(func=inject)
+    
     #Parse the arguments and call the appropriate funciton
     args = arg_parser.parse_args(argv[1:])
-    args.func(args)
+    return args.func(args)
     
 def split(args):
     src_path = args.src_nii[0]
@@ -103,6 +116,7 @@ def split(args):
         else:
             out_name = os.path.join(src_dir, '%03d-%s' % (split_idx, src_fn))
         nb.save(split, out_name)
+    return 0
     
 def make_key_func(meta_key, index=None):
     def key_func(src_nii):
@@ -134,7 +148,8 @@ def merge(args):
         
     out_name = (args.output[0] % 
                 result_wrp.meta_ext.get_class_dict(('global', 'const')))
-    result_wrp.to_filename(out_name)    
+    result_wrp.to_filename(out_name)  
+    return 0 
     
 def dump(args):
     src_nii = nb.load(args.src_nii[0])
@@ -146,6 +161,7 @@ def dump(args):
     if args.remove:
         src_wrp.remove_extension()
         src_wrp.to_filename(args.src_nii[0])
+    return 0
                 
 def check_overwrite():
     usr_input = ''
@@ -169,6 +185,7 @@ def embed(args):
     
     hdr.extensions.append(DcmMetaExtension.from_json(args.src_json.read()))
     nb.save(dest_nii, args.dest_nii[0])
+    return 0
     
 def lookup(args):
     src_wrp = NiftiWrapper.from_filename(args.src_nii[0])
@@ -178,6 +195,46 @@ def lookup(args):
     meta = src_wrp.get_meta(args.key[0], index)
     if not meta is None:
         print meta
+    return 0
+
+def convert_values(values):
+    for conv_type in (int, float):
+        try:
+            values = [conv_type(val) for val in values]
+        except ValueError:
+            pass
+        else:
+            break
+    if len(values) == 1:
+        return values[0]
+    return values
+    
+def inject(args):
+    dest_nii = nb.load(args.dest_nii[0])
+    dest_wrp = NiftiWrapper(dest_nii, make_empty=True)
+    classification = tuple(args.classification)
+    if not classification in dest_wrp.meta_ext.get_valid_classes():
+        print "Invalid classification: %s" % (classification,)
+        return 1
+    n_vals = len(args.values)
+    mult = dest_wrp.meta_ext.get_multiplicity(classification)
+    if n_vals != mult:
+        print ("Invalid number of values for classification. Expected "
+               "%d but got %d") % (mult, n_vals)
+        return 1
+    key = args.key[0]
+    if key in dest_wrp.meta_ext.get_keys():
+        if not args.force_overwrite:
+            print "Key already exists, must pass --force-overwrite"
+            return 1
+        else:
+            curr_class = dest_wrp.meta_ext.get_classification(key)
+            curr_dict = dest_wrp.meta_ext.get_class_dict(curr_class)
+            del curr_dict[key]
+    class_dict = dest_wrp.meta_ext.get_class_dict(classification)
+    class_dict[key] = convert_values(args.values)
+    nb.save(dest_nii, args.dest_nii[0])
+    return 0
     
 if __name__ == '__main__':
     sys.exit(main())
