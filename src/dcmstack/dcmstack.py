@@ -937,7 +937,13 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
             dcm = dicom.read_file(dcm_path, force=force)
             meta = extractor(dcm)
             base_key = key_format % meta
-            opt_suffix = opt_key_suffix % meta
+            opt_suffix=None
+            if dcm.SOPClassUID ==  '1.2.840.10008.5.1.4.1.1.4.1':
+                private = dcm.PerFrameFunctionalGroupsSequence[0]['0x2005','0x140f'][0]
+                opt_suffix = private.EchoTime
+            else:
+                opt_suffix = opt_key_suffix % meta
+                
             stack_key = base_key
             if base_key in suffixes:
                 #We have already found more than one suffix, so use it
@@ -950,7 +956,6 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
                     new_key = '%s-%s' % (base_key, existing_suffix)
                     results[new_key] = results[base_key]
                     del results[base_key]
-                    
                     #Use the suffix for this stack and add it to suffixes
                     stack_key = '%s-%s' % (base_key, opt_suffix)
                     suffixes[base_key].add(opt_suffix)
