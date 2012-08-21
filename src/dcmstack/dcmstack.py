@@ -461,12 +461,21 @@ class DicomStack(object):
         #Pull the info used for sorting
         if 'CsaImage.SliceNormalVector' in meta:
             slice_dir = np.array(meta['CsaImage.SliceNormalVector'])
+            slice_pos = np.dot(slice_dir, 
+                           np.array(meta['ImagePositionPatient']))
+        elif 'PerFrameFunctionalGroupsSequence' in meta:
+            frameOrientation = meta['PerFrameFunctionalGroupsSequence'][0]['PlaneOrientationSequence'][0]['ImageOrientationPatient']
+            framePosition = meta['PerFrameFunctionalGroupsSequence'][0]['PlanePositionSequence'][0]['ImagePositionPatient']
+            slice_dir = np.cross(frameOrientation[:3],frameOrientation[3:],)
+            slice_pos = np.dot(slice_dir, 
+                           np.array(framePosition))
         else:
             slice_dir = np.cross(meta['ImageOrientationPatient'][:3],
                                  meta['ImageOrientationPatient'][3:],
                                 )
-        slice_pos = np.dot(slice_dir, 
+            slice_pos = np.dot(slice_dir, 
                            np.array(meta['ImagePositionPatient']))
+
         self._slice_pos_vals.add(slice_pos)
         time_val = None
         if self._time_order:
