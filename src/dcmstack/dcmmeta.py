@@ -1359,16 +1359,19 @@ class NiftiWrapper(object):
                     'slope_intercept' : first_hdr.get_slope_inter(),
                     'dim_info' : first_hdr.get_dim_info(),
                     'xyzt_units' : first_hdr.get_xyzt_units(),
-                    'slice_duration' : first_hdr.get_slice_duration(),
                    }
                    
         try:
+            hdr_info['slice_duration'] = first_hdr.get_slice_duration()
+        except HeaderDataError:
+            hdr_info['slice_duration'] = None
+        try:
             hdr_info['intent'] = first_hdr.get_intent()
-        except Exception:
+        except HeaderDataError:
             hdr_info['intent'] = None
         try:
             hdr_info['slice_times'] = first_hdr.get_slice_times()
-        except Exception:
+        except HeaderDataError:
             hdr_info['slice_times'] = None
                
         #Fill the data array, check header consistency
@@ -1403,14 +1406,21 @@ class NiftiWrapper(object):
                     hdr_info['dim_info'] = None
                 if input_hdr.get_xyzt_units() != hdr_info['xyzt_units']:
                     hdr_info['xyzt_units'] = None
-                if input_hdr.get_slice_duration() != hdr_info['slice_duration']:
+                    
+                try:
+                    if input_hdr.get_slice_duration() != hdr_info['slice_duration']:
+                        hdr_info['slice_duration'] = None
+                except HeaderDataError:
                     hdr_info['slice_duration'] = None
-                if input_hdr.get_intent() != hdr_info['intent']:
+                try:
+                    if input_hdr.get_intent() != hdr_info['intent']:
+                        hdr_info['intent'] = None
+                except HeaderDataError:
                     hdr_info['intent'] = None
                 try:
                     if input_hdr.get_slice_times() != hdr_info['slice_times']:
                         hdr_info['slice_times'] = None
-                except Exception:
+                except HeaderDataError:
                     hdr_info['slice_times'] = None
             
         #Create the resulting Nifti and wrapper
