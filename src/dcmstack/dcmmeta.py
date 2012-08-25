@@ -1392,11 +1392,17 @@ class NiftiWrapper(object):
             result_data[data_slices] = input_nii.get_data().squeeze()
             
             if input_idx != 0:
-                if not np.allclose(input_hdr.get_qform(), hdr_info['qform']):
+                if (hdr_info['qform'] is None or 
+                    input_hdr.get_qform() is None or
+                    not np.allclose(input_hdr.get_qform(), hdr_info['qform'])
+                   ):
                     hdr_info['qform'] = None
                 if input_hdr['qform_code'] != hdr_info['qform_code']:
                     hdr_info['qform_code'] = None
-                if not np.allclose(input_hdr.get_sform(), hdr_info['sform']):
+                if (hdr_info['sform'] is None or 
+                    input_hdr.get_sform() is None or
+                    not np.allclose(input_hdr.get_sform(), hdr_info['sform'])
+                   ):
                     hdr_info['sform'] = None
                 if input_hdr['sform_code'] != hdr_info['sform_code']:
                     hdr_info['sform_code'] = None
@@ -1436,6 +1442,9 @@ class NiftiWrapper(object):
             result_hdr.set_slope_inter(*hdr_info['slope_intercept'])
         if hdr_info['dim_info'] != None:
             result_hdr.set_dim_info(*hdr_info['dim_info'])
+            slice_dim = hdr_info['dim_info'][2]
+        else:
+            slice_dim = None
         if hdr_info['intent'] != None:
             result_hdr.set_intent(*hdr_info['intent'])
         if hdr_info['xyzt_units'] != None:
@@ -1447,8 +1456,10 @@ class NiftiWrapper(object):
         
         #Create the meta data extension and insert it
         seq_exts = [elem.meta_ext for elem in seq]
-        result_ext = DcmMetaExtension.from_sequence(seq_exts, dim, affine,
-                                                    hdr_info['dim_info'][2])
+        result_ext = DcmMetaExtension.from_sequence(seq_exts, 
+                                                    dim, 
+                                                    affine,
+                                                    slice_dim)
         result_hdr.extensions.append(result_ext)
         
         return NiftiWrapper(result_nii)
