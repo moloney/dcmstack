@@ -9,6 +9,7 @@ from tempfile import mkdtemp
 from shutil import rmtree
 from nose.tools import ok_, eq_, assert_raises
 import numpy as np
+from numpy.testing.decorators import skipif
 import dicom
 import nibabel as nb
 
@@ -383,6 +384,46 @@ class TestGetAffine(object):
         ok_(np.all(affine == ref))
     
 class TestToNifti(object):
+    
+    eq_keys = ['sizeof_hdr',
+               'data_type',
+               'extents',
+               'dim_info',
+               'dim',
+               'intent_p1',
+               'intent_p2',
+               'intent_p3',
+               'intent_code',
+               'datatype',
+               'bitpix',
+               'slice_start',
+               'pixdim',
+               'scl_slope',
+               'scl_inter',
+               'slice_end',
+               'slice_code',
+               'xyzt_units',
+              ]
+              
+    close_keys = ['cal_max',
+                  'cal_min',
+                  'slice_duration',
+                  'toffset',
+                  'glmax',
+                  'glmin',
+                  'qform_code',
+                  'sform_code',
+                  'quatern_b',
+                  'quatern_c',
+                  'quatern_d',
+                  'qoffset_x',
+                  'qoffset_y',
+                  'qoffset_z',
+                  'srow_x',
+                  'srow_y',
+                  'srow_z',
+                 ]
+
     def setUp(self):
         self.data_dir = path.join(test_dir, 
                              'data', 
@@ -395,68 +436,48 @@ class TestToNifti(object):
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                  )
                       ]
-        self.tmp_dir = mkdtemp(prefix='dcmstack_test')
+                      
+    def _chk(self, nii, ref_base_fn):
+        hdr = nii.get_header()
+        ref_nii = nb.load(path.join(self.data_dir, ref_base_fn) + '.nii.gz')
+        ref_hdr = ref_nii.get_header()
         
-    def tearDown(self):
-        rmtree(self.tmp_dir)
+        for key in self.eq_keys:
+            print "Checking %s for equality" % key
+            ok_(np.all(hdr[key] == ref_hdr[key]))
+            
+        for key in self.close_keys:
+            print "Checking %s for closeness" % key
+            ok_(np.allclose(hdr[key], ref_hdr[key]))
+
+    def test_single_slice(self):
+        stack = dcmstack.DicomStack()
+        stack.add_dcm(self.inputs[0])
+        nii = stack.to_nifti()
+        self._chk(nii, 'single_slice')
         
-    def _chk(self, ref_base_fn, embed):
-        nii = self.stack.to_nifti(embed_meta=embed)
-        nii_path = path.join(self.tmp_dir, 'test.nii')
-        nb.save(nii, nii_path)
-        
-        test_fd = open(nii_path)
-        test_data = test_fd.read()
-        test_fd.close()
-        test_sha = sha256(test_data).hexdigest()
-        
-        ref_fn = ref_base_fn
-        if embed:
-            ref_fn += '_embed'
-        else:
-            ref_fn += '_non_embed'
-        ref_fn += '.sha256sum'
-        ref_fd = open(path.join(self.data_dir, ref_fn))
-        ref_sha = ref_fd.read().strip()
-        ref_fd.close()
-        eq_(test_sha, ref_sha)
-        
-    def test_single_slice(self, embed=False):
-        self.stack = dcmstack.DicomStack()
-        self.stack.add_dcm(self.inputs[0])
-        self._chk('single_slice', embed)
-        
-    def test_single_slice_embed(self):
-        self.test_single_slice(True)
-        
-    def test_single_vol(self, embed=False):
-        self.stack = dcmstack.DicomStack()
-        self.stack.add_dcm(self.inputs[0])
-        self.stack.add_dcm(self.inputs[1])
-        self._chk('single_vol', embed)
-        
-    def test_single_vol_embed(self):
-        self.test_single_vol(True)
+    def test_single_vol(self):
+        stack = dcmstack.DicomStack()
+        stack.add_dcm(self.inputs[0])
+        stack.add_dcm(self.inputs[1])
+        nii = stack.to_nifti()
+        self._chk(nii, 'single_vol')
         
     def test_two_time_vol(self, embed=False):
-        self.stack = dcmstack.DicomStack(time_order='EchoTime')
-        self.stack.add_dcm(self.inputs[0])
-        self.stack.add_dcm(self.inputs[1])
-        self.stack.add_dcm(self.inputs[2])
-        self.stack.add_dcm(self.inputs[3])
-        self._chk('two_time_vol', embed)
-        
-    def test_two_time_vol_embed(self):
-        self.test_two_time_vol(True)
+        stack = dcmstack.DicomStack(time_order='EchoTime')
+        stack.add_dcm(self.inputs[0])
+        stack.add_dcm(self.inputs[1])
+        stack.add_dcm(self.inputs[2])
+        stack.add_dcm(self.inputs[3])
+        nii = stack.to_nifti()
+        self._chk(nii, 'two_time_vol')
         
     def test_two_vector_vol(self, embed=False):
-        self.stack = dcmstack.DicomStack(vector_order='EchoTime')
-        self.stack.add_dcm(self.inputs[0])
-        self.stack.add_dcm(self.inputs[1])
-        self.stack.add_dcm(self.inputs[2])
-        self.stack.add_dcm(self.inputs[3])
-        self._chk('two_vector_vol', embed)
-        
-    def test_two_vector_vol_embed(self):
-        self.test_two_vector_vol(True)
+        stack = dcmstack.DicomStack(vector_order='EchoTime')
+        stack.add_dcm(self.inputs[0])
+        stack.add_dcm(self.inputs[1])
+        stack.add_dcm(self.inputs[2])
+        stack.add_dcm(self.inputs[3])
+        nii = stack.to_nifti()
+        self._chk(nii, 'two_vector_vol')
         
