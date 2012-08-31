@@ -38,3 +38,35 @@ def test_is_repeating():
     assert_raises(ValueError, dcmmeta.is_repeating, [0, 1, 0, 1], 4)
     assert_raises(ValueError, dcmmeta.is_repeating, [0, 1, 0, 1], 5)
     
+def test_get_valid_classes():
+    ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4))
+    eq_(ext.get_valid_classes(), (('global', 'const'), ('global', 'slices')))
+    
+    ext.set_shape((2, 2, 2, 2))
+    eq_(ext.get_valid_classes(), 
+        (('global', 'const'), 
+         ('global', 'slices'),
+         ('time', 'samples'),
+         ('time', 'slices')
+        )
+       )
+       
+    ext.set_shape((2, 2, 2, 1, 2))
+    eq_(ext.get_valid_classes(), 
+        (('global', 'const'), 
+         ('global', 'slices'),
+         ('vector', 'samples'),
+         ('vector', 'slices')
+        )
+       )
+ 
+    ext.set_shape((2, 2, 2, 2, 2))
+    eq_(ext.get_valid_classes(), 
+        (('global', 'const'), 
+         ('global', 'slices'),
+         ('time', 'samples'),
+         ('time', 'slices'),
+         ('vector', 'samples'),
+         ('vector', 'slices')
+        )
+       )
