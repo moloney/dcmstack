@@ -292,6 +292,46 @@ class TestGetShape(object):
         shape = stack.get_shape()
         eq_(shape, (192, 192, 2))
         
+class TestGuessDim(object):
+    def setUp(self):
+        data_dir = path.join(test_dir, 
+                             'data', 
+                             'dcmstack', 
+                             '2D_16Echo_qT2')
+        self.inputs = [dicom.read_file(path.join(data_dir, fn)) 
+                       for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
+                                  'TE_40_SlcPos_-23.207628249046.dcm',
+                                  'TE_60_SlcPos_-33.707626341697.dcm',
+                                  'TE_60_SlcPos_-23.207628249046.dcm',
+                                  )
+                      ]
+        for in_dcm in self.inputs:
+            for key in dcmstack.DicomStack.sort_guesses:
+                if hasattr(in_dcm, key):
+                    delattr(in_dcm, key)
+        
+    def test_single_guess(self):
+        #Test situations where there is only one possible correct guess
+        for key in dcmstack.DicomStack.sort_guesses:
+            stack = dcmstack.DicomStack()
+            for idx, in_dcm in enumerate(self.inputs):
+                setattr(in_dcm, key, idx)
+                stack.add_dcm(in_dcm)
+            eq_(stack.get_shape(), (192, 192, 2, 2))
+            for in_dcm in self.inputs:
+                delattr(in_dcm, key)
+                
+    def test_wrong_guess_first(self):
+        #Test situations where the initial guesses are wrong
+        stack = dcmstack.DicomStack()
+        for key in dcmstack.DicomStack.sort_guesses[:-1]:
+            for in_dcm in self.inputs:
+                setattr(in_dcm, key, 0)
+        for idx, in_dcm in enumerate(self.inputs):
+            setattr(in_dcm, dcmstack.DicomStack.sort_guesses[-1], idx)
+            stack.add_dcm(in_dcm)
+        eq_(stack.get_shape(), (192, 192, 2, 2))
+        
 class TestGetData(object):
     def setUp(self):
         data_dir = path.join(test_dir, 

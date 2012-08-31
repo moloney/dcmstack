@@ -357,6 +357,17 @@ class DicomStack(object):
     into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
     '''
     
+    sort_guesses = ['EchoTime',
+                    'InversionTime',
+                    'RepetitionTime',
+                    'FlipAngle',
+                    'TriggerTime',
+                    'AcquisitionTime',
+                    'ContentTime',
+                   ]
+    '''The meta data keywords used when trying to guess the sorting order. 
+    Keys that come earlier in the list are given higher priority.'''
+    
     def __init__(self, time_order=None, vector_order=None, 
                  allow_dummies=False, meta_filter=None):
         '''Initialize a DicomStack object. 
@@ -542,17 +553,6 @@ class DicomStack(object):
         
         self._files_info = []
     
-    sort_guesses = ['EchoTime',
-                    'InversionTime',
-                    'RepetitionTime',
-                    'FlipAngle',
-                    'TriggerTime',
-                    'AcquisitionTime',
-                    'ContentTime',
-                   ]
-    '''The keywords used when trying to guess the sorting order. Keys at the 
-    beggining are given priority.'''
-    
     def _chk_order(self, slice_positions, files_per_vol, num_volumes, 
                    num_time_points, num_vec_comps):
         #Sort the files
@@ -661,11 +661,12 @@ class DicomStack(object):
                 #Update sorting tuples
                 for idx in xrange(len(self._files_info)):
                     nii_wrp, curr_tuple = self._files_info[idx] 
-                    self._files_info[idx] = (nii_wrp, (curr_tuple[0], 
-                                                          nii_wrp[time_order],
-                                                          curr_tuple[2]
-                                                         )
-                                               )
+                    self._files_info[idx] = (nii_wrp, 
+                                             (curr_tuple[0], 
+                                              nii_wrp[time_order],
+                                              curr_tuple[2]
+                                             )
+                                            )
                                                
                 #Check the order
                 try:
