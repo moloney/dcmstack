@@ -1,15 +1,12 @@
 """
 Tests for dcmstack.dcmstack
 """
-import sys, shutil
+import sys
 from os import path
 from glob import glob
 from hashlib import sha256
-from tempfile import mkdtemp
-from shutil import rmtree
 from nose.tools import ok_, eq_, assert_raises
 import numpy as np
-from numpy.testing.decorators import skipif
 import dicom
 import nibabel as nb
 

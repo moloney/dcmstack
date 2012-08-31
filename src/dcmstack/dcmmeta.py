@@ -36,10 +36,13 @@ def is_constant(sequence, period=None):
     if period is None:
         return all(val == sequence[0] for val in sequence)
     else:
+        if period <= 1:
+            raise ValueError('The period must be greater than one')
         seq_len = len(sequence)
         if seq_len % period != 0:
             raise ValueError('The sequence length is not evenly divisible by '
                              'the period length.')
+                             
         for period_idx in range(seq_len / period):
             start_idx = period_idx * period
             end_idx = start_idx + period
@@ -62,9 +65,13 @@ def is_repeating(sequence, period):
         The period over which the elements should repeat.    
     '''
     seq_len = len(sequence)
+    if period <= 1 or period >= seq_len:
+        raise ValueError('The period must be greater than one and less than '
+                         'the length of the sequence')
     if seq_len % period != 0:
         raise ValueError('The sequence length is not evenly divisible by the '
                          'period length.')
+                         
     for period_idx in range(1, seq_len / period):
         start_idx = period_idx * period
         end_idx = start_idx + period
