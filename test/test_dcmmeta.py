@@ -146,3 +146,8 @@ class TestCheckValid(object):
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         self.ext._content['dcmmeta_shape'] = [2, 2, 1, 1, 1, 2]
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
+        
+    def test_multiple_classes(self):
+        self.ext.get_class_dict(('global', 'const'))['Test'] = 0 
+        self.ext.get_class_dict(('time', 'samples'))['Test'] = [0] * 3
+        assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)

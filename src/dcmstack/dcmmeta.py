@@ -156,7 +156,8 @@ class DcmMetaExtension(Nifti1Extension):
             
         #Check all required meta dictionaries, make sure values have correct
         #multiplicity
-        for classes in self.get_valid_classes():
+        valid_classes = self.get_valid_classes()
+        for classes in valid_classes:
             if not classes[0] in self._content:
                 raise InvalidExtensionError('Missing required base '
                                             'classification %s' % classes[0])
@@ -178,6 +179,18 @@ class DcmMetaExtension(Nifti1Extension):
                                (key, classes, cls_mult, n_vals)
                               )
                         raise InvalidExtensionError(msg)
+                        
+        #Check that all keys are uniquely classified
+        for classes in valid_classes:
+            for other_classes in valid_classes:
+                if classes == other_classes:
+                    continue
+                intersect = (set(self.get_class_dict(classes)) & 
+                             set(self.get_class_dict(other_classes))
+                            )
+                if len(intersect) != 0:
+                    raise InvalidExtensionError("One or more keys have "
+                                                "multiple classifications")
     
     @property
     def affine(self):
