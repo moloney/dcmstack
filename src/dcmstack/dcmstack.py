@@ -469,6 +469,8 @@ class DicomStack(object):
             slice_dir = np.cross(frameOrientation[:3],frameOrientation[3:],)
             slice_pos = np.dot(slice_dir, 
                            np.array(framePosition))
+            self._contains_multiframe = True
+            self._multiframe_dcm = dcm
         else:
             slice_dir = np.cross(meta['ImageOrientationPatient'][:3],
                                  meta['ImageOrientationPatient'][3:],
@@ -564,7 +566,7 @@ class DicomStack(object):
             raise InvalidStackError("No (non-dummy) files in the stack")
         
         #Figure out number of files and slices per volume
-        files_per_vol = len(self._slice_pos_vals)
+        files_per_vol = len(self._slice_pos_vals) 
         
         #If more than one file per volume, check that slice spacing is equal
         if files_per_vol > 1:
@@ -578,7 +580,7 @@ class DicomStack(object):
                 raise InvalidStackError("Slice spacings are not consistent")
         
         #Simple check for an incomplete stack
-        if len(self._files_info) % files_per_vol != 0:
+        if len(self._files_info) % files_per_vol != 0: 
             raise InvalidStackError("Number of files is not an even multiple "
                                     "of the number of unique slice positions.")
         num_volumes = len(self._files_info) / files_per_vol
@@ -658,6 +660,14 @@ class DicomStack(object):
         '''
         #Create a numpy array for storing the voxel data
         stack_shape = self.get_shape()
+        if self._contains_multiframe:
+            n_mrslices = self._multiframe_dcm['0x2001','0x1018'].value
+            n_frames = self._multiframe_dcm.NumberOfFrames
+            n_temporal_pos = int(self._multiframe_dcm.PerFrameFunctionalGroupsSequence[0][0x2005,0x140f][0]['0x0020','0x0105'].value)
+            if n_mrslices > 0 and n_frames > 1 and n_temporal_pos > 0:
+                self._contains_e_4d = True
+                temp_shape = (stack_shape[0], stack_shape[1], n_mrslices, n_frames / n_mrslices)
+                stack_shape = temp_shape
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         vox_array = np.empty(stack_shape, np.int16)        
         
@@ -671,7 +681,11 @@ class DicomStack(object):
         file_shape = self._files_info[0][0].nii_img.get_shape()
         for vec_idx in range(stack_shape[4]):
             for time_idx in range(stack_shape[3]):
-                if files_per_vol == 1 and file_shape[2] != 1:
+                if self._contains_e_4d:
+                    for slice_idx in range(stack_shape[2]):
+                        vox_array[:, :, slice_idx, time_idx, vec_idx] = \
+                            self._files_info[0][0].nii_img.get_data()[:, :, time_idx + stack_shape[3]*slice_idx]
+                elif files_per_vol == 1 and file_shape[2] != 1:
                     file_idx = vec_idx*(stack_shape[3]) + time_idx
                     vox_array[:, :, :, time_idx, vec_idx] = \
                         self._files_info[file_idx][0].nii_img.get_data()
