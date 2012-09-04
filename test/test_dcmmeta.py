@@ -42,7 +42,7 @@ def test_get_valid_classes():
     ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4))
     eq_(ext.get_valid_classes(), (('global', 'const'), ('global', 'slices')))
     
-    ext.set_shape((2, 2, 2, 2))
+    ext.shape = (2, 2, 2, 2)
     eq_(ext.get_valid_classes(), 
         (('global', 'const'), 
          ('global', 'slices'),
@@ -51,7 +51,7 @@ def test_get_valid_classes():
         )
        )
        
-    ext.set_shape((2, 2, 2, 1, 2))
+    ext.shape = (2, 2, 2, 1, 2)
     eq_(ext.get_valid_classes(), 
         (('global', 'const'), 
          ('global', 'slices'),
@@ -60,7 +60,7 @@ def test_get_valid_classes():
         )
        )
  
-    ext.set_shape((2, 2, 2, 2, 2))
+    ext.shape = (2, 2, 2, 2, 2)
     eq_(ext.get_valid_classes(), 
         (('global', 'const'), 
          ('global', 'slices'),
@@ -132,17 +132,17 @@ class TestCheckValid(object):
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_invalid_affine(self):
-        self.ext.set_affine(np.eye(3))
+        self.ext._content['dcmmeta_affine'] = np.eye(3).tolist()
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_invalid_slice_dim(self):
-        self.ext.set_slice_dim(3)
+        self.ext._content['dcmmeta_slice_dim'] = 3
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
-        self.ext.set_slice_dim(-1)
+        self.ext._content['dcmmeta_slice_dim'] = -1
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_invalid_shape(self):
-        self.ext.set_shape((2, 2))
+        self.ext._content['dcmmeta_shape'] = [2, 2]
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
-        self.ext.set_shape((2, 2, 1, 1, 1, 2))
+        self.ext._content['dcmmeta_shape'] = [2, 2, 1, 1, 1, 2]
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)

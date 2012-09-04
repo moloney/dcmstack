@@ -938,9 +938,9 @@ class DicomStack(object):
                 if meta_ext is file_info[0].meta_ext:
                     meta_ext = deepcopy(meta_ext)
                     
-            meta_ext.set_shape(data.shape)
-            meta_ext.set_slice_dim(slice_dim)
-            meta_ext.set_affine(nifti_header.get_best_affine())
+            meta_ext.shape = data.shape
+            meta_ext.slice_dim = slice_dim
+            meta_ext.affine = nifti_header.get_best_affine()
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)
