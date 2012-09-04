@@ -151,3 +151,60 @@ class TestCheckValid(object):
         self.ext.get_class_dict(('global', 'const'))['Test'] = 0 
         self.ext.get_class_dict(('time', 'samples'))['Test'] = [0] * 3
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
+        
+def test_dcmmeta_affine():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
+                                              np.diag([1, 2, 3, 4]), 
+                                              2
+                                             )
+    ok_(np.allclose(ext.affine, np.diag([1, 2, 3, 4])))
+    assert_raises(ValueError, 
+                  setattr, 
+                  ext, 
+                  'affine', 
+                  np.eye(3)
+                 )
+    ext.affine = np.eye(4)
+    ok_(np.allclose(ext.affine, np.eye(4)))
+    
+def test_dcmmeta_slice_dim():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), None)
+    eq_(ext.slice_dim, None)
+    assert_raises(ValueError, 
+                  setattr, 
+                  ext, 
+                  'slice_dim', 
+                  3
+                 )
+    ext.slice_dim = 2
+    eq_(ext.slice_dim, 2)
+    
+def test_dcmmeta_shape():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), None)
+    eq_(ext.shape, (64, 64, 2))
+    assert_raises(ValueError, 
+                  setattr, 
+                  ext, 
+                  'shape', 
+                  (64, 64)
+                 )
+    ext.shape = (128, 128, 64)
+    eq_(ext.shape, (128, 128, 64))
+    
+def test_dcmmeta_version():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), None)
+    eq_(ext.version, dcmmeta._meta_version)
+    ext.version = 1.0
+    eq_(ext.version, 1.0)
+    
+def test_dcmmeta_slice_norm():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), 2)
+    ok_(np.allclose(ext.slice_normal, [0, 0, 1]))
+    ext.slice_dim = 1
+    ok_(np.allclose(ext.slice_normal, [0, 1, 0]))
+    
+def test_dcmmeta_n_slices():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), 2)
+    eq_(ext.n_slices, 2)
+    ext.slice_dim = 1
+    eq_(ext.n_slices, 64)
