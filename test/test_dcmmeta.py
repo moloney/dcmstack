@@ -4,7 +4,6 @@ Tests for dcmstack.dcmmeta
 import sys
 from os import path
 from glob import glob
-from hashlib import sha256
 from nose.tools import ok_, eq_, assert_raises
 import numpy as np
 import dicom
@@ -208,3 +207,47 @@ def test_dcmmeta_n_slices():
     eq_(ext.n_slices, 2)
     ext.slice_dim = 1
     eq_(ext.n_slices, 64)
+    
+class TestGetKeysClassesValues(object):
+    def setUp(self):
+        self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2, 3, 4), 
+                                                       np.eye(4), 
+                                                       2
+                                                      )
+        self.keys = []
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            self.keys.append(key)
+            self.ext.get_class_dict(classes)[key] = \
+                ([0] * self.ext.get_multiplicity(classes))
+                
+    
+    def test_get_keys(self):
+        eq_(set(self.keys), set(self.ext.get_keys()))
+        
+    def test_get_classification(self):
+        eq_(self.ext.get_classification('foo'), None)
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            eq_(self.ext.get_classification(key), classes)
+            
+    def test_get_class_dict(self):
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            ok_(key in self.ext.get_class_dict(classes))
+            
+    def test_get_values(self):
+        eq_(self.ext.get_values('foo'), None)
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            eq_(self.ext.get_values(key), 
+                [0] * self.ext.get_multiplicity(classes)
+               )
+    
+    def test_get_vals_and_class(self):
+        eq_(self.ext.get_values_and_class('foo'), (None, None))
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            eq_(self.ext.get_values_and_class(key), 
+                ([0] * self.ext.get_multiplicity(classes), classes)
+               )

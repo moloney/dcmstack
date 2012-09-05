@@ -313,6 +313,8 @@ class DcmMetaExtension(Nifti1Extension):
              returned depends on the classification (see 'get_multiplicity').
         '''
         classification = self.get_classification(key)
+        if classification is None:
+            return None
         return self.get_class_dict(classification)[key]
     
     def get_values_and_class(self, key):
