@@ -251,3 +251,36 @@ class TestGetKeysClassesValues(object):
             eq_(self.ext.get_values_and_class(key), 
                 ([0] * self.ext.get_multiplicity(classes), classes)
                )
+
+class TestFiltering(object):
+    def setUp(self):
+        self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2, 3, 4), 
+                                                       np.eye(4), 
+                                                       2
+                                                      )
+        
+        for classes in self.ext.get_valid_classes():
+            prefix = '%s_%s_test_' % classes
+            self.ext.get_class_dict(classes)[prefix + 'foo'] = \
+                    ([0] * self.ext.get_multiplicity(classes))
+            self.ext.get_class_dict(classes)[prefix + 'foobaz'] = \
+                    ([0] * self.ext.get_multiplicity(classes))
+    
+    def test_filter_all(self):
+        self.ext.filter_meta(lambda key, val: 'foo' in key)
+        ok_(len(self.ext.get_keys()) == 0)
+        
+    def test_filter_some(self):
+        self.ext.filter_meta(lambda key, val: key.endswith('baz'))
+        keys = self.ext.get_keys()
+        for classes in self.ext.get_valid_classes():
+            prefix = '%s_%s_test_' % classes
+            ok_(prefix + 'foo' in keys)
+            ok_(not prefix + 'foobaz' in keys)
+            
+    def test_clear_slices(self):
+        self.ext.clear_slice_meta()
+        for base_cls, sub_cls in self.ext.get_valid_classes():
+            if sub_cls == 'slices':
+                ok_(len(self.ext.get_class_dict((base_cls, sub_cls))) == 0)
+    
