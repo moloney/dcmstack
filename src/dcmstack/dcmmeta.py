@@ -95,103 +95,6 @@ class DcmMetaExtension(Nifti1Extension):
     DICOM files.
     '''
     
-    classifications = (('global', 'const'),
-                       ('global', 'slices'),
-                       ('time', 'samples'),
-                       ('time', 'slices'),
-                       ('vector', 'samples'),
-                       ('vector', 'slices'),
-                      )
-    '''The classifications used to seperate meta data based on if and how the
-    values repeat. Each class is a tuple with a base class and a sub class.'''
-    
-    def get_valid_classes(self):
-        '''Return the meta data classifications that are valid for this 
-        extension.
-        
-        Returns
-        -------
-        valid_classes : tuple
-            The classifications that are valid for this extension (based on its 
-            shape).
-        
-        '''
-        shape = self.shape
-        n_dims = len(shape)
-        if n_dims == 3:
-            return self.classifications[:2]
-        elif n_dims == 4:
-            return self.classifications[:4]
-        elif n_dims == 5:
-            if shape[3] != 1:
-                return self.classifications
-            else:
-                return self.classifications[:2] + self.classifications[-2:]
-        else:
-            raise ValueError("There must be 3 to 5 dimensions.")
-    
-    def check_valid(self):
-        '''Check if the extension is valid.
-        
-        Raises
-        ------
-        InvalidExtensionError 
-            The extension is missing required meta data or classifications, or
-            some element(s) have the wrong number of values for their 
-            classification.
-        '''
-        #Check for the required base keys in the json data
-        if not self._req_base_keys <= set(self._content):
-            raise InvalidExtensionError('Missing one or more required keys')
-            
-        #Check the orientation/shape/version
-        if self.affine.shape != (4, 4):
-            raise InvalidExtensionError('Affine has incorrect shape')
-        slice_dim = self.slice_dim
-        if slice_dim != None:
-            if not (0 <= slice_dim < 3):
-                raise InvalidExtensionError('Slice dimension is not valid')
-        if not (3 <= len(self.shape) < 6):
-            raise InvalidExtensionError('Shape is not valid')
-            
-        #Check all required meta dictionaries, make sure values have correct
-        #multiplicity
-        valid_classes = self.get_valid_classes()
-        for classes in valid_classes:
-            if not classes[0] in self._content:
-                raise InvalidExtensionError('Missing required base '
-                                            'classification %s' % classes[0])
-            if not classes[1] in self._content[classes[0]]:
-                raise InvalidExtensionError(('Missing required sub '
-                                             'classification %s in base '
-                                             'classification %s') % classes)
-            cls_meta = self.get_class_dict(classes)
-            cls_mult = self.get_multiplicity(classes)
-            if cls_mult == 0 and len(cls_meta) != 0:
-                raise InvalidExtensionError('Slice dim is None but per-slice '
-                                            'meta data is present')
-            elif cls_mult > 1:
-                for key, vals in cls_meta.iteritems():
-                    n_vals = len(vals)
-                    if n_vals != cls_mult:
-                        msg = (('Incorrect number of values for key %s with '
-                                'classification %s, expected %d found %d') %
-                               (key, classes, cls_mult, n_vals)
-                              )
-                        raise InvalidExtensionError(msg)
-                        
-        #Check that all keys are uniquely classified
-        for classes in valid_classes:
-            for other_classes in valid_classes:
-                if classes == other_classes:
-                    continue
-                intersect = (set(self.get_class_dict(classes)) & 
-                             set(self.get_class_dict(other_classes))
-                            )
-                if len(intersect) != 0:
-                    raise InvalidExtensionError("One or more keys have "
-                                                "multiple classifications")
-    
     @property
     def affine(self):
         '''The affine associated with the per-slice meta data.'''
@@ -254,6 +157,141 @@ class DcmMetaExtension(Nifti1Extension):
             return None
         return self.shape[slice_dim]
         
+    classifications = (('global', 'const'),
+                       ('global', 'slices'),
+                       ('time', 'samples'),
+                       ('time', 'slices'),
+                       ('vector', 'samples'),
+                       ('vector', 'slices'),
+                      )
+    '''The classifications used to seperate meta data based on if and how the
+    values repeat. Each class is a tuple with a base class and a sub class.'''
+    
+    def get_valid_classes(self):
+        '''Return the meta data classifications that are valid for this 
+        extension.
+        
+        Returns
+        -------
+        valid_classes : tuple
+            The classifications that are valid for this extension (based on its 
+            shape).
+        
+        '''
+        shape = self.shape
+        n_dims = len(shape)
+        if n_dims == 3:
+            return self.classifications[:2]
+        elif n_dims == 4:
+            return self.classifications[:4]
+        elif n_dims == 5:
+            if shape[3] != 1:
+                return self.classifications
+            else:
+                return self.classifications[:2] + self.classifications[-2:]
+        else:
+            raise ValueError("There must be 3 to 5 dimensions.")
+            
+    def get_multiplicity(self, classification):
+        '''Get the number of meta data values for all meta data of the provided 
+        classification.
+        
+        Parameters
+        ----------
+        classification : tuple
+            The meta data classification.
+            
+        Returns
+        -------
+        multiplicity : int
+            The number of values for any meta data of the provided 
+            `classification`.
+        '''
+        if not classification in self.get_valid_classes():
+            raise ValueError("Invalid classification: %s" % classification)
+        
+        base, sub = classification
+        shape = self.shape
+        n_vals = 1
+        if sub == 'slices':
+            n_vals = self.n_slices
+            if n_vals is None:
+                return 0
+            if base == 'vector':
+                n_vals *= shape[3]
+            elif base == 'global':
+                for dim_size in shape[3:]:
+                    n_vals *= dim_size
+        elif sub == 'samples':
+            if base == 'time':
+                n_vals = shape[3]
+            elif base == 'vector':
+                n_vals = shape[4]
+                
+        return n_vals
+    
+    def check_valid(self):
+        '''Check if the extension is valid.
+        
+        Raises
+        ------
+        InvalidExtensionError 
+            The extension is missing required meta data or classifications, or
+            some element(s) have the wrong number of values for their 
+            classification.
+        '''
+        #Check for the required base keys in the json data
+        if not self._req_base_keys <= set(self._content):
+            raise InvalidExtensionError('Missing one or more required keys')
+            
+        #Check the orientation/shape/version
+        if self.affine.shape != (4, 4):
+            raise InvalidExtensionError('Affine has incorrect shape')
+        slice_dim = self.slice_dim
+        if slice_dim != None:
+            if not (0 <= slice_dim < 3):
+                raise InvalidExtensionError('Slice dimension is not valid')
+        if not (3 <= len(self.shape) < 6):
+            raise InvalidExtensionError('Shape is not valid')
+            
+        #Check all required meta dictionaries, make sure values have correct
+        #multiplicity
+        valid_classes = self.get_valid_classes()
+        for classes in valid_classes:
+            if not classes[0] in self._content:
+                raise InvalidExtensionError('Missing required base '
+                                            'classification %s' % classes[0])
+            if not classes[1] in self._content[classes[0]]:
+                raise InvalidExtensionError(('Missing required sub '
+                                             'classification %s in base '
+                                             'classification %s') % classes)
+            cls_meta = self.get_class_dict(classes)
+            cls_mult = self.get_multiplicity(classes)
+            if cls_mult == 0 and len(cls_meta) != 0:
+                raise InvalidExtensionError('Slice dim is None but per-slice '
+                                            'meta data is present')
+            elif cls_mult > 1:
+                for key, vals in cls_meta.iteritems():
+                    n_vals = len(vals)
+                    if n_vals != cls_mult:
+                        msg = (('Incorrect number of values for key %s with '
+                                'classification %s, expected %d found %d') %
+                               (key, classes, cls_mult, n_vals)
+                              )
+                        raise InvalidExtensionError(msg)
+                        
+        #Check that all keys are uniquely classified
+        for classes in valid_classes:
+            for other_classes in valid_classes:
+                if classes == other_classes:
+                    continue
+                intersect = (set(self.get_class_dict(classes)) & 
+                             set(self.get_class_dict(other_classes))
+                            )
+                if len(intersect) != 0:
+                    raise InvalidExtensionError("One or more keys have "
+                                                "multiple classifications")
+            
     def get_keys(self):
         '''Get a list of all the meta data keys that are available.'''
         keys = []
@@ -361,44 +399,6 @@ class DcmMetaExtension(Nifti1Extension):
             if sub_class == 'slices':
                 self.get_class_dict((base_class, sub_class)).clear()
     
-    def get_multiplicity(self, classification):
-        '''Get the number of meta data values for all meta data of the provided 
-        classification.
-        
-        Parameters
-        ----------
-        classification : tuple
-            The meta data classification.
-            
-        Returns
-        -------
-        multiplicity : int
-            The number of values for any meta data of the provided 
-            `classification`.
-        '''
-        if not classification in self.get_valid_classes():
-            raise ValueError("Invalid classification: %s" % classification)
-        
-        base, sub = classification
-        shape = self.shape
-        n_vals = 1
-        if sub == 'slices':
-            n_vals = self.n_slices
-            if n_vals is None:
-                return 0
-            if base == 'vector':
-                n_vals *= shape[3]
-            elif base == 'global':
-                for dim_size in shape[3:]:
-                    n_vals *= dim_size
-        elif sub == 'samples':
-            if base == 'time':
-                n_vals = shape[3]
-            elif base == 'vector':
-                n_vals = shape[4]
-                
-        return n_vals
-    
     def get_subset(self, dim, idx):
         '''Get a DcmMetaExtension containing a subset of the meta data.
         
@@ -454,7 +454,19 @@ class DcmMetaExtension(Nifti1Extension):
                 result._copy_sample(self, src_class, 'vector', idx)
                 
         return result
+    
+    def to_json(self):
+        '''Return the extension encoded as a JSON string.'''
+        self.check_valid()
+        return self._mangle(self._content)
         
+    @classmethod
+    def from_json(klass, json_str):
+        '''Create an extension from the JSON string representation.'''
+        result = klass(dcm_meta_ecode, json_str)
+        result.check_valid()
+        return result
+    
     @classmethod
     def make_empty(klass, shape, affine, slice_dim=None):
         '''Make an empty DcmMetaExtension.
@@ -499,19 +511,7 @@ class DcmMetaExtension(Nifti1Extension):
         result.version = _meta_version
         
         return result
-
-    def to_json(self):
-        '''Return the extension encoded as a JSON string.'''
-        self.check_valid()
-        return self._mangle(self._content)
-        
-    @classmethod
-    def from_json(klass, json_str):
-        '''Create an extension from the JSON string representation.'''
-        result = klass(dcm_meta_ecode, json_str)
-        result.check_valid()
-        return result
-        
+    
     @classmethod
     def from_runtime_repr(klass, runtime_repr):
         '''Create an extension from the Python runtime representation (nested 
