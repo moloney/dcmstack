@@ -357,7 +357,18 @@ class DicomStack(object):
     into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
     '''
     
-    def __init__(self, time_order='AcquisitionTime', vector_order=None, 
+    sort_guesses = ['EchoTime',
+                    'InversionTime',
+                    'RepetitionTime',
+                    'FlipAngle',
+                    'TriggerTime',
+                    'AcquisitionTime',
+                    'ContentTime',
+                   ]
+    '''The meta data keywords used when trying to guess the sorting order. 
+    Keys that come earlier in the list are given higher priority.'''
+    
+    def __init__(self, time_order=None, vector_order=None, 
                  allow_dummies=False, meta_filter=None):
         '''Initialize a DicomStack object. 
         
@@ -379,6 +390,11 @@ class DicomStack(object):
         meta_filter : callable
             A callable that takes a meta data key and value, and returns True if 
             that meta data element should be excluded from the DcmMeta extension.
+            
+        Notes
+        -----
+        If both time_order and vector_order are None, the time_order will be 
+        guessed based off the data sets.
         '''
         if isinstance(time_order, str):
             self._time_order = DicomOrdering(time_order)
@@ -461,23 +477,12 @@ class DicomStack(object):
         #Pull the info used for sorting
         if 'CsaImage.SliceNormalVector' in meta:
             slice_dir = np.array(meta['CsaImage.SliceNormalVector'])
-            slice_pos = np.dot(slice_dir, 
-                           np.array(meta['ImagePositionPatient']))
-        elif 'PerFrameFunctionalGroupsSequence' in meta:
-            frameOrientation = meta['PerFrameFunctionalGroupsSequence'][0]['PlaneOrientationSequence'][0]['ImageOrientationPatient']
-            framePosition = meta['PerFrameFunctionalGroupsSequence'][0]['PlanePositionSequence'][0]['ImagePositionPatient']
-            slice_dir = np.cross(frameOrientation[:3],frameOrientation[3:],)
-            slice_pos = np.dot(slice_dir, 
-                           np.array(framePosition))
-            self._contains_multiframe = True
-            self._multiframe_dcm = dcm
         else:
             slice_dir = np.cross(meta['ImageOrientationPatient'][:3],
                                  meta['ImageOrientationPatient'][3:],
                                 )
-            slice_pos = np.dot(slice_dir, 
+        slice_pos = np.dot(slice_dir, 
                            np.array(meta['ImagePositionPatient']))
-
         self._slice_pos_vals.add(slice_pos)
         time_val = None
         if self._time_order:
@@ -491,8 +496,12 @@ class DicomStack(object):
         #Create a tuple with the sorting values
         sorting_tuple = (vector_val, time_val, slice_pos)
         
-        #Raise exception if image collides with another already in the stack
-        if sorting_tuple in self._sorting_tuples:
+        #If a explicit order was specified, raise an exception if image 
+        #collides with another already in the stack
+        if ((not self._time_order is None or 
+             not self._vector_order is None) and 
+            sorting_tuple in self._sorting_tuples
+           ):
             raise ImageCollisionError()
         self._sorting_tuples.add(sorting_tuple)
         
@@ -543,48 +552,9 @@ class DicomStack(object):
         self._meta = None
         
         self._files_info = []
-        
-        
-    def get_shape(self):
-        '''Get the shape of the stack.
-        
-        Returns
-        -------
-        A tuple of integers giving the size of the dimensions of the stack.
-        
-        Raises
-        ------
-        InvalidStackError
-            The stack is incomplete or invalid.
-        '''
-        #If the dirty flag is not set, return the cached value
-        if not self._shape_dirty:
-            return self._shape
-
-        #We need at least one non-dummy file in the stack
-        if len(self._files_info) == 0:
-            raise InvalidStackError("No (non-dummy) files in the stack")
-        
-        #Figure out number of files and slices per volume
-        files_per_vol = len(self._slice_pos_vals) 
-        
-        #If more than one file per volume, check that slice spacing is equal
-        if files_per_vol > 1:
-            positions = sorted(list(self._slice_pos_vals))
-            spacings = []
-            for idx in xrange(files_per_vol - 1):
-                spacings.append(positions[idx+1] - positions[idx])
-            spacings = np.array(spacings)
-            avg_spacing = np.mean(spacings)
-            if not np.allclose(avg_spacing, spacings, rtol=4e-2):
-                raise InvalidStackError("Slice spacings are not consistent")
-        
-        #Simple check for an incomplete stack
-        if len(self._files_info) % files_per_vol != 0: 
-            raise InvalidStackError("Number of files is not an even multiple "
-                                    "of the number of unique slice positions.")
-        num_volumes = len(self._files_info) / files_per_vol
-        
+    
+    def _chk_order(self, slice_positions, files_per_vol, num_volumes, 
+                   num_time_points, num_vec_comps):
         #Sort the files
         self._files_info.sort(key=lambda x: x[1])
         if files_per_vol > 1:
@@ -594,18 +564,8 @@ class DicomStack(object):
                 self._files_info[start_slice:end_slice] = \
                     sorted(self._files_info[start_slice:end_slice], 
                            key=lambda x: x[1][-1])
-        
-        #Figure out the number of vector components and time points
-        num_vec_comps = len(self._vector_vals)
-        if num_vec_comps > num_volumes:
-            raise InvalidStackError("Vector variable varies within volumes")
-        if num_volumes % num_vec_comps != 0:
-            raise InvalidStackError("Number of volumes not an even multiple "
-                                    "of the number of vector components.")
-        num_time_points = num_volumes / num_vec_comps
        
-        #Do a more thorough check for completeness
-        slice_positions = sorted(list(self._slice_pos_vals))
+        #Do a thorough check for correctness
         for vec_idx in xrange(num_vec_comps):
             file_idx = vec_idx*num_time_points*files_per_vol
             curr_vec_val = self._files_info[file_idx][1][0]
@@ -630,6 +590,105 @@ class DicomStack(object):
                             error_msg.append(' for vector component %s' % 
                                              str(curr_vec_val))
                         raise InvalidStackError(''.join(error_msg))
+        
+        
+    def get_shape(self):
+        '''Get the shape of the stack.
+        
+        Returns
+        -------
+        A tuple of integers giving the size of the dimensions of the stack.
+        
+        Raises
+        ------
+        InvalidStackError
+            The stack is incomplete or invalid.
+        '''
+        #If the dirty flag is not set, return the cached value
+        if not self._shape_dirty:
+            return self._shape
+
+        #We need at least one non-dummy file in the stack
+        if len(self._files_info) == 0:
+            raise InvalidStackError("No (non-dummy) files in the stack")
+        
+        #Figure out number of files and slices per volume
+        files_per_vol = len(self._slice_pos_vals)
+        slice_positions = sorted(list(self._slice_pos_vals))
+        
+        #If more than one file per volume, check that slice spacing is equal
+        if files_per_vol > 1:
+            positions = sorted(list(self._slice_pos_vals))
+            spacings = []
+            for idx in xrange(files_per_vol - 1):
+                spacings.append(slice_positions[idx+1] - slice_positions[idx])
+            spacings = np.array(spacings)
+            avg_spacing = np.mean(spacings)
+            if not np.allclose(avg_spacing, spacings, rtol=4e-2):
+                raise InvalidStackError("Slice spacings are not consistent")
+        
+        #Simple check for an incomplete stack
+        if len(self._files_info) % files_per_vol != 0:
+            raise InvalidStackError("Number of files is not an even multiple "
+                                    "of the number of unique slice positions.")
+        num_volumes = len(self._files_info) / files_per_vol
+        
+        #Figure out the number of vector components and time points
+        num_vec_comps = len(self._vector_vals)
+        if num_vec_comps > num_volumes:
+            raise InvalidStackError("Vector variable varies within volumes")
+        if num_volumes % num_vec_comps != 0:
+            raise InvalidStackError("Number of volumes not an even multiple "
+                                    "of the number of vector components.")
+        num_time_points = num_volumes / num_vec_comps
+        
+        #If both sort keys are None try to guess
+        if (num_volumes > 1 and self._time_order == None and 
+                self._vector_order == None):
+            #Get a list of possible sort orders
+            possible_orders = []
+            for key in self.sort_guesses:
+                vals = set([file_info[0].get_meta(key)
+                            for file_info in self._files_info]
+                          )
+                if len(vals) == num_volumes or len(vals) == len(self._files_info):
+                    possible_orders.append(key)
+            if len(possible_orders) == 0:
+                raise InvalidStackError("Unable to guess key for sorting the "
+                                        "fourth dimension")
+            
+            #Try out each possible sort order
+            for time_order in possible_orders:
+                #Update sorting tuples
+                for idx in xrange(len(self._files_info)):
+                    nii_wrp, curr_tuple = self._files_info[idx] 
+                    self._files_info[idx] = (nii_wrp, 
+                                             (curr_tuple[0], 
+                                              nii_wrp[time_order],
+                                              curr_tuple[2]
+                                             )
+                                            )
+                                               
+                #Check the order
+                try:
+                    self._chk_order(slice_positions,
+                                    files_per_vol, 
+                                    num_volumes, 
+                                    num_time_points, 
+                                    num_vec_comps)
+                except InvalidStackError:
+                    pass
+                else:
+                    break
+            else:
+                raise InvalidStackError("Unable to guess key for sorting the "
+                                        "fourth dimension")
+        else: #If at least on sort key was specified, just check the order
+            self._chk_order(slice_positions,
+                            files_per_vol, 
+                            num_volumes, 
+                            num_time_points, 
+                            num_vec_comps)
         
         #Stack appears to be valid, build the shape tuple
         file_shape = self._files_info[0][0].nii_img.get_shape()
@@ -660,14 +719,6 @@ class DicomStack(object):
         '''
         #Create a numpy array for storing the voxel data
         stack_shape = self.get_shape()
-        if self._contains_multiframe:
-            n_mrslices = self._multiframe_dcm['0x2001','0x1018'].value
-            n_frames = self._multiframe_dcm.NumberOfFrames
-            n_temporal_pos = int(self._multiframe_dcm.PerFrameFunctionalGroupsSequence[0][0x2005,0x140f][0]['0x0020','0x0105'].value)
-            if n_mrslices > 0 and n_frames > 1 and n_temporal_pos > 0:
-                self._contains_e_4d = True
-                temp_shape = (stack_shape[0], stack_shape[1], n_mrslices, n_frames / n_mrslices)
-                stack_shape = temp_shape
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         vox_array = np.empty(stack_shape, np.int16)        
         
@@ -681,11 +732,7 @@ class DicomStack(object):
         file_shape = self._files_info[0][0].nii_img.get_shape()
         for vec_idx in range(stack_shape[4]):
             for time_idx in range(stack_shape[3]):
-                if self._contains_e_4d:
-                    for slice_idx in range(stack_shape[2]):
-                        vox_array[:, :, slice_idx, time_idx, vec_idx] = \
-                            self._files_info[0][0].nii_img.get_data()[:, :, time_idx + stack_shape[3]*slice_idx]
-                elif files_per_vol == 1 and file_shape[2] != 1:
+                if files_per_vol == 1 and file_shape[2] != 1:
                     file_idx = vec_idx*(stack_shape[3]) + time_idx
                     vox_array[:, :, :, time_idx, vec_idx] = \
                         self._files_info[file_idx][0].nii_img.get_data()
@@ -892,9 +939,9 @@ class DicomStack(object):
                 if meta_ext is file_info[0].meta_ext:
                     meta_ext = deepcopy(meta_ext)
                     
-            meta_ext.set_shape(data.shape)
-            meta_ext.set_slice_dim(slice_dim)
-            meta_ext.set_affine(nifti_header.get_best_affine())
+            meta_ext.shape = data.shape
+            meta_ext.slice_dim = slice_dim
+            meta_ext.affine = nifti_header.get_best_affine()
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)
@@ -907,8 +954,8 @@ class DicomStack(object):
         return NiftiWrapper(self.to_nifti(voxel_order, True))
         
 def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s', 
-                    opt_key_suffix='TE_%(EchoTime).3f', extractor=None, 
-                    force=False, warn_on_except=False, **stack_args):
+                    extractor=None, force=False, warn_on_except=False, 
+                    **stack_args):
     '''Parse the given dicom files into a dictionary containing one or more 
     DicomStack objects.
     
@@ -945,44 +992,32 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
         extractor = default_extractor
         
     results = {}
-    suffixes = {}
     for dcm_path in src_paths:
+        #Read the DICOM file
         try:
             dcm = dicom.read_file(dcm_path, force=force)
-            meta = extractor(dcm)
-            base_key = key_format % meta
-            opt_suffix=None
-            if dcm.SOPClassUID ==  '1.2.840.10008.5.1.4.1.1.4.1':
-                private = dcm.PerFrameFunctionalGroupsSequence[0]['0x2005','0x140f'][0]
-                opt_suffix = private.EchoTime
-            else:
-                opt_suffix = opt_key_suffix % meta
-                
-            stack_key = base_key
-            if base_key in suffixes:
-                #We have already found more than one suffix, so use it
-                if len(suffixes[base_key]) != 1:
-                    stack_key = '%s-%s' % (base_key, opt_suffix)
-                #We have found the first different suffix
-                elif not opt_suffix in suffixes[base_key]:
-                    #Change key for existing stack
-                    existing_suffix = list(suffixes[base_key])[0]
-                    new_key = '%s-%s' % (base_key, existing_suffix)
-                    results[new_key] = results[base_key]
-                    del results[base_key]
-                    #Use the suffix for this stack and add it to suffixes
-                    stack_key = '%s-%s' % (base_key, opt_suffix)
-                    suffixes[base_key].add(opt_suffix)
-            else:
-                suffixes[base_key] = set([opt_suffix])
-
-            if not stack_key in results:
-                results[stack_key] = DicomStack(**stack_args)
-            results[stack_key].add_dcm(dcm, meta)
         except Exception, e:
             if warn_on_except:
-                warnings.warn('Error adding file %s to stack: %s' % 
-                              (dcm_path, str(e)))
+                warnings.warn('Error reading file %s: %s' % (dcm_path, str(e)))
+                continue
+            else:
+                raise
+            
+        #Extract the meta data, find the key for results dict, and create the 
+        #stack if needed
+        meta = extractor(dcm)
+        stack_key = key_format % meta
+        if not stack_key in results:
+            results[stack_key] = DicomStack(**stack_args)
+        
+        #Try to add it to the stack
+        try:
+            results[stack_key].add_dcm(dcm, meta)
+            
+        except Exception, e:
+            if warn_on_except:
+                warnings.warn('Error adding file %s to stack %s: %s' % 
+                              (dcm_path, stack_key, str(e)))
             else:
                 raise
     
