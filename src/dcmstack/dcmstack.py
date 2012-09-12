@@ -364,6 +364,8 @@ class DicomStack(object):
                     'TriggerTime',
                     'AcquisitionTime',
                     'ContentTime',
+                    'AcquisitionNumber',
+                    'InstanceNumber',
                    ]
     '''The meta data keywords used when trying to guess the sorting order. 
     Keys that come earlier in the list are given higher priority.'''
