@@ -69,6 +69,32 @@ def test_get_valid_classes():
          ('vector', 'slices')
         )
        )
+       
+def test_get_mulitplicity_4d():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 11), np.eye(4), 2)
+    eq_(ext.get_multiplicity(('global', 'const')), 1)
+    eq_(ext.get_multiplicity(('global', 'slices')), 7 * 11)
+    eq_(ext.get_multiplicity(('time', 'samples')), 11)
+    eq_(ext.get_multiplicity(('time', 'slices')), 7)
+    
+def test_get_mulitplicity_4d_vec():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 1, 11), np.eye(4), 2)
+    eq_(ext.get_multiplicity(('global', 'const')), 1)
+    eq_(ext.get_multiplicity(('global', 'slices')), 7 * 11)
+    eq_(ext.get_multiplicity(('vector', 'samples')), 11)
+    eq_(ext.get_multiplicity(('vector', 'slices')), 7)
+
+def test_get_mulitplicity_5d():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 11, 13), 
+                                              np.eye(4), 
+                                              2
+                                             )
+    eq_(ext.get_multiplicity(('global', 'const')), 1)
+    eq_(ext.get_multiplicity(('global', 'slices')), 7 * 11 * 13)
+    eq_(ext.get_multiplicity(('time', 'samples')), 11 * 13)
+    eq_(ext.get_multiplicity(('time', 'slices')), 7)
+    eq_(ext.get_multiplicity(('vector', 'samples')), 13)
+    eq_(ext.get_multiplicity(('vector', 'slices')), 7 * 11)
 
 class TestCheckValid(object):
     def setUp(self):
@@ -99,6 +125,8 @@ class TestCheckValid(object):
         cls_dict['TimeSampleTest'] = [0] * 2
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         cls_dict['TimeSampleTest'] = [0] * 3
+        assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
+        cls_dict['TimeSampleTest'] = [0] * 12
         self.ext.check_valid()
         del self.ext._content['time']['samples']
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
@@ -268,7 +296,7 @@ class TestFiltering(object):
     
     def test_filter_all(self):
         self.ext.filter_meta(lambda key, val: 'foo' in key)
-        ok_(len(self.ext.get_keys()) == 0)
+        eq_(len(self.ext.get_keys()), 0)
         
     def test_filter_some(self):
         self.ext.filter_meta(lambda key, val: key.endswith('baz'))
@@ -282,5 +310,123 @@ class TestFiltering(object):
         self.ext.clear_slice_meta()
         for base_cls, sub_cls in self.ext.get_valid_classes():
             if sub_cls == 'slices':
-                ok_(len(self.ext.get_class_dict((base_cls, sub_cls))) == 0)
+                eq_(len(self.ext.get_class_dict((base_cls, sub_cls))), 0)
     
+class TestGetSubset(object):
+    def setUp(self):
+        self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
+                                                       np.eye(4), 
+                                                       2
+                                                      )
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            mult = self.ext.get_multiplicity(classes)
+            self.ext.get_class_dict(classes)[key] = range(mult)
+        
+    def test_slice_subset(self):
+        for slc_idx in xrange(self.ext.n_slices):
+            sub = self.ext.get_subset(2, slc_idx)
+            for classes in self.ext.get_valid_classes():
+                key = '%s_%s_test' % classes
+                if classes == ('time', 'slices'):
+                    eq_(sub.get_values_and_class(key), 
+                        (slc_idx, ('global', 'const'))
+                       )
+                elif classes[1] == 'slices':
+                    eq_(sub.get_classification(key), ('time', 'samples'))
+                else:
+                    eq_(sub.get_values_and_class(key), 
+                        self.ext.get_values_and_class(key)
+                       )
+
+class TestSimplify(object):
+    def setUp(self):
+        self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
+                                                       np.eye(4),
+                                                       2
+                                                      )
+    
+    def test_simplify_global_slices(self):
+        glob_slc = self.ext.get_class_dict(('global', 'slices'))
+        glob_slc['Test1'] = [0] * (3 * 5 * 7)
+        glob_slc['Test2'] = []
+        for idx in xrange(7):
+            glob_slc['Test2'] += [idx] * (3 * 5)
+        glob_slc['Test3'] = []
+        for idx in xrange(5 * 7):
+            glob_slc['Test3'] += [idx] * (3)
+        glob_slc['Test4'] = []
+        for idx in xrange(7):
+            glob_slc['Test4'] += [idx2 for idx2 in xrange(3*5)]
+        glob_slc['Test5'] = []
+        for idx in xrange(7 * 5):
+            glob_slc['Test5'] += [idx2 for idx2 in xrange(3)]
+        self.ext.check_valid()
+            
+        eq_(self.ext._simplify('Test1'), True)
+        eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+        
+        eq_(self.ext._simplify('Test2'), True)
+        eq_(self.ext.get_classification('Test2'), ('vector', 'samples'))
+        
+        eq_(self.ext._simplify('Test3'), True)
+        eq_(self.ext.get_classification('Test3'), ('time', 'samples'))
+        
+        eq_(self.ext._simplify('Test4'), True)
+        eq_(self.ext.get_classification('Test4'), ('vector', 'slices'))
+        
+        eq_(self.ext._simplify('Test5'), True)
+        eq_(self.ext.get_classification('Test5'), ('time', 'slices'))
+    
+    def test_simplify_vector_slices(self):
+        vec_slc = self.ext.get_class_dict(('vector', 'slices'))
+        vec_slc['Test1'] = [0] * (3 * 5)
+        vec_slc['Test2'] = []
+        for time_idx in xrange(5):
+            vec_slc['Test2'] += [time_idx] * 3
+        vec_slc['Test3'] = []
+        for time_idx in xrange(5):
+            for slc_idx in xrange(3):
+                vec_slc['Test3'] += [slc_idx]
+        self.ext.check_valid()
+        
+        eq_(self.ext._simplify('Test1'), True)
+        eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+        
+        eq_(self.ext._simplify('Test2'), True)
+        eq_(self.ext.get_classification('Test2'), ('time', 'samples'))
+        
+        eq_(self.ext._simplify('Test3'), True)
+        eq_(self.ext.get_classification('Test3'), ('time', 'slices'))
+        
+    def test_simplify_time_slices(self):
+        time_slc = self.ext.get_class_dict(('time', 'slices'))
+        time_slc['Test1'] = [0] * 3
+        self.ext.check_valid()
+        
+        eq_(self.ext._simplify('Test1'), True)
+        eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+        
+    def test_simplify_time_samples(self):
+        time_smp = self.ext.get_class_dict(('time', 'samples'))
+        time_smp['Test1'] = [0] * (5 * 7)
+        time_smp['Test2'] = []
+        for vec_idx in xrange(7):
+            time_smp['Test2'] += [vec_idx] * 5
+        self.ext.check_valid()
+        
+        eq_(self.ext._simplify('Test1'), True)
+        eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+        
+        eq_(self.ext._simplify('Test2'), True)
+        eq_(self.ext.get_classification('Test2'), ('vector', 'samples'))
+        
+    def test_simplify_vector_samples(self):
+        vector_smp = self.ext.get_class_dict(('vector', 'samples'))
+        vector_smp['Test1'] = [0] * 7
+        self.ext.check_valid()
+        
+        eq_(self.ext._simplify('Test1'), True)
+        eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+        
+        

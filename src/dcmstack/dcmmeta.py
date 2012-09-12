@@ -225,10 +225,21 @@ class DcmMetaExtension(Nifti1Extension):
         elif sub == 'samples':
             if base == 'time':
                 n_vals = shape[3]
+                if len(shape) == 5:
+                    n_vals *= shape[4]
             elif base == 'vector':
                 n_vals = shape[4]
                 
         return n_vals
+        
+    _req_base_keys = set(('dcmmeta_affine', 
+                          'dcmmeta_slice_dim',
+                          'dcmmeta_shape',
+                          'dcmmeta_version',
+                          'global',
+                         )
+                        )
+    '''Minimum required keys in the base dictionaty to be considered valid'''
     
     def check_valid(self):
         '''Check if the extension is valid.
@@ -615,15 +626,96 @@ class DcmMetaExtension(Nifti1Extension):
                 return False
                 
         return True
-
-    _req_base_keys = set(('dcmmeta_affine', 
-                          'dcmmeta_slice_dim',
-                          'dcmmeta_shape',
-                          'dcmmeta_version',
-                          'global',
-                         )
-                        )
-
+        
+    def _unmangle(self, value):
+        '''Go from extension data to runtime representation.'''
+        #Its not possible to preserve order while loading with python 2.6
+        kwargs = {}
+        if sys.version_info >= (2, 7):
+            kwargs['object_pairs_hook'] = OrderedDict
+        return json.loads(value, **kwargs)
+    
+    def _mangle(self, value):
+        '''Go from runtime representation to extension data.'''
+        return json.dumps(value, indent=4)
+                
+    _const_tests = {('global', 'slices') : (('global', 'const'),
+                                            ('vector', 'samples'),
+                                            ('time', 'samples')
+                                           ),
+                    ('vector', 'slices') : (('global', 'const'),
+                                            ('time', 'samples')
+                                           ),
+                    ('time', 'slices') : (('global', 'const'),
+                                         ),
+                    ('time', 'samples') : (('global', 'const'),
+                                           ('vector', 'samples'),
+                                          ),
+                    ('vector', 'samples') : (('global', 'const'),)
+                   }
+    '''Classification mapping showing possible reductions in multiplicity for
+    values that are constant with some period.'''
+    
+    def _get_const_period(self, src_cls, dest_cls):
+        '''Get the period over which we test for const-ness with for the 
+        given classification change.'''
+        if dest_cls == ('global', 'const'):
+            return None
+        elif src_cls == ('global', 'slices'):
+            return self.get_multiplicity(src_cls) / self.get_multiplicity(dest_cls)
+        elif src_cls == ('vector', 'slices'): #implies dest_cls == ('time', 'samples'):
+            return  self.n_slices
+        elif src_cls == ('time', 'samples'): #implies dest_cls == ('vector', 'samples')
+            return self.shape[3]
+        assert False #Should take one of the above branches
+    
+    _repeat_tests = {('global', 'slices') : (('time', 'slices'),
+                                             ('vector', 'slices')
+                                            ),
+                     ('vector', 'slices') : (('time', 'slices'),),
+                    }
+    '''Classification mapping showing possible reductions in multiplicity for
+    values that are repeating with some period.'''
+    
+    def _simplify(self, key):
+        '''Try to simplify the meta data by changing its classification. 
+        Return True if the classification is changed, otherwise False.'''
+        values, curr_class = self.get_values_and_class(key)
+        curr_mult = self.get_multiplicity(curr_class)
+        
+        #If the class is global const then just delete it if the value is None
+        if curr_class == ('global', 'const'):
+            if values is None:
+                del self.get_class_dict(curr_class)[key]
+                return True
+            return False
+        
+        #Test if the values are constant with some period
+        dests = self._const_tests[curr_class]
+        for dest_cls in dests:
+            if dest_cls[0] in self._content:
+                period = self._get_const_period(curr_class, dest_cls)
+                if is_constant(values, period):
+                    self.get_class_dict(dest_cls)[key] = \
+                        values[::period]
+                    break
+        else: #Otherwise test if values are repeating with some period
+            if curr_class in self._repeat_tests:
+                for dest_cls in self._repeat_tests[curr_class]:
+                    if dest_cls[0] in self._content:
+                        dest_mult = self.get_multiplicity(dest_cls)
+                        if is_repeating(values, dest_mult):
+                            self.get_class_dict(dest_cls)[key] = \
+                                values[:dest_mult]
+                            break
+                else: #Can't simplify
+                    return False
+            else:
+                return False
+            
+        del self.get_class_dict(curr_class)[key]
+        return True
+        
     _preserving_changes = {None : (('global', 'const'),
                                    ('vector', 'samples'),
                                    ('time', 'samples'),
@@ -649,25 +741,8 @@ class DcmMetaExtension(Nifti1Extension):
                                                   ),
                            ('global', 'slices') : tuple(),
                           }
-                          
-    _const_test_order = (('global', 'const'),
-                         ('vector', 'samples'),
-                         ('time', 'samples'),
-                        )
-
-    _repeat_test_order = (('time', 'slices'),
-                          ('vector', 'slices'),
-                         )
-    
-    def _unmangle(self, value):
-        #Its not possible to preserve order while loading with python 2.6
-        kwargs = {}
-        if sys.version_info >= (2, 7):
-            kwargs['object_pairs_hook'] = OrderedDict
-        return json.loads(value, **kwargs)
-    
-    def _mangle(self, value):
-        return json.dumps(value, indent=4)
+    '''Classification mapping showing allowed changes when increasing the 
+    multiplicity.'''        
         
     def _get_changed_class(self, key, new_class):
         values, curr_class = self.get_values_and_class(key)
@@ -710,41 +785,7 @@ class DcmMetaExtension(Nifti1Extension):
         if not curr_class is None:
             del self.get_class_dict(curr_class)[key]
     
-    def _simplify(self, key):
-        values, curr_class = self.get_values_and_class(key)
-        curr_mult = self.get_multiplicity(curr_class)
-        
-        #If the class is global const then just delete it if the value is None
-        if curr_class == ('global', 'const'):
-            if values is None:
-                del self.get_class_dict(curr_class)[key]
-                return True
-            return False
-        
-        #Test if the values are constant with some period
-        for classes in self._const_test_order:
-            if classes != curr_class and classes[0] in self._content:
-                mult = self.get_multiplicity(classes)
-                reduce_factor = curr_mult / mult
-                if mult == 1:
-                    if is_constant(values):
-                        self.get_class_dict(classes)[key] = values[0]
-                        break
-                elif is_constant(values, reduce_factor):
-                    self.get_class_dict(classes)[key] = values[::reduce_factor]
-                    break
-        else: #Otherwise test if they are repeating with some period
-            for classes in self._repeat_test_order:
-                if classes[0] in self._content:
-                    mult = self.get_multiplicity(classes)
-                    if is_repeating(values, mult):
-                        self.get_class_dict(classes)[key] = values[:mult]
-                        break
-            else: #Can't simplify
-                return False
-            
-        del self.get_class_dict(curr_class)[key]
-        return True
+    
     
     def _copy_slice(self, other, src_class, idx):
         if src_class[0] == 'global':
