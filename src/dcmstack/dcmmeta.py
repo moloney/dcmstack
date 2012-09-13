@@ -804,9 +804,18 @@ class DcmMetaExtension(Nifti1Extension):
         else:
             dest_class = ('global', 'const')
             
+        src_dict = other.get_class_dict(src_class)
+        dest_dict = self.get_class_dict(dest_class)
+        dest_mult = self.get_multiplicity(dest_class)
         stride = other.n_slices
         for key, vals in other.get_class_dict(src_class).iteritems():
             subset_vals = vals[idx::stride]
+            
+            if len(subset_vals) < dest_mult:
+                full_vals = []
+                for idx in xrange(dest_mult / len(subset_vals)):
+                    full_vals += deepcopy(subset_vals)
+                subset_vals = full_vals
             if len(subset_vals) == 1:
                 subset_vals = subset_vals[0]
             self.get_class_dict(dest_class)[key] = deepcopy(subset_vals)
@@ -829,7 +838,7 @@ class DcmMetaExtension(Nifti1Extension):
             else:
                 result = []
                 slices_per_vec = n_slices * shape[3]
-                for vec_idx in shape[4]:
+                for vec_idx in xrange(shape[4]):
                     start_idx = (vec_idx * slices_per_vec) + (idx * n_slices)
                     end_idx = start_idx + n_slices
                     result.extend(src_dict[key][start_idx:end_idx])
@@ -838,6 +847,8 @@ class DcmMetaExtension(Nifti1Extension):
     def _copy_sample(self, other, src_class, sample_base, idx):
         src_dict = other.get_class_dict(src_class)
         if src_class[1] == 'samples':
+            #TODO: This is wrong (e.g. time samples would become vector 
+            #samples when splitting on time samples).
             if src_class[0] == sample_base:
                 for key, vals in src_dict.iteritems():
                     self.get_class_dict(('global', 'const'))[key] = \

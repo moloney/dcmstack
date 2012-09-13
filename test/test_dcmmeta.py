@@ -326,6 +326,8 @@ class TestGetSubset(object):
     def test_slice_subset(self):
         for slc_idx in xrange(self.ext.n_slices):
             sub = self.ext.get_subset(2, slc_idx)
+            sub.check_valid()
+            
             for classes in self.ext.get_valid_classes():
                 key = '%s_%s_test' % classes
                 if classes == ('time', 'slices'):
@@ -338,6 +340,37 @@ class TestGetSubset(object):
                     eq_(sub.get_values_and_class(key), 
                         self.ext.get_values_and_class(key)
                        )
+                       
+    def test_time_sample_subset(self):
+        for time_idx in xrange(5):
+            sub = self.ext.get_subset(3, time_idx)
+            sub.check_valid()
+            for classes in self.ext.get_valid_classes():
+                key = '%s_%s_test' % classes
+                if classes[0] == 'time':
+                    ok_(not classes in sub.get_valid_classes())
+                    if classes[1] == 'samples':
+                        eq_(sub.get_values_and_class(key),
+                            (time_idx, ('vector', 'samples'))
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_classification(key), ('vector', 'slices'))
+                elif classes[0] == 'vector':
+                    if classes[1] == 'samples':
+                        eq_(sub.get_values_and_class(key),
+                            self.ext.get_values_and_class(key)
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_classification(key), ('vector', 'slices'))
+                else:
+                    if classes[1] == 'const':
+                        eq_(sub.get_values_and_class(key),
+                            self.ext.get_values_and_class(key)
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_classification(key), ('global', 'slices'))
+            
+                
 
 class TestSimplify(object):
     def setUp(self):
