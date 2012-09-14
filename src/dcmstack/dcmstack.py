@@ -2,7 +2,7 @@
 Stack DICOM datasets into volumes. The contents of this module are imported 
 into the package namespace.
 """
-import warnings, re, dicom
+import warnings, re, dicom, os
 from copy import deepcopy
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
@@ -442,7 +442,7 @@ class DicomStack(object):
         return is_dummy
             
     
-    def add_dcm(self, dcm, meta=None):
+    def add_dcm(self, dcm, meta=None, filename=None):
         '''Add a pydicom dataset to the stack. 
         
         Parameters
@@ -515,7 +515,7 @@ class DicomStack(object):
                 #Convert any dummies that we have stashed previously
                 for dummy_meta, dummy_tuple in self._dummies:
                     dummy_wrp = _make_dummy(self._ref_input, dummy_meta)
-                    self._files_info.append((dummy_wrp, dummy_tuple))
+                    self._files_info.append((dummy_wrp, dummy_tuple, filename))
         else:
             if self._ref_input is None:
                 #We don't have a reference input, so stash the dummy for now
@@ -526,7 +526,7 @@ class DicomStack(object):
         
         #If we made a NiftiWrapper add it to the stack
         if not nii_wrp is None:
-            self._files_info.append((nii_wrp, sorting_tuple))
+            self._files_info.append((nii_wrp, sorting_tuple, filename))
         
         #Set the dirty flags
         self._shape_dirty = True 
@@ -552,6 +552,7 @@ class DicomStack(object):
         self._meta = None
         
         self._files_info = []
+        self.error = False
     
     def _chk_order(self, slice_positions, files_per_vol, num_volumes, 
                    num_time_points, num_vec_comps):
@@ -660,12 +661,13 @@ class DicomStack(object):
             for time_order in possible_orders:
                 #Update sorting tuples
                 for idx in xrange(len(self._files_info)):
-                    nii_wrp, curr_tuple = self._files_info[idx] 
+                    nii_wrp, curr_tuple, filename = self._files_info[idx]
                     self._files_info[idx] = (nii_wrp, 
                                              (curr_tuple[0], 
                                               nii_wrp[time_order],
                                               curr_tuple[2]
-                                             )
+                                             ),
+                                             filename
                                             )
                                                
                 #Check the order
@@ -1001,7 +1003,7 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
                 continue
             else:
                 raise
-            
+        filename = os.path.split(dcm_path)[-1]
         #Extract the meta data, find the key for results dict, and create the 
         #stack if needed
         meta = extractor(dcm)
@@ -1011,12 +1013,15 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
         
         #Try to add it to the stack
         try:
-            results[stack_key].add_dcm(dcm, meta)
+            results[stack_key].add_dcm(dcm, meta, filename)
             
         except Exception, e:
+
             if warn_on_except:
                 warnings.warn('Error adding file %s to stack %s: %s' % 
                               (dcm_path, stack_key, str(e)))
+                results[stack_key].error = True
+                results[stack_key]._files_info.append((None, None, filename))
             else:
                 raise
     
