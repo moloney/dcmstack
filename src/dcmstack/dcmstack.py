@@ -620,6 +620,7 @@ class DicomStack(object):
         
         #If more than one file per volume, check that slice spacing is equal
         if files_per_vol > 1:
+            positions = sorted(list(self._slice_pos_vals))
             spacings = []
             for idx in xrange(files_per_vol - 1):
                 spacings.append(slice_positions[idx+1] - slice_positions[idx])
