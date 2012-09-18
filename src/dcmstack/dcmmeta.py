@@ -869,6 +869,7 @@ class DcmMetaExtension(Nifti1Extension):
         '''Get a copy of meta data from 'other' instance with classification 
         'src_class', corresponding to one sample along the time or vector 
         dimension.'''
+        assert src_class != ('global', 'const')
         src_dict = other.get_class_dict(src_class)
         if src_class[1] == 'samples':
             #If we are indexing on the same dim as the src_class we need to 
@@ -897,10 +898,20 @@ class DcmMetaExtension(Nifti1Extension):
                     for key in src_dict.keys():
                         self._simplify(key)
 
-            else: #Otherwise just copy the meta data
-                for key, vals in src_dict.iteritems():
-                    self.get_class_dict(src_class)[key] = deepcopy(vals)
-        else:
+            else: #Otherwise classification does not change
+                #The multiplicity will change for time samples if splitting
+                #vector dimension
+                if src_class == ('time', 'samples'):
+                    dest_mult = self.get_multiplicity(src_class)
+                    start_idx = idx * dest_mult
+                    end_idx = start_idx + dest_mult
+                    for key, vals in src_dict.iteritems():
+                        self.get_class_dict(src_class)[key] = \
+                            deepcopy(vals[start_idx:end_idx])
+                else: #Otherwise multiplicity is unchanged
+                    for key, vals in src_dict.iteritems():
+                        self.get_class_dict(src_class)[key] = deepcopy(vals)
+        else: #The src_class is per slice
             if src_class[0] == sample_base:
                 best_dest = None
                 for dest_class in self._preserving_changes[src_class]:

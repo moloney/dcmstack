@@ -464,7 +464,8 @@ class TestGetSubset(object):
                         eq_(sub.get_classification(key), ('global', 'slices'))
             
     def test_time_sample_simplify(self):
-        #Add an element to test for simplification of time samples
+        #Add an element to test for simplification of time samples that 
+        #become constant
         vals = []
         for vector_idx in xrange(7):
             for time_idx in xrange(5):
@@ -477,5 +478,40 @@ class TestGetSubset(object):
             sub.check_valid()
             eq_(sub.get_values_and_class('const_test'),
                 (time_idx, ('global', 'const')))
-                
-
+    
+    def test_vector_sample_subset(self):
+        for vector_idx in xrange(7):
+            sub = self.ext.get_subset(4, vector_idx)
+            sub.check_valid()
+            for classes in self.ext.get_valid_classes():
+                key = '%s_%s_test' % classes
+                if classes[0] == 'vector':
+                    ok_(not classes in sub.get_valid_classes())
+                    if classes[1] == 'samples':
+                        eq_(sub.get_values_and_class(key),
+                            (vector_idx, ('global', 'const'))
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_values_and_class(key), 
+                            (range(3 * 5), ('global', 'slices'))
+                           )
+                elif classes[0] == 'time':
+                    if classes[1] == 'samples':
+                        start = vector_idx * 5
+                        end = start + 5
+                        eq_(sub.get_values_and_class(key),
+                            (range(start, end), classes)
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_values_and_class(key),
+                            self.ext.get_values_and_class(key))
+                else:
+                    if classes[1] == 'const':
+                        eq_(sub.get_values_and_class(key),
+                            self.ext.get_values_and_class(key)
+                           )
+                    elif classes[1] == 'slices':
+                        start = vector_idx * (3 * 5)
+                        end = start + (3 * 5)
+                        eq_(sub.get_values_and_class(key),
+                            (range(start, end), classes))
