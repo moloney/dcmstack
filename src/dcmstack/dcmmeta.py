@@ -678,10 +678,14 @@ class DcmMetaExtension(Nifti1Extension):
     values that are repeating with some period.'''
     
     def _simplify(self, key):
-        '''Try to simplify the meta data by changing its classification. 
-        Return True if the classification is changed, otherwise False.'''
+        '''Try to simplify (reduce the multiplicity) of a single meta data 
+        element by changing its classification. Return True if the 
+        classification is changed, otherwise False. 
+        
+        Looks for values that are constant or repeating with some pattern. 
+        Constant elements with a value of None will be deleted.
+        '''
         values, curr_class = self.get_values_and_class(key)
-        curr_mult = self.get_multiplicity(curr_class)
         
         #If the class is global const then just delete it if the value is None
         if curr_class == ('global', 'const'):
@@ -696,8 +700,12 @@ class DcmMetaExtension(Nifti1Extension):
             if dest_cls[0] in self._content:
                 period = self._get_const_period(curr_class, dest_cls)
                 if is_constant(values, period):
-                    self.get_class_dict(dest_cls)[key] = \
-                        values[::period]
+                    if period is None:
+                        self.get_class_dict(dest_cls)[key] = \
+                            values[0]
+                    else:
+                        self.get_class_dict(dest_cls)[key] = \
+                            values[::period]
                     break
         else: #Otherwise test if values are repeating with some period
             if curr_class in self._repeat_tests:
@@ -745,6 +753,10 @@ class DcmMetaExtension(Nifti1Extension):
     multiplicity.'''        
         
     def _get_changed_class(self, key, new_class):
+        '''Get an array of values corresponding to a single meta data 
+        element with its classification changed by increasing its 
+        multiplicity. This will preserve all the meta data and allow easier
+        merging of values with different classifications.'''
         values, curr_class = self.get_values_and_class(key)
         if curr_class == new_class:
             return values
@@ -775,6 +787,8 @@ class DcmMetaExtension(Nifti1Extension):
         
         
     def _change_class(self, key, new_class):
+        '''Change the classification of the meta data element in place. See 
+        _get_changed_class.'''
         values, curr_class = self.get_values_and_class(key)
         if curr_class == new_class:
             return
@@ -788,6 +802,9 @@ class DcmMetaExtension(Nifti1Extension):
     
     
     def _copy_slice(self, other, src_class, idx):
+        '''Get a copy of the meta data from the 'other' instance with 
+        classification 'src_class', corresponding to the slice with index
+        'idx'.'''
         if src_class[0] == 'global':
             for classes in (('time', 'samples'),
                             ('vector', 'samples'),
@@ -808,7 +825,7 @@ class DcmMetaExtension(Nifti1Extension):
         dest_dict = self.get_class_dict(dest_class)
         dest_mult = self.get_multiplicity(dest_class)
         stride = other.n_slices
-        for key, vals in other.get_class_dict(src_class).iteritems():
+        for key, vals in src_dict.iteritems():
             subset_vals = vals[idx::stride]
             
             if len(subset_vals) < dest_mult:
@@ -818,10 +835,14 @@ class DcmMetaExtension(Nifti1Extension):
                 subset_vals = full_vals
             if len(subset_vals) == 1:
                 subset_vals = subset_vals[0]
-            self.get_class_dict(dest_class)[key] = deepcopy(subset_vals)
+            dest_dict[key] = deepcopy(subset_vals)
             self._simplify(key)
 
     def _global_slice_subset(self, key, sample_base, idx):
+        '''Get a subset of the meta data values with the classificaion 
+        ('global', 'slices') corresponding to a single sample along the 
+        time or vector dimension (as specified by 'sample_base' and 'idx').
+        '''
         n_slices = self.n_slices
         shape = self.shape
         src_dict = self.get_class_dict(('global', 'slices'))
@@ -845,15 +866,38 @@ class DcmMetaExtension(Nifti1Extension):
                 return result
     
     def _copy_sample(self, other, src_class, sample_base, idx):
+        '''Get a copy of meta data from 'other' instance with classification 
+        'src_class', corresponding to one sample along the time or vector 
+        dimension.'''
         src_dict = other.get_class_dict(src_class)
         if src_class[1] == 'samples':
-            #TODO: This is wrong (e.g. time samples would become vector 
-            #samples when splitting on time samples).
+            #If we are indexing on the same dim as the src_class we need to 
+            #change the classification
             if src_class[0] == sample_base:
-                for key, vals in src_dict.iteritems():
-                    self.get_class_dict(('global', 'const'))[key] = \
-                        deepcopy(vals[idx])
-            else:
+                #Time samples may become vector samples, otherwise const
+                best_dest = None
+                for dest_cls in (('vector', 'samples'),
+                                 ('global', 'const')):
+                    if (dest_cls != src_class and 
+                        dest_cls in self.get_valid_classes()
+                       ):
+                        best_dest = dest_cls
+                        break
+                    
+                dest_mult = self.get_multiplicity(dest_cls)
+                if dest_mult == 1:
+                    for key, vals in src_dict.iteritems():
+                        self.get_class_dict(dest_cls)[key] = \
+                            deepcopy(vals[idx])
+                else: #We must be doing time samples -> vector samples
+                    stride = other.shape[3]
+                    for key, vals in src_dict.iteritems():
+                        self.get_class_dict(dest_cls)[key] = \
+                            deepcopy(vals[idx::stride])
+                    for key in src_dict.keys():
+                        self._simplify(key)
+
+            else: #Otherwise just copy the meta data
                 for key, vals in src_dict.iteritems():
                     self.get_class_dict(src_class)[key] = deepcopy(vals)
         else:

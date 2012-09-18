@@ -312,66 +312,6 @@ class TestFiltering(object):
             if sub_cls == 'slices':
                 eq_(len(self.ext.get_class_dict((base_cls, sub_cls))), 0)
     
-class TestGetSubset(object):
-    def setUp(self):
-        self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
-                                                       np.eye(4), 
-                                                       2
-                                                      )
-        for classes in self.ext.get_valid_classes():
-            key = '%s_%s_test' % classes
-            mult = self.ext.get_multiplicity(classes)
-            self.ext.get_class_dict(classes)[key] = range(mult)
-        
-    def test_slice_subset(self):
-        for slc_idx in xrange(self.ext.n_slices):
-            sub = self.ext.get_subset(2, slc_idx)
-            sub.check_valid()
-            
-            for classes in self.ext.get_valid_classes():
-                key = '%s_%s_test' % classes
-                if classes == ('time', 'slices'):
-                    eq_(sub.get_values_and_class(key), 
-                        (slc_idx, ('global', 'const'))
-                       )
-                elif classes[1] == 'slices':
-                    eq_(sub.get_classification(key), ('time', 'samples'))
-                else:
-                    eq_(sub.get_values_and_class(key), 
-                        self.ext.get_values_and_class(key)
-                       )
-                       
-    def test_time_sample_subset(self):
-        for time_idx in xrange(5):
-            sub = self.ext.get_subset(3, time_idx)
-            sub.check_valid()
-            for classes in self.ext.get_valid_classes():
-                key = '%s_%s_test' % classes
-                if classes[0] == 'time':
-                    ok_(not classes in sub.get_valid_classes())
-                    if classes[1] == 'samples':
-                        eq_(sub.get_values_and_class(key),
-                            (time_idx, ('vector', 'samples'))
-                           )
-                    elif classes[1] == 'slices':
-                        eq_(sub.get_classification(key), ('vector', 'slices'))
-                elif classes[0] == 'vector':
-                    if classes[1] == 'samples':
-                        eq_(sub.get_values_and_class(key),
-                            self.ext.get_values_and_class(key)
-                           )
-                    elif classes[1] == 'slices':
-                        eq_(sub.get_classification(key), ('vector', 'slices'))
-                else:
-                    if classes[1] == 'const':
-                        eq_(sub.get_values_and_class(key),
-                            self.ext.get_values_and_class(key)
-                           )
-                    elif classes[1] == 'slices':
-                        eq_(sub.get_classification(key), ('global', 'slices'))
-            
-                
-
 class TestSimplify(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
@@ -449,7 +389,8 @@ class TestSimplify(object):
         self.ext.check_valid()
         
         eq_(self.ext._simplify('Test1'), True)
-        eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+        eq_(self.ext.get_values_and_class('Test1'), 
+            (0, ('global', 'const')))
         
         eq_(self.ext._simplify('Test2'), True)
         eq_(self.ext.get_classification('Test2'), ('vector', 'samples'))
@@ -461,5 +402,80 @@ class TestSimplify(object):
         
         eq_(self.ext._simplify('Test1'), True)
         eq_(self.ext.get_classification('Test1'), ('global', 'const'))
+    
+class TestGetSubset(object):
+    def setUp(self):
+        self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
+                                                       np.eye(4), 
+                                                       2
+                                                      )
+                                                      
+        #Add an element to every classification
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            mult = self.ext.get_multiplicity(classes)
+            self.ext.get_class_dict(classes)[key] = range(mult)
         
+    def test_slice_subset(self):
+        for slc_idx in xrange(self.ext.n_slices):
+            sub = self.ext.get_subset(2, slc_idx)
+            sub.check_valid()
+            
+            for classes in self.ext.get_valid_classes():
+                key = '%s_%s_test' % classes
+                if classes == ('time', 'slices'):
+                    eq_(sub.get_values_and_class(key), 
+                        (slc_idx, ('global', 'const'))
+                       )
+                elif classes[1] == 'slices':
+                    eq_(sub.get_classification(key), ('time', 'samples'))
+                else:
+                    eq_(sub.get_values_and_class(key), 
+                        self.ext.get_values_and_class(key)
+                       )
+                       
+    def test_time_sample_subset(self):
+        for time_idx in xrange(5):
+            sub = self.ext.get_subset(3, time_idx)
+            sub.check_valid()
+            for classes in self.ext.get_valid_classes():
+                key = '%s_%s_test' % classes
+                if classes[0] == 'time':
+                    ok_(not classes in sub.get_valid_classes())
+                    if classes[1] == 'samples':
+                        eq_(sub.get_values_and_class(key),
+                            (range(time_idx, 5 * 7, 5), ('vector', 'samples'))
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_classification(key), ('vector', 'slices'))
+                elif classes[0] == 'vector':
+                    if classes[1] == 'samples':
+                        eq_(sub.get_values_and_class(key),
+                            self.ext.get_values_and_class(key)
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_classification(key), ('vector', 'slices'))
+                else:
+                    if classes[1] == 'const':
+                        eq_(sub.get_values_and_class(key),
+                            self.ext.get_values_and_class(key)
+                           )
+                    elif classes[1] == 'slices':
+                        eq_(sub.get_classification(key), ('global', 'slices'))
+            
+    def test_time_sample_simplify(self):
+        #Add an element to test for simplification of time samples
+        vals = []
+        for vector_idx in xrange(7):
+            for time_idx in xrange(5):
+                vals.append(time_idx)
+        self.ext.get_class_dict(('time', 'samples'))['const_test'] = vals
         
+        #Make sure it becomes global const
+        for time_idx in xrange(5):
+            sub = self.ext.get_subset(3, time_idx)
+            sub.check_valid()
+            eq_(sub.get_values_and_class('const_test'),
+                (time_idx, ('global', 'const')))
+                
+
