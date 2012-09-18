@@ -830,7 +830,7 @@ class DcmMetaExtension(Nifti1Extension):
             
             if len(subset_vals) < dest_mult:
                 full_vals = []
-                for idx in xrange(dest_mult / len(subset_vals)):
+                for val_idx in xrange(dest_mult / len(subset_vals)):
                     full_vals += deepcopy(subset_vals)
                 subset_vals = full_vals
             if len(subset_vals) == 1:

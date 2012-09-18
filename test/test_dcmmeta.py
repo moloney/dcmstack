@@ -439,6 +439,34 @@ class TestGetSubset(object):
                         self.ext.get_values_and_class(key)
                        )
                        
+    def test_slice_subset_simplify(self):
+        vals = []
+        for time_idx in xrange(5):
+            for slice_idx in xrange(3):
+                if slice_idx == 1:
+                    vals.append(1)
+                else:
+                    vals.append(time_idx)
+        self.ext.get_class_dict(('vector', 'slices'))['const_test'] = vals
+        
+        vals = []
+        for vector_idx in xrange(7):
+            for time_idx in xrange(5):
+                for slice_idx in xrange(3):
+                    if slice_idx == 1:
+                        vals.append(1)
+                    else:
+                        vals.append(vector_idx)
+        self.ext.get_class_dict(('global', 'slices'))['const_test2'] = vals
+        self.ext.check_valid()
+        
+        sub = self.ext.get_subset(2, 1)
+        sub.check_valid()
+        eq_(sub.get_values_and_class('const_test'),
+            (1, ('global', 'const')))
+        eq_(sub.get_values_and_class('const_test2'),
+            (1, ('global', 'const')))
+                       
     def test_time_sample_subset(self):
         for time_idx in xrange(5):
             sub = self.ext.get_subset(3, time_idx)
@@ -478,7 +506,7 @@ class TestGetSubset(object):
                         eq_(sub.get_values_and_class(key), 
                             (vals, ('global', 'slices')))
             
-    def test_time_sample_simplify(self):
+    def test_time_sample_subset_simplify(self):
         #Add an element to test for simplification of time samples that 
         #become constant
         vals = []
