@@ -507,20 +507,58 @@ class TestGetSubset(object):
                             (vals, ('global', 'slices')))
             
     def test_time_sample_subset_simplify(self):
-        #Add an element to test for simplification of time samples that 
-        #become constant
+        #Test for simplification of time samples that become constant
         vals = []
         for vector_idx in xrange(7):
             for time_idx in xrange(5):
                 vals.append(time_idx)
         self.ext.get_class_dict(('time', 'samples'))['const_test'] = vals
         
-        #Make sure it becomes global const
+        #Test for simplification of vector slices that become constant
+        vals = []
+        for time_idx in xrange(5):
+            for slice_idx in xrange(3):
+                if time_idx == 1:
+                    vals.append(1)
+                else:
+                    vals.append(slice_idx)
+        self.ext.get_class_dict(('vector', 'slices'))['const_test2'] = vals
+        
+        #Test simplification of global slices that become constant
+        vals = []
+        for vector_idx in xrange(7):
+            for time_idx in xrange(5):
+                for slice_idx in xrange(3):
+                    if time_idx == 1:
+                        vals.append(1)
+                    else:
+                        vals.append(vector_idx)
+        self.ext.get_class_dict(('global', 'slices'))['const_test3'] = vals
+        
+        #Test simplification of global slices that become vector slices
+        vals = []
+        for vector_idx in xrange(7):
+            for time_idx in xrange(5):
+                for slice_idx in xrange(3):
+                    if time_idx == 1:
+                        vals.append(slice_idx)
+                    else:
+                        vals.append(vector_idx)
+        self.ext.get_class_dict(('global', 'slices'))['repeat_test'] = vals
+        
         for time_idx in xrange(5):
             sub = self.ext.get_subset(3, time_idx)
             sub.check_valid()
             eq_(sub.get_values_and_class('const_test'),
                 (time_idx, ('global', 'const')))
+                
+        sub = self.ext.get_subset(3, 1)
+        eq_(sub.get_values_and_class('const_test2'),
+            (1, ('global', 'const')))
+        eq_(sub.get_values_and_class('const_test3'),
+            (1, ('global', 'const')))
+        eq_(sub.get_values_and_class('repeat_test'),
+            (range(3), ('vector', 'slices')))
     
     def test_vector_sample_subset(self):
         for vector_idx in xrange(7):
