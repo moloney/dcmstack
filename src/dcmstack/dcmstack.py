@@ -235,9 +235,19 @@ def dcm_time_to_sec(time_str):
     -------
     A floating point representing the number of seconds past midnight
     '''
-    return ((int(time_str[:2]) * 3600) + 
-            (int(time_str[2:4]) * 60) + 
-            float(time_str[4:]))
+    #Allow ACR/NEMA style format by removing any colon chars
+    time_str = time_str.replace(':', '')
+        
+    #Only the hours portion is required
+    result = int(time_str[:2]) * 3600
+
+    str_len = len(time_str)
+    if str_len > 2:
+        result += int(time_str[2:4]) * 60
+    if str_len > 4:
+        result += float(time_str[4:])
+    
+    return float(result)
 
 class IncongruentImageError(Exception):
     '''An exception denoting that a DICOM with incorrect size or orientation 
