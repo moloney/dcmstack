@@ -908,6 +908,7 @@ class DcmMetaExtension(Nifti1Extension):
                     for key, vals in src_dict.iteritems():
                         self.get_class_dict(src_class)[key] = \
                             deepcopy(vals[start_idx:end_idx])
+                        self._simplify(key)
                 else: #Otherwise multiplicity is unchanged
                     for key, vals in src_dict.iteritems():
                         self.get_class_dict(src_class)[key] = deepcopy(vals)

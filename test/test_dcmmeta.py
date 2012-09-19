@@ -447,7 +447,7 @@ class TestGetSubset(object):
                     vals.append(1)
                 else:
                     vals.append(time_idx)
-        self.ext.get_class_dict(('vector', 'slices'))['const_test'] = vals
+        self.ext.get_class_dict(('vector', 'slices'))['vec_slc_to_const'] = vals
         
         vals = []
         for vector_idx in xrange(7):
@@ -457,14 +457,15 @@ class TestGetSubset(object):
                         vals.append(1)
                     else:
                         vals.append(vector_idx)
-        self.ext.get_class_dict(('global', 'slices'))['const_test2'] = vals
+        self.ext.get_class_dict(('global', 'slices'))['glb_slc_to_const'] = \
+            vals
         self.ext.check_valid()
         
         sub = self.ext.get_subset(2, 1)
         sub.check_valid()
-        eq_(sub.get_values_and_class('const_test'),
+        eq_(sub.get_values_and_class('vec_slc_to_const'),
             (1, ('global', 'const')))
-        eq_(sub.get_values_and_class('const_test2'),
+        eq_(sub.get_values_and_class('glb_slc_to_const'),
             (1, ('global', 'const')))
                        
     def test_time_sample_subset(self):
@@ -512,7 +513,14 @@ class TestGetSubset(object):
         for vector_idx in xrange(7):
             for time_idx in xrange(5):
                 vals.append(time_idx)
-        self.ext.get_class_dict(('time', 'samples'))['const_test'] = vals
+        self.ext.get_class_dict(('time', 'samples'))['time_smp_to_const'] = \
+            vals
+            
+        for time_idx in xrange(5):
+            sub = self.ext.get_subset(3, time_idx)
+            sub.check_valid()
+            eq_(sub.get_values_and_class('time_smp_to_const'),
+                (time_idx, ('global', 'const')))
         
         #Test for simplification of vector slices that become constant
         vals = []
@@ -522,7 +530,8 @@ class TestGetSubset(object):
                     vals.append(1)
                 else:
                     vals.append(slice_idx)
-        self.ext.get_class_dict(('vector', 'slices'))['const_test2'] = vals
+        self.ext.get_class_dict(('vector', 'slices'))['vec_slc_to_const'] = \
+            vals
         
         #Test simplification of global slices that become constant
         vals = []
@@ -533,9 +542,18 @@ class TestGetSubset(object):
                         vals.append(1)
                     else:
                         vals.append(vector_idx)
-        self.ext.get_class_dict(('global', 'slices'))['const_test3'] = vals
+        self.ext.get_class_dict(('global', 'slices'))['glb_slc_to_const'] = \
+            vals
+            
+        sub = self.ext.get_subset(3, 1)
+        sub.check_valid()
+        eq_(sub.get_values_and_class('vec_slc_to_const'),
+            (1, ('global', 'const')))
+        eq_(sub.get_values_and_class('glb_slc_to_const'),
+            (1, ('global', 'const')))
         
-        #Test simplification of global slices that become vector slices
+        #Test simplification of global slices that become vector slices or 
+        #samples
         vals = []
         for vector_idx in xrange(7):
             for time_idx in xrange(5):
@@ -544,21 +562,18 @@ class TestGetSubset(object):
                         vals.append(slice_idx)
                     else:
                         vals.append(vector_idx)
-        self.ext.get_class_dict(('global', 'slices'))['repeat_test'] = vals
-        
+        self.ext.get_class_dict(('global', 'slices'))['glb_slc_to_vec'] = \
+            vals
+
         for time_idx in xrange(5):
             sub = self.ext.get_subset(3, time_idx)
             sub.check_valid()
-            eq_(sub.get_values_and_class('const_test'),
-                (time_idx, ('global', 'const')))
-                
-        sub = self.ext.get_subset(3, 1)
-        eq_(sub.get_values_and_class('const_test2'),
-            (1, ('global', 'const')))
-        eq_(sub.get_values_and_class('const_test3'),
-            (1, ('global', 'const')))
-        eq_(sub.get_values_and_class('repeat_test'),
-            (range(3), ('vector', 'slices')))
+            if time_idx == 1:
+                eq_(sub.get_values_and_class('glb_slc_to_vec'),
+                    (range(3), ('vector', 'slices')))
+            else:
+                eq_(sub.get_values_and_class('glb_slc_to_vec'),
+                    (range(7), ('vector', 'samples')))            
     
     def test_vector_sample_subset(self):
         for vector_idx in xrange(7):
@@ -577,7 +592,7 @@ class TestGetSubset(object):
                             (range(3 * 5), ('global', 'slices'))
                            )
                 elif classes[0] == 'time':
-                    if classes[1] == 'samples':
+                    if classes[1] == 'samples': #Could be const
                         start = vector_idx * 5
                         end = start + 5
                         eq_(sub.get_values_and_class(key),
@@ -591,8 +606,52 @@ class TestGetSubset(object):
                         eq_(sub.get_values_and_class(key),
                             self.ext.get_values_and_class(key)
                            )
-                    elif classes[1] == 'slices':
+                    elif classes[1] == 'slices': #Could be const or time samples or time slices
                         start = vector_idx * (3 * 5)
                         end = start + (3 * 5)
                         eq_(sub.get_values_and_class(key),
                             (range(start, end), classes))
+                            
+    def test_vector_sample_subset_simplify(self):
+        
+        #Test for simplification of time samples that become constant
+        vals = []
+        for vector_idx in xrange(7):
+            for time_idx in xrange(5):
+                if vector_idx == 1:
+                    vals.append(1)
+                else:
+                    vals.append(time_idx)
+        self.ext.get_class_dict(('time', 'samples'))['time_smp_to_const'] = \
+            vals
+        sub = self.ext.get_subset(4, 1)
+        eq_(sub.get_values_and_class('time_smp_to_const'),
+            (1, ('global', 'const')))
+            
+        #Test for simplification of global slices that become constant, time 
+        #samples, or time slices
+        vals = []
+        for vector_idx in xrange(7):
+            for time_idx in xrange(5):
+                for slice_idx in xrange(3):
+                    if vector_idx == 1:
+                        vals.append(1)
+                    elif vector_idx == 2:
+                        vals.append(slice_idx)
+                    else:
+                        vals.append(time_idx)
+        self.ext.get_class_dict(('global', 'slices'))['glb_slc'] = \
+            vals
+                
+        for vector_idx in xrange(7):
+            sub = self.ext.get_subset(4, vector_idx)
+            sub.check_valid()
+            if vector_idx == 1:
+                eq_(sub.get_values_and_class('glb_slc'),
+                    (1, ('global', 'const')))
+            elif vector_idx == 2:
+                eq_(sub.get_values_and_class('glb_slc'),
+                    (range(3), ('time', 'slices')))
+            else:
+                eq_(sub.get_values_and_class('glb_slc'),
+                    (range(5), ('time', 'samples')))
