@@ -655,3 +655,20 @@ class TestGetSubset(object):
             else:
                 eq_(sub.get_values_and_class('glb_slc'),
                     (range(5), ('time', 'samples')))
+
+def test_slice_from_sequence():
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), np.eye(4), 2)
+    ext1.get_class_dict(('global', 'const'))['const'] = 1
+    ext1.get_class_dict(('global', 'const'))['var'] = 1
+    ext1.get_class_dict(('global', 'const'))['missing'] = 1
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), np.eye(4), 2)
+    ext2.get_class_dict(('global', 'const'))['const'] = 1
+    ext2.get_class_dict(('global', 'const'))['var'] = 2
+    
+    merged = dcmmeta.DcmMetaExtension.from_sequence([ext1, ext2], 2)
+    eq_(merged.get_values_and_class('const'),
+        (1, ('global', 'const')))
+    eq_(merged.get_values_and_class('var'),
+        ([1, 2], ('global', 'slices')))
+    eq_(merged.get_values_and_class('missing'),
+        ([1, None], ('global', 'slices')))
