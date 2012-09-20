@@ -656,7 +656,7 @@ class TestGetSubset(object):
                 eq_(sub.get_values_and_class('glb_slc'),
                     (range(5), ('time', 'samples')))
 
-def test_slice_from_sequence():
+def test_from_sequence_2d_to_3d():
     ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), np.eye(4), 2)
     ext1.get_class_dict(('global', 'const'))['const'] = 1
     ext1.get_class_dict(('global', 'const'))['var'] = 1
@@ -672,3 +672,32 @@ def test_slice_from_sequence():
         ([1, 2], ('global', 'slices')))
     eq_(merged.get_values_and_class('missing'),
         ([1, None], ('global', 'slices')))
+        
+def test_from_sequence_3d_to_4d():
+    for dim_name, dim in (('time', 3), ('vector', 4)):
+        ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), 2)
+        ext1.get_class_dict(('global', 'const'))['global_const_const'] = 1
+        ext1.get_class_dict(('global', 'const'))['global_const_var'] = 1
+        ext1.get_class_dict(('global', 'const'))['global_const_missing'] = 1
+        ext1.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1]
+        ext1.get_class_dict(('global', 'slices'))['global_slices_var'] = [0, 1]
+        ext1.get_class_dict(('global', 'slices'))['global_slices_missing'] = [0, 1]
+        ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), 2)
+        ext2.get_class_dict(('global', 'const'))['global_const_const'] = 1
+        ext2.get_class_dict(('global', 'const'))['global_const_var'] = 2
+        ext2.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1]
+        ext2.get_class_dict(('global', 'slices'))['global_slices_var'] = [1, 2]
+        
+        merged = dcmmeta.DcmMetaExtension.from_sequence([ext1, ext2], dim)
+        eq_(merged.get_values_and_class('global_const_const'),
+            (1, ('global', 'const')))
+        eq_(merged.get_values_and_class('global_const_var'),
+            ([1, 2], (dim_name, 'samples')))
+        eq_(merged.get_values_and_class('global_const_missing'),
+            ([1, None], (dim_name, 'samples')))
+        eq_(merged.get_values_and_class('global_slices_const'),
+            ([0, 1], (dim_name, 'slices')))
+        eq_(merged.get_values_and_class('global_slices_var'),
+            ([0, 1, 1, 2], ('global', 'slices')))
+        eq_(merged.get_values_and_class('global_slices_missing'),
+            ([0, 1, None, None], ('global', 'slices')))
