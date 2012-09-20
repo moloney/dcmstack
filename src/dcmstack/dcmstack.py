@@ -235,9 +235,19 @@ def dcm_time_to_sec(time_str):
     -------
     A floating point representing the number of seconds past midnight
     '''
-    return ((int(time_str[:2]) * 3600) + 
-            (int(time_str[2:4]) * 60) + 
-            float(time_str[4:]))
+    #Allow ACR/NEMA style format by removing any colon chars
+    time_str = time_str.replace(':', '')
+        
+    #Only the hours portion is required
+    result = int(time_str[:2]) * 3600
+
+    str_len = len(time_str)
+    if str_len > 2:
+        result += int(time_str[2:4]) * 60
+    if str_len > 4:
+        result += float(time_str[4:])
+    
+    return float(result)
 
 class IncongruentImageError(Exception):
     '''An exception denoting that a DICOM with incorrect size or orientation 
@@ -364,6 +374,8 @@ class DicomStack(object):
                     'TriggerTime',
                     'AcquisitionTime',
                     'ContentTime',
+                    'AcquisitionNumber',
+                    'InstanceNumber',
                    ]
     '''The meta data keywords used when trying to guess the sorting order. 
     Keys that come earlier in the list are given higher priority.'''
@@ -940,9 +952,9 @@ class DicomStack(object):
                 if meta_ext is file_info[0].meta_ext:
                     meta_ext = deepcopy(meta_ext)
                     
-            meta_ext.set_shape(data.shape)
-            meta_ext.set_slice_dim(slice_dim)
-            meta_ext.set_affine(nifti_header.get_best_affine())
+            meta_ext.shape = data.shape
+            meta_ext.slice_dim = slice_dim
+            meta_ext.affine = nifti_header.get_best_affine()
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)

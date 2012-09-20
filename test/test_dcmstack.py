@@ -1,15 +1,12 @@
 """
 Tests for dcmstack.dcmstack
 """
-import sys, shutil
+import sys
 from os import path
 from glob import glob
 from hashlib import sha256
-from tempfile import mkdtemp
-from shutil import rmtree
 from nose.tools import ok_, eq_, assert_raises
 import numpy as np
-from numpy.testing.decorators import skipif
 import dicom
 import nibabel as nb
 
@@ -93,6 +90,15 @@ class TestReorderVoxels(object):
         
 def test_dcm_time_to_sec():
     eq_(dcmstack.dcm_time_to_sec('100235.123456'), 36155.123456)
+    eq_(dcmstack.dcm_time_to_sec('100235'), 36155)
+    eq_(dcmstack.dcm_time_to_sec('1002'), 36120)
+    eq_(dcmstack.dcm_time_to_sec('10'), 36000)
+    
+    #Allow older NEMA style values
+    eq_(dcmstack.dcm_time_to_sec('10:02:35.123456'), 36155.123456)
+    eq_(dcmstack.dcm_time_to_sec('10:02:35'), 36155)
+    eq_(dcmstack.dcm_time_to_sec('10:02'), 36120)
+    eq_(dcmstack.dcm_time_to_sec('10'), 36000)
     
 class TestDicomOrdering(object):
     def setUp(self):
