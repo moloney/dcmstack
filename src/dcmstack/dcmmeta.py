@@ -766,8 +766,10 @@ class DcmMetaExtension(Nifti1Extension):
         
         if curr_class is None:
             curr_mult = 1
+            per_slice = False
         else:
             curr_mult = self.get_multiplicity(curr_class)
+            per_slice = curr_class[1] == 'slices'
         if new_class in self.get_valid_classes():
             new_mult = self.get_multiplicity(new_class)
         else:
@@ -776,9 +778,13 @@ class DcmMetaExtension(Nifti1Extension):
         if curr_mult == 1:
             values = [values] 
             
-        result = []
-        for value in values:
-            result.extend([deepcopy(value)] * mult_fact)
+            
+        if per_slice:
+            result = values * mult_fact
+        else:
+            result = []
+            for value in values:
+                result.extend([deepcopy(value)] * mult_fact)
             
         if new_class == ('global', 'const'):
             result = result[0]

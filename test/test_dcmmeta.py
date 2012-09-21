@@ -656,6 +656,98 @@ class TestGetSubset(object):
                 eq_(sub.get_values_and_class('glb_slc'),
                     (range(5), ('time', 'samples')))
 
+class TestChangeClass(object):
+    def setUp(self):
+        self.ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 3, 5, 7), 
+                                                       np.eye(4), 
+                                                       2
+                                                      )
+        #Add an element to every classification
+        for classes in self.ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            mult = self.ext.get_multiplicity(classes)
+            if mult == 1:
+                vals = 0
+            else:
+                vals = range(mult)
+            self.ext.get_class_dict(classes)[key] = vals
+    
+    def test_change_none(self):
+        eq_(self.ext._get_changed_class('None_test', ('global', 'const')),
+            None)
+        eq_(self.ext._get_changed_class('None_test', ('global', 'slices')),
+            [None] * (3 * 5 * 7))
+        eq_(self.ext._get_changed_class('None_test', ('time', 'samples')),
+            [None] * (5 * 7))
+        eq_(self.ext._get_changed_class('None_test', ('time', 'slices')),
+            [None] * 3)
+        eq_(self.ext._get_changed_class('None_test', ('vector', 'samples')),
+            [None] * 7)
+        eq_(self.ext._get_changed_class('None_test', ('vector', 'slices')),
+            [None] * (3 * 5))
+        
+    def test_change_global_const(self):
+        eq_(self.ext._get_changed_class('global_const_test', 
+                                        ('global', 'slices')),
+            [0] * (3 * 5 * 7))
+        eq_(self.ext._get_changed_class('global_const_test', 
+                                        ('time', 'samples')),
+            [0] * (5 * 7))
+        eq_(self.ext._get_changed_class('global_const_test', 
+                                        ('time', 'slices')),
+            [0] * 3)
+        eq_(self.ext._get_changed_class('global_const_test', 
+                                        ('vector', 'samples')),
+            [0] * 7)
+        eq_(self.ext._get_changed_class('global_const_test', 
+                                        ('vector', 'slices')),
+            [0] * (3 * 5))
+    
+    def test_change_vector_samples(self):
+        vals = []
+        for vector_idx in xrange(7):
+            vals += [vector_idx] * 15
+        eq_(self.ext._get_changed_class('vector_samples_test', 
+                                        ('global', 'slices')),
+            vals)
+        vals = []
+        for vector_idx in xrange(7):
+            vals += [vector_idx] * 5
+        eq_(self.ext._get_changed_class('vector_samples_test', 
+                                        ('time', 'samples')),
+            vals)
+        
+    def test_change_time_samples(self):
+        vals = []
+        for time_idx in xrange(5 * 7):
+            vals += [time_idx] * 3
+        eq_(self.ext._get_changed_class('time_samples_test', 
+                                        ('global', 'slices')),
+            vals)
+            
+    def test_time_slices(self):
+        vals = []
+        for time_idx in xrange(5 * 7):
+            vals += range(3)
+        eq_(self.ext._get_changed_class('time_slices_test', 
+                                        ('global', 'slices')),
+            vals)
+        vals = []
+        for time_idx in xrange(5):
+            vals += range(3)
+        eq_(self.ext._get_changed_class('time_slices_test', 
+                                        ('vector', 'slices')),
+            vals)
+    
+    def test_vector_slices(self):
+        vals = []
+        for vector_idx in xrange(7):
+            vals += range(15)
+        eq_(self.ext._get_changed_class('vector_slices_test', 
+                                        ('global', 'slices')),
+            vals)
+    
+
 def test_from_sequence_2d_to_3d():
     ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), np.eye(4), 2)
     ext1.get_class_dict(('global', 'const'))['const'] = 1
@@ -701,3 +793,56 @@ def test_from_sequence_3d_to_4d():
             ([0, 1, 1, 2], ('global', 'slices')))
         eq_(merged.get_values_and_class('global_slices_missing'),
             ([0, 1, None, None], ('global', 'slices')))
+
+def test_from_sequence_4d_time_to_5d():
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2, 2), np.eye(4), 2)
+    ext1.get_class_dict(('global', 'const'))['global_const_const'] = 1
+    ext1.get_class_dict(('global', 'const'))['global_const_var'] = 1
+    ext1.get_class_dict(('global', 'const'))['global_const_missing'] = 1
+    ext1.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1, 2, 3]
+    ext1.get_class_dict(('global', 'slices'))['global_slices_var'] = [0, 1, 2, 3]
+    ext1.get_class_dict(('global', 'slices'))['global_slices_missing'] = [0, 1, 2, 3]
+    ext1.get_class_dict(('time', 'samples'))['time_samples_const'] = [0, 1]
+    ext1.get_class_dict(('time', 'samples'))['time_samples_var'] = [0, 1]
+    ext1.get_class_dict(('time', 'samples'))['time_samples_missing'] = [0, 1]
+    ext1.get_class_dict(('time', 'slices'))['time_slices_const'] = [0, 1]
+    ext1.get_class_dict(('time', 'slices'))['time_slices_var'] = [0, 1]
+    ext1.get_class_dict(('time', 'slices'))['time_slices_missing'] = [0, 1]
+    
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2, 2), np.eye(4), 2)
+    ext2.get_class_dict(('global', 'const'))['global_const_const'] = 1
+    ext2.get_class_dict(('global', 'const'))['global_const_var'] = 2
+    ext2.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1, 2, 3]
+    ext2.get_class_dict(('global', 'slices'))['global_slices_var'] = [1, 2, 3, 4]
+    ext2.get_class_dict(('time', 'samples'))['time_samples_const'] = [0, 1]
+    ext2.get_class_dict(('time', 'samples'))['time_samples_var'] = [1, 2]
+    ext2.get_class_dict(('time', 'slices'))['time_slices_const'] = [0, 1]
+    ext2.get_class_dict(('time', 'slices'))['time_slices_var'] = [1, 2]
+    
+    merged = dcmmeta.DcmMetaExtension.from_sequence([ext1, ext2], 4)
+    eq_(merged.get_values_and_class('global_const_const'),
+        (1, ('global', 'const')))
+    eq_(merged.get_values_and_class('global_const_var'),
+        ([1, 2], ('vector', 'samples')))
+    eq_(merged.get_values_and_class('global_const_missing'),
+        ([1, None], ('vector', 'samples')))
+    eq_(merged.get_values_and_class('global_slices_const'),
+        ([0, 1, 2, 3], ('vector', 'slices')))
+    eq_(merged.get_values_and_class('global_slices_var'),
+        ([0, 1, 2, 3, 1, 2, 3, 4], ('global', 'slices')))
+    eq_(merged.get_values_and_class('global_slices_missing'),
+        ([0, 1, 2, 3, None, None, None, None], ('global', 'slices')))
+    eq_(merged.get_values_and_class('time_samples_const'),
+        ([0, 1, 0, 1], ('time', 'samples')))
+    eq_(merged.get_values_and_class('time_samples_var'),
+        ([0, 1, 1, 2], ('time', 'samples')))
+    eq_(merged.get_values_and_class('time_samples_missing'),
+        ([0, 1, None, None], ('time', 'samples')))
+    eq_(merged.get_values_and_class('time_slices_const'),
+        ([0, 1], ('time', 'slices')))
+    eq_(merged.get_values_and_class('time_slices_var'),
+        ([0, 1, 0, 1, 1, 2, 1, 2], ('global', 'slices')))
+    eq_(merged.get_values_and_class('time_slices_missing'),
+        ([0, 1, 0, 1, None, None, None, None], ('global', 'slices')))
+    
+    
