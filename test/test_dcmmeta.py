@@ -845,4 +845,18 @@ def test_from_sequence_4d_time_to_5d():
     eq_(merged.get_values_and_class('time_slices_missing'),
         ([0, 1, 0, 1, None, None, None, None], ('global', 'slices')))
     
+def test_nifti_wrapper_init():
+    nii = nb.Nifti1Image(np.zeros((5, 5, 5)), np.eye(4))
+    assert_raises(dcmmeta.MissingExtensionError, 
+                  dcmmeta.NiftiWrapper,
+                  nii)
+    hdr = nii.get_header()
+    ext = dcmmeta.DcmMetaExtension.make_empty((5, 5, 5), np.eye(4))
+    hdr.extensions.append(ext)
+    nw = dcmmeta.NiftiWrapper(nii)
+    eq_(nw.meta_ext, ext)
     
+    nii2 = nb.Nifti1Image(np.zeros((5, 5, 5)), np.eye(4))
+    nw2 = dcmmeta.NiftiWrapper(nii, True)
+    ext2 = nw2.meta_ext
+    eq_(ext, ext2)
