@@ -1193,6 +1193,9 @@ class NiftiWrapper(object):
     def slices_valid(self):
         '''Return True if the per-slice meta data appears to be valid for the 
         wrapped nifti image.'''
+        if not self.samples_valid():
+            return False
+        
         hdr = self.nii_img.get_header()
         if self.meta_ext.n_slices != hdr.get_n_slices():
             return False
@@ -1200,7 +1203,7 @@ class NiftiWrapper(object):
         slice_dim = hdr.get_dim_info()[2]
         if slice_dim is None:
             return False
-        slice_dir = hdr.get_best_affine()[slice_dim, :3]
+        slice_dir = self.nii_img.get_affine()[slice_dim, :3]
         
         return np.allclose(slice_dir, 
                            self.meta_ext.slice_normal,

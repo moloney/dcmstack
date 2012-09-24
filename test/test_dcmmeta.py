@@ -860,3 +860,41 @@ def test_nifti_wrapper_init():
     nw2 = dcmmeta.NiftiWrapper(nii, True)
     ext2 = nw2.meta_ext
     eq_(ext, ext2)
+    
+def test_samples_valid():
+    nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
+    nw = dcmmeta.NiftiWrapper(nii, True)
+    
+    ok_(nw.samples_valid())
+    nw.meta_ext.shape = (5, 5, 5, 3, 9)
+    ok_(nw.samples_valid() == False)
+    nw.meta_ext.shape = (5, 5, 5, 7, 3)
+    ok_(nw.samples_valid() == False)
+    
+class TestSlicesValid(object):
+    def setUp(self):
+        nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
+        hdr = nii.get_header()
+        hdr.set_dim_info(None, None, 2)
+        self.nw = dcmmeta.NiftiWrapper(nii, True)
+        ok_(self.nw.slices_valid())
+        
+    def test_samples_chagned(self):
+        self.nw.meta_ext.shape = (5, 5, 5, 3, 9)
+        ok_(self.nw.slices_valid() == False)
+        
+    def test_slice_dim_changed(self):
+        self.nw.meta_ext.slice_dim = 0
+        ok_(self.nw.slices_valid() == False)
+        self.nw.meta_ext.slice_dim = None
+        ok_(self.nw.slices_valid() == False)
+        
+    def test_slice_dir_changed(self):
+        aff = self.nw.nii_img.get_affine()
+        aff[:] = np.c_[aff[2, :],
+                       aff[1, :],
+                       aff[0, :],
+                       aff[3, :],
+                      ]
+        
+        ok_(self.nw.slices_valid() == False)
