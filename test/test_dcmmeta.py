@@ -1012,3 +1012,6 @@ class TestGetMeta(object):
                     eq_(self.nw.get_meta('time_samples_test', idx),
                         time_idx + (vector_idx * 7)
                        )
+                       
+class TestSplit(object):
+    pass

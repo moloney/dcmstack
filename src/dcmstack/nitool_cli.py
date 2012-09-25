@@ -108,7 +108,7 @@ def split(args):
     except MissingExtensionError:
         print "No dcmmeta extension found, making empty one..."
         src_wrp = NiftiWrapper(src_nii, make_empty=True)
-    for split_idx, split in enumerate(src_wrp.generate_splits(args.dimension)):
+    for split_idx, split in enumerate(src_wrp.split(args.dimension)):
         if args.output_format:
             out_name = (args.output_format % 
                         split.meta_ext.get_class_dict(('global', 'const'))

@@ -1314,7 +1314,7 @@ class NiftiWrapper(object):
         self.nii_img.get_header().extensions.append(dcmmeta_ext)
         self.meta_ext = dcmmeta_ext
     
-    def generate_splits(self, dim=None):
+    def split(self, dim=None):
         '''Generate splits of the array and meta data along specified dimension.
         
         Parameters
@@ -1326,7 +1326,8 @@ class NiftiWrapper(object):
         Returns
         -------
         result
-            Generator which yields the result for each index along `dim`.
+            Generator which yields a NiftiWrapper result for each index 
+            along `dim`.
             
         '''
         shape = self.nii_img.get_shape()
@@ -1366,11 +1367,6 @@ class NiftiWrapper(object):
             result.replace_extension(split_meta)
             
             yield result
-    
-    def split(self, dim=None):
-        '''Convienance method, returns a list containing the results from 
-        `generate_splits`.'''
-        return list(self.generate_splits(dim))
             
     def to_filename(self, out_path):
         '''Write out the wrapped Nifti to a file
