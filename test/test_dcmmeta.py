@@ -1051,3 +1051,20 @@ class TestSplit(object):
             ok_(np.all(nw_split.nii_img.get_data() == 
                        self.arr[:, :, :, :, split_idx])
                )
+
+def test_from_dicom():
+    data_dir = path.join(test_dir, 
+                         'data', 
+                         'dcmstack', 
+                         '2D_16Echo_qT2')
+    src_fn = path.join(data_dir, 'TE_40_SlcPos_-33.707626341697.dcm')
+    src_dcm = dicom.read_file(src_fn)
+    meta = {'EchoTime': 40}
+    nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
+    hdr = nw.nii_img.get_header()
+    eq_(nw.nii_img.get_shape(), (192, 192, 1))
+    eq_(hdr.get_xyzt_units(), ('mm', 'sec'))
+    eq_(hdr.get_dim_info(), (0, 1, 2))
+    eq_(nw.meta_ext.get_values_and_class('EchoTime'), 
+        (40, ('global', 'const'))
+       )
