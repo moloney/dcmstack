@@ -1182,32 +1182,36 @@ class NiftiWrapper(object):
         method 'get_meta'.'''
         return self.meta_ext.get_class_dict(('global', 'const'))[key]
     
-    def samples_valid(self):
-        '''Return True if the per-sample meta data appears to be valid for the 
-        wrapped nifti image.
-        '''
+    def meta_valid(self, classification):
+        '''Return true if the meta data with the given classification appears 
+        to be valid for the wrapped Nifti image. Considers the shape and 
+        orientation of the image and the meta data extension.'''
+        if classification == ('global', 'const'):
+            return True
+            
         img_shape = self.nii_img.get_shape()
         meta_shape = self.meta_ext.shape
-        return meta_shape[3:] == img_shape[3:]
-    
-    def slices_valid(self):
-        '''Return True if the per-slice meta data appears to be valid for the 
-        wrapped nifti image.'''
-        if not self.samples_valid():
-            return False
-        
+        if classification == ('vector', 'samples'):
+            return meta_shape[4:] == img_shape[4:]
+        if classification == ('time', 'samples'):
+            return meta_shape[3:] == img_shape[3:]
+            
         hdr = self.nii_img.get_header()
         if self.meta_ext.n_slices != hdr.get_n_slices():
             return False
-        
+            
         slice_dim = hdr.get_dim_info()[2]
-        if slice_dim is None:
-            return False
         slice_dir = self.nii_img.get_affine()[slice_dim, :3]
-        
-        return np.allclose(slice_dir, 
-                           self.meta_ext.slice_normal,
-                           atol=1e-6)
+        slices_aligned = np.allclose(slice_dir, 
+                                     self.meta_ext.slice_normal,
+                                     atol=1e-6)
+                                     
+        if classification == ('time', 'slices'):
+            return slices_aligned
+        if classification == ('vector', 'slices'):
+            return meta_shape[3] == img_shape[3] and slices_aligned
+        if classification == ('global', 'slices'):
+            return meta_shape[3:] == img_shape[3:] and slices_aligned
     
     def get_meta(self, key, index=None, default=None):
         '''Return the meta data value for the provided `key`.
@@ -1242,6 +1246,10 @@ class NiftiWrapper(object):
         #Check if the value is constant
         if classes == ('global', 'const'):
             return values
+            
+        #Check if the classification is valid
+        if not self.meta_valid(classes):
+            return default
         
         #If an index is provided check the varying values
         if not index is None:
@@ -1254,31 +1262,27 @@ class NiftiWrapper(object):
                     raise IndexError('Index is out of bounds.')
             
             #First try per time/vector sample values
-            if self.samples_valid():
-                if classes == ('time', 'samples'):
-                    return values[index[3]]
-                if classes == ('vector', 'samples'):
-                    return values[index[4]]
+            if classes == ('time', 'samples'):
+                return values[index[3]]
+            if classes == ('vector', 'samples'):
+                return values[index[4]]
                 
             #Finally, if aligned, try per-slice values
-            if self.slices_valid():
-                slice_dim = self.nii_img.get_header().get_dim_info()[2]
-                n_slices = shape[slice_dim]
-                if classes == ('global', 'slices'):
-                    val_idx = index[slice_dim]
-                    for count, idx_val in enumerate(index[3:]):
-                        val_idx += idx_val * n_slices
-                        n_slices *= shape[count+3]
-                    return values[val_idx]    
-                
-                if self.samples_valid():
-                    if classes == ('time', 'slices'):
-                        val_idx = index[slice_dim]
-                        return values[val_idx]
-                    if classes == ('vector', 'slices'):
-                        val_idx = index[slice_dim]
-                        val_idx += index[3]*n_slices
-                        return values[val_idx]
+            slice_dim = self.nii_img.get_header().get_dim_info()[2]
+            n_slices = shape[slice_dim]
+            if classes == ('global', 'slices'):
+                val_idx = index[slice_dim]
+                for count, idx_val in enumerate(index[3:]):
+                    val_idx += idx_val * n_slices
+                    n_slices *= shape[count+3]
+                return values[val_idx]    
+            elif classes == ('time', 'slices'):
+                val_idx = index[slice_dim]
+                return values[val_idx]
+            elif classes == ('vector', 'slices'):
+                val_idx = index[slice_dim]
+                val_idx += index[3]*n_slices
+                return values[val_idx]
             
         return default
     

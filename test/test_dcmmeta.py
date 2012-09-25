@@ -861,33 +861,42 @@ def test_nifti_wrapper_init():
     ext2 = nw2.meta_ext
     eq_(ext, ext2)
     
-def test_samples_valid():
-    nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
-    nw = dcmmeta.NiftiWrapper(nii, True)
-    
-    ok_(nw.samples_valid())
-    nw.meta_ext.shape = (5, 5, 5, 3, 9)
-    ok_(nw.samples_valid() == False)
-    nw.meta_ext.shape = (5, 5, 5, 7, 3)
-    ok_(nw.samples_valid() == False)
-    
-class TestSlicesValid(object):
+class TestMetaValid(object):
     def setUp(self):
         nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
         hdr = nii.get_header()
         hdr.set_dim_info(None, None, 2)
         self.nw = dcmmeta.NiftiWrapper(nii, True)
-        ok_(self.nw.slices_valid())
+        for classes in self.nw.meta_ext.get_valid_classes():
+            ok_(self.nw.meta_valid(classes))
         
-    def test_samples_chagned(self):
+    def test_time_samples_changed(self):
         self.nw.meta_ext.shape = (5, 5, 5, 3, 9)
-        ok_(self.nw.slices_valid() == False)
-        
+        for classes in self.nw.meta_ext.get_valid_classes():
+            if classes in (('time', 'samples'),
+                           ('vector', 'slices'),
+                           ('global', 'slices')):
+                eq_(self.nw.meta_valid(classes), False)
+            else:
+                ok_(self.nw.meta_valid(classes))
+    
+    def test_vector_samples_changed(self):
+        self.nw.meta_ext.shape = (5, 5, 5, 7, 3)
+        for classes in self.nw.meta_ext.get_valid_classes():
+            if classes in (('time', 'samples'),
+                           ('vector', 'samples'),
+                           ('global', 'slices')):
+                eq_(self.nw.meta_valid(classes), False)
+            else:
+                ok_(self.nw.meta_valid(classes))
+          
     def test_slice_dim_changed(self):
         self.nw.meta_ext.slice_dim = 0
-        ok_(self.nw.slices_valid() == False)
-        self.nw.meta_ext.slice_dim = None
-        ok_(self.nw.slices_valid() == False)
+        for classes in self.nw.meta_ext.get_valid_classes():
+            if classes[1] == 'slices':
+                eq_(self.nw.meta_valid(classes), False)
+            else:
+                ok_(self.nw.meta_valid(classes))
         
     def test_slice_dir_changed(self):
         aff = self.nw.nii_img.get_affine()
@@ -897,4 +906,109 @@ class TestSlicesValid(object):
                        aff[3, :],
                       ]
         
-        ok_(self.nw.slices_valid() == False)
+        for classes in self.nw.meta_ext.get_valid_classes():
+            if classes[1] == 'slices':
+                eq_(self.nw.meta_valid(classes), False)
+            else:
+                ok_(self.nw.meta_valid(classes))
+        
+class TestGetMeta(object):
+    def setUp(self):
+        nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
+        hdr = nii.get_header()
+        hdr.set_dim_info(None, None, 2)
+        self.nw = dcmmeta.NiftiWrapper(nii, True)
+        
+        #Add an element to every classification
+        for classes in self.nw.meta_ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            mult = self.nw.meta_ext.get_multiplicity(classes)
+            if mult == 1:
+                vals = 0
+            else:
+                vals = range(mult)
+            self.nw.meta_ext.get_class_dict(classes)[key] = vals
+            
+    def test_invalid_index(self):
+        assert_raises(IndexError, 
+                      self.nw.get_meta('time_samples_test'), 
+                      (0, 0, 0, 0))
+        assert_raises(IndexError, 
+                      self.nw.get_meta('time_samples_test'), 
+                      (0, 0, 0, 0, 0, 0))
+        assert_raises(IndexError, 
+                      self.nw.get_meta('time_samples_test'), 
+                      (6, 0, 0, 0, 0))
+        assert_raises(IndexError, 
+                      self.nw.get_meta('time_samples_test'), 
+                      (-1, 0, 0, 0, 0))
+            
+    def test_get_item(self):
+        for classes in self.nw.meta_ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            if classes == ('global', 'const'):
+                eq_(self.nw[key], 0)
+            else:
+                assert_raises(KeyError,
+                              self.nw.__getitem__,
+                              key)
+        
+    def test_get_const(self):
+        eq_(self.nw.get_meta('global_const_test'), 0)
+        eq_(self.nw.get_meta('global_const_test', (0, 0, 0, 0, 0)), 0)
+        eq_(self.nw.get_meta('global_const_test', (0, 0, 3, 4, 5)), 0)
+        
+    def test_get_global_slices(self):
+        eq_(self.nw.get_meta('global_slices_test'), None)
+        eq_(self.nw.get_meta('global_slices_test', None, 0), 0)
+        for vector_idx in xrange(9):
+            for time_idx in xrange(7):
+                for slice_idx in xrange(5):
+                    idx = (0, 0, slice_idx, time_idx, vector_idx)
+                    eq_(self.nw.get_meta('global_slices_test', idx),
+                        slice_idx + (time_idx * 5) + (vector_idx * 7 * 5)
+                       )
+    
+    def test_get_vector_slices(self):
+        eq_(self.nw.get_meta('vector_slices_test'), None)
+        eq_(self.nw.get_meta('vector_slices_test', None, 0), 0)
+        for vector_idx in xrange(9):
+            for time_idx in xrange(7):
+                for slice_idx in xrange(5):
+                    idx = (0, 0, slice_idx, time_idx, vector_idx)
+                    eq_(self.nw.get_meta('vector_slices_test', idx),
+                        slice_idx + (time_idx * 5)
+                       )
+                       
+    def test_get_time_slices(self):
+        eq_(self.nw.get_meta('time_slices_test'), None)
+        eq_(self.nw.get_meta('time_slices_test', None, 0), 0)
+        for vector_idx in xrange(9):
+            for time_idx in xrange(7):
+                for slice_idx in xrange(5):
+                    idx = (0, 0, slice_idx, time_idx, vector_idx)
+                    eq_(self.nw.get_meta('time_slices_test', idx),
+                        slice_idx
+                       )
+                       
+    def test_get_vector_samples(self):
+        eq_(self.nw.get_meta('vector_samples_test'), None)
+        eq_(self.nw.get_meta('vector_samples_test', None, 0), 0)
+        for vector_idx in xrange(9):
+            for time_idx in xrange(7):
+                for slice_idx in xrange(5):
+                    idx = (0, 0, slice_idx, time_idx, vector_idx)
+                    eq_(self.nw.get_meta('vector_samples_test', idx),
+                        vector_idx
+                       )
+                       
+    def get_time_samples(self):
+        eq_(self.nw.get_meta('time_samples_test'), None)
+        eq_(self.nw.get_meta('time_samples_test', None, 0), 0)
+        for vector_idx in xrange(9):
+            for time_idx in xrange(7):
+                for slice_idx in xrange(5):
+                    idx = (0, 0, slice_idx, time_idx, vector_idx)
+                    eq_(self.nw.get_meta('time_samples_test', idx),
+                        time_idx + (vector_idx * 7)
+                       )
