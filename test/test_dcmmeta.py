@@ -1012,6 +1012,42 @@ class TestGetMeta(object):
                     eq_(self.nw.get_meta('time_samples_test', idx),
                         time_idx + (vector_idx * 7)
                        )
-                       
+ 
 class TestSplit(object):
-    pass
+    def setUp(self):
+        self.arr = np.arange(3 * 3 * 3 * 5 * 7).reshape(3, 3, 3, 5, 7)
+        nii = nb.Nifti1Image(self.arr, np.eye(4))
+        hdr = nii.get_header()
+        hdr.set_dim_info(None, None, 2)
+        self.nw = dcmmeta.NiftiWrapper(nii, True)
+        
+        #Add an element to every classification
+        for classes in self.nw.meta_ext.get_valid_classes():
+            key = '%s_%s_test' % classes
+            mult = self.nw.meta_ext.get_multiplicity(classes)
+            if mult == 1:
+                vals = 0
+            else:
+                vals = range(mult)
+            self.nw.meta_ext.get_class_dict(classes)[key] = vals
+            
+    def test_split_slice(self):
+        for split_idx, nw_split in enumerate(self.nw.split(2)):
+            eq_(nw_split.nii_img.shape, (3, 3, 1, 5, 7))
+            ok_(np.all(nw_split.nii_img.get_data() == 
+                       self.arr[:, :, split_idx:split_idx+1, :, :])
+               )
+            
+    def test_split_time(self):
+        for split_idx, nw_split in enumerate(self.nw.split(3)):
+            eq_(nw_split.nii_img.shape, (3, 3, 3, 1, 7))
+            ok_(np.all(nw_split.nii_img.get_data() == 
+                       self.arr[:, :, :, split_idx:split_idx+1, :])
+               )
+               
+    def test_split_vector(self):
+        for split_idx, nw_split in enumerate(self.nw.split(4)):
+            eq_(nw_split.nii_img.shape, (3, 3, 3, 5))
+            ok_(np.all(nw_split.nii_img.get_data() == 
+                       self.arr[:, :, :, :, split_idx])
+               )

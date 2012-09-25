@@ -1315,7 +1315,8 @@ class NiftiWrapper(object):
         self.meta_ext = dcmmeta_ext
     
     def split(self, dim=None):
-        '''Generate splits of the array and meta data along specified dimension.
+        '''Generate splits of the array and meta data along the specified 
+        dimension.
         
         Parameters
         ----------
@@ -1346,11 +1347,12 @@ class NiftiWrapper(object):
         split_hdr = header.copy()
         slices = [slice(None)] * len(shape)
         for idx in xrange(shape[dim]):
-            #Grab the split data, keeping singular spatial dimensions
-            if dim < 3:
-                slices[dim] = slice(idx, idx+1)
-            else:
+            #Grab the split data, get rid of trailing singular dimensions
+            if dim == len(shape) - 1:
                 slices[dim] = idx
+            else:
+                slices[dim] = slice(idx, idx+1)
+            
             split_data = data[slices].copy()
             
             #Create the initial Nifti1Image object
