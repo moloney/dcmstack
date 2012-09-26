@@ -1356,9 +1356,11 @@ class NiftiWrapper(object):
             split_data = data[slices].copy()
             
             #Create the initial Nifti1Image object
-            #TODO: Nibabel 1.2 will allow us to set the affine here without 
-            #wiping out qform/sform and associated codes
-            split_nii = nb.Nifti1Image(split_data, None, header=split_hdr)
+            #TODO: The affine needs to be updated if we are splitting the 
+            #slice dim (the translation will change)
+            split_nii = nb.Nifti1Image(split_data, 
+                                       split_hdr.get_best_affine(), 
+                                       header=split_hdr)
             
             #Replace the meta data with the appropriate subset
             meta_dim = dim
@@ -1418,15 +1420,17 @@ class NiftiWrapper(object):
         
         dcm_wrp = wrapper_from_data(dcm_data)
         data = dcm_wrp.get_data()
+        affine = dcm_wrp.get_affine()
         
         #Make 2D data 3D
         if len(data.shape) == 2:
             data = data.reshape(data.shape + (1,))
         
         #Create the nifti image and set header data
-        nii_img = nb.nifti1.Nifti1Image(data, None)
+        nii_img = nb.nifti1.Nifti1Image(data, np.eye(4))
+        nii_img.set_qform(affine, 'scanner', update_affine=True)
+        nii_img.set_sform(affine, 'aligned', update_affine=True)
         hdr = nii_img.get_header()
-        hdr.set_qform(dcm_wrp.get_affine(), 'scanner')
         hdr.set_xyzt_units('mm', 'sec')
         dim_info = {'freq' : None, 
                     'phase' : None, 
@@ -1450,7 +1454,8 @@ class NiftiWrapper(object):
         
     @classmethod
     def from_sequence(klass, seq, dim=None):
-        '''Create a NiftiWrapper by joining a sequence of NiftiWrapper objects. 
+        '''Create a NiftiWrapper by joining a sequence of NiftiWrapper objects
+        along the given dimension. 
         
         Parameters
         ----------
@@ -1583,14 +1588,18 @@ class NiftiWrapper(object):
                     hdr_info['slice_times'] = None
             
         #Create the resulting Nifti and wrapper
-        result_nii = nb.Nifti1Image(result_data, None)
+        result_nii = nb.Nifti1Image(result_data, np.eye(4))
         result_hdr = result_nii.get_header()
         
         #Update the header with any info that is consistent across inputs
         if hdr_info['qform'] != None and hdr_info['qform_code'] != None:
-            result_hdr.set_qform(hdr_info['qform'], int(hdr_info['qform_code']))
+            result_nii.set_qform(hdr_info['qform'], 
+                                 int(hdr_info['qform_code']), 
+                                 update_affine=True)
         if hdr_info['sform'] != None and hdr_info['sform_code'] != None:
-            result_hdr.set_sform(hdr_info['sform'], int(hdr_info['sform_code']))
+            result_nii.set_sform(hdr_info['sform'], 
+                                 int(hdr_info['sform_code']),
+                                 update_affine=True)
         if hdr_info['slope_intercept'] != None:
             result_hdr.set_slope_inter(*hdr_info['slope_intercept'])
         if hdr_info['dim_info'] != None:

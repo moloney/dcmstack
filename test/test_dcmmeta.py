@@ -1016,7 +1016,7 @@ class TestGetMeta(object):
 class TestSplit(object):
     def setUp(self):
         self.arr = np.arange(3 * 3 * 3 * 5 * 7).reshape(3, 3, 3, 5, 7)
-        nii = nb.Nifti1Image(self.arr, np.eye(4))
+        nii = nb.Nifti1Image(self.arr, np.diag([1.1, 1.1, 1.1, 1.0]))
         hdr = nii.get_header()
         hdr.set_dim_info(None, None, 2)
         self.nw = dcmmeta.NiftiWrapper(nii, True)
@@ -1034,6 +1034,8 @@ class TestSplit(object):
     def test_split_slice(self):
         for split_idx, nw_split in enumerate(self.nw.split(2)):
             eq_(nw_split.nii_img.shape, (3, 3, 1, 5, 7))
+            ok_(np.allclose(nw_split.nii_img.get_affine(), 
+                            np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() == 
                        self.arr[:, :, split_idx:split_idx+1, :, :])
                )
@@ -1041,6 +1043,8 @@ class TestSplit(object):
     def test_split_time(self):
         for split_idx, nw_split in enumerate(self.nw.split(3)):
             eq_(nw_split.nii_img.shape, (3, 3, 3, 1, 7))
+            ok_(np.allclose(nw_split.nii_img.get_affine(), 
+                            np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() == 
                        self.arr[:, :, :, split_idx:split_idx+1, :])
                )
@@ -1048,6 +1052,8 @@ class TestSplit(object):
     def test_split_vector(self):
         for split_idx, nw_split in enumerate(self.nw.split(4)):
             eq_(nw_split.nii_img.shape, (3, 3, 3, 5))
+            ok_(np.allclose(nw_split.nii_img.get_affine(), 
+                            np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() == 
                        self.arr[:, :, :, :, split_idx])
                )
@@ -1059,12 +1065,82 @@ def test_from_dicom():
                          '2D_16Echo_qT2')
     src_fn = path.join(data_dir, 'TE_40_SlcPos_-33.707626341697.dcm')
     src_dcm = dicom.read_file(src_fn)
+    src_dw = nb.nicom.dicomwrappers.wrapper_from_data(src_dcm)
     meta = {'EchoTime': 40}
     nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
     hdr = nw.nii_img.get_header()
     eq_(nw.nii_img.get_shape(), (192, 192, 1))
+    print src_dw.get_affine()
+    print nw.nii_img.get_affine()
+    ok_(np.allclose(src_dw.get_affine(), nw.nii_img.get_affine()))
     eq_(hdr.get_xyzt_units(), ('mm', 'sec'))
     eq_(hdr.get_dim_info(), (0, 1, 2))
     eq_(nw.meta_ext.get_values_and_class('EchoTime'), 
         (40, ('global', 'const'))
        )
+       
+class TestFromSliceSequence(object):
+    def setUp(self):
+        self.slice_nws = []
+        for idx in xrange(3):
+            arr = np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4, 1)
+            nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
+            hdr = nii.get_header()
+            hdr.set_dim_info(0, 1, 2)
+            hdr.set_xyzt_units('mm', 'sec')
+            nw = dcmmeta.NiftiWrapper(nii, True)
+            nw.meta_ext.get_class_dict(('global', 'const'))['EchoTime'] = 40
+            nw.meta_ext.get_class_dict(('global', 'const'))['SliceLocation'] = idx
+            self.slice_nws.append(nw)
+        
+    def test_merge(self):
+        merged = dcmmeta.NiftiWrapper.from_sequence(self.slice_nws)
+        eq_(merged.nii_img.shape, (4, 4, 3))
+        ok_(np.allclose(merged.nii_img.get_affine(), 
+                        np.diag((1.1, 1.1, 1.1, 1.0)))
+           )
+        eq_(merged.meta_ext.get_values_and_class('EchoTime'),
+            (40, ('global', 'const'))
+           )
+        eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
+            (range(3), ('global', 'slices'))
+           )
+        merged_hdr = merged.nii_img.get_header()
+        eq_(merged_hdr.get_dim_info(), (0, 1, 2))
+        eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
+        merged_data = merged.nii_img.get_data()
+        for idx in xrange(3):
+            ok_(np.all(merged_data[:, :, idx] == 
+                       np.arange(idx * (4*4), (idx + 1) * (4 * 4)).reshape(4, 4))
+               )
+
+#def test_from_time_sequence():
+#    time_nws = []
+#    for idx in xrange(3):
+#        arr = np.arange(idx * (4 * 4 * 4), 
+#                        (idx + 1) * (4 * 4 * 4)
+#                       ).reshape(4, 4, 4)
+#        nii = nb.Nifti1Image(arr, np.eye(4))
+#        hdr = nii.get_header()
+#        hdr.set_dim_info(0, 1, 2)
+#        hdr.set_xyzt_units('mm', 'sec')
+#        nw = dcmmeta.NiftiWrapper(nii, True)
+#        nw.meta_ext.get_class_dict(('global', 'const'))['EchoTime'] = idx
+#        slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
+#        slice_meta['SliceLocation'] = range(4)
+#        slice_meta['AcquisitionTime'] = [idx + slice_idx 
+#                                         for slice_idx in xrange(4)
+#                                        ]
+#        
+#        slice_nws.append(nw)
+#        
+#    merged = dcmmeta.NiftiWrapper.from_sequence(slice_nws)
+#    eq_(merged.nii_img.shape, (4, 4, 3))
+#    merged_hdr = merged.nii_img.get_header()
+#    eq_(merged_hdr.get_dim_info(), (0, 1, 2))
+#    eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
+#    merged_data = merged.nii_img.get_data()
+#    for idx in xrange(3):
+#        ok_(np.all(merged_data[:, :, idx] == 
+#                   np.arange(idx * (4*4), (idx + 1) * (4 * 4)).reshape(4, 4))
+#           )

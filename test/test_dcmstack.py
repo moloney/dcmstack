@@ -419,6 +419,8 @@ class TestGetAffine(object):
         stack.add_dcm(self.inputs[0])
         affine = stack.get_affine()
         ref = np.load(path.join(self.data_dir, 'single_slice_aff.npy'))
+        print affine
+        print ref
         ok_(np.all(affine == ref))
     
     def test_three_dim(self):
@@ -489,11 +491,9 @@ class TestToNifti(object):
         ref_hdr = ref_nii.get_header()
         
         for key in self.eq_keys:
-            print "Checking %s for equality" % key
             ok_(np.all(hdr[key] == ref_hdr[key]))
             
         for key in self.close_keys:
-            print "Checking %s for closeness" % key
             ok_(np.allclose(hdr[key], ref_hdr[key]))
 
     def test_single_slice(self):
