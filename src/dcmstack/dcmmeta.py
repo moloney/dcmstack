@@ -1344,6 +1344,12 @@ class NiftiWrapper(object):
                     raise ValueError("Slice dimension is not known")
                 dim = slice_dim
         
+        #If we are splitting on a spatial dimension, we need to update the 
+        #translation
+        trans_update = None
+        if dim < 3:
+            trans_update = header.get_best_affine()[:3, dim]
+        
         split_hdr = header.copy()
         slices = [slice(None)] * len(shape)
         for idx in xrange(shape[dim]):
@@ -1354,10 +1360,19 @@ class NiftiWrapper(object):
                 slices[dim] = slice(idx, idx+1)
             
             split_data = data[slices].copy()
+
+            #Update the translation in any affines if needed
+            if not trans_update is None and idx != 0:
+                qform = split_hdr.get_qform()
+                if not qform is None:
+                    qform[:3, 3] += trans_update
+                    split_hdr.set_qform(qform)
+                sform = split_hdr.get_sform()
+                if not sform is None:
+                    sform[:3, 3] += trans_update
+                    split_hdr.set_sform(sform)
             
             #Create the initial Nifti1Image object
-            #TODO: The affine needs to be updated if we are splitting the 
-            #slice dim (the translation will change)
             split_nii = nb.Nifti1Image(split_data, 
                                        split_hdr.get_best_affine(), 
                                        header=split_hdr)

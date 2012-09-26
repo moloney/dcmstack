@@ -1035,7 +1035,13 @@ class TestSplit(object):
         for split_idx, nw_split in enumerate(self.nw.split(2)):
             eq_(nw_split.nii_img.shape, (3, 3, 1, 5, 7))
             ok_(np.allclose(nw_split.nii_img.get_affine(), 
-                            np.diag([1.1, 1.1, 1.1, 1.0])))
+                            np.c_[[1.1, 0.0, 0.0, 0.0],
+                                  [0.0, 1.1, 0.0, 0.0],
+                                  [0.0, 0.0, 1.1, 0.0],
+                                  [0.0, 0.0, 1.1*split_idx, 1.0]
+                                 ]
+                           )
+               )
             ok_(np.all(nw_split.nii_img.get_data() == 
                        self.arr[:, :, split_idx:split_idx+1, :, :])
                )
