@@ -787,19 +787,16 @@ class DicomStack(object):
         files_per_vol = len(self._files_info) / n_vols
         
         #Pull the DICOM Patient Space affine from the first input
-        dps_aff = self._files_info[0][0].nii_img.get_header().get_best_affine()
+        aff = self._files_info[0][0].nii_img.get_header().get_best_affine()
         
         #If there is more than one file per volume, we need to fix slice scaling
         if files_per_vol > 1:
-            first_offset = dps_aff[:3, 3]
+            first_offset = aff[:3, 3]
             second_offset = self._files_info[1][0].nii_img.get_header().get_best_affine()[:3,3]
             scaled_slc_dir = second_offset - first_offset
-            dps_aff[:3, 2] = scaled_slc_dir
-       
-        #The Nifti patient space flips the x and y directions
-        nps_aff = np.dot(np.diag([-1., -1., 1., 1.]), dps_aff)
+            aff[:3, 2] = scaled_slc_dir
         
-        return nps_aff
+        return aff
         
     def to_nifti(self, voxel_order='rpi', embed_meta=False):
         '''Returns a NiftiImage with the data and affine from the stack.
