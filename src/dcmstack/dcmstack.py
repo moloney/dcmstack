@@ -333,11 +333,8 @@ def _make_dummy(reference, meta):
     data[...] = np.iinfo(data.dtype).max
     
     #Create the nifti image and set header data
-    nii_img = nb.nifti1.Nifti1Image(data, None)
+    nii_img = nb.nifti1.Nifti1Image(data, reference.nii_img.get_affine())
     hdr = nii_img.get_header()
-    aff = reference.nii_img.get_header().get_best_affine()
-    hdr.set_qform(aff, 'scanner')
-    nii_img._affine = hdr.get_best_affine()
     hdr.set_xyzt_units('mm', 'sec')
     dim_info = {'freq' : None, 
                 'phase' : None, 
@@ -854,11 +851,8 @@ class DicomStack(object):
                 assert np.allclose(orig_slice_dir, new_slice_dir)
         
         #Create the nifti image using the data array
-        nifti_image = nb.Nifti1Image(data, None)
+        nifti_image = nb.Nifti1Image(data, affine)
         nifti_header = nifti_image.get_header()
-        
-        #Stick the affine in the q_form with 'scanner' code
-        nifti_header.set_qform(affine, 'scanner')
         
         #Set the units and dimension info
         nifti_header.set_xyzt_units('mm', 'msec')

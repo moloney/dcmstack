@@ -1444,9 +1444,7 @@ class NiftiWrapper(object):
             data = data.reshape(data.shape + (1,))
         
         #Create the nifti image and set header data
-        nii_img = nb.nifti1.Nifti1Image(data, np.eye(4))
-        nii_img.set_qform(affine, 'scanner', update_affine=True)
-        nii_img.set_sform(affine, 'aligned', update_affine=True)
+        nii_img = nb.nifti1.Nifti1Image(data, affine)
         hdr = nii_img.get_header()
         hdr.set_xyzt_units('mm', 'sec')
         dim_info = {'freq' : None, 
