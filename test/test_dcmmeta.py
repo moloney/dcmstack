@@ -1121,6 +1121,21 @@ class TestFromSliceSequence(object):
             ok_(np.all(merged_data[:, :, idx] == 
                        np.arange(idx * (4*4), (idx + 1) * (4 * 4)).reshape(4, 4))
                )
+               
+    def test_merge_inconsistent_hdr(self):
+        #Test that inconsistent header data does not make it into the merged
+        #result
+        nw_2 = self.slice_nws[1]
+        hdr_2 = nw_2.nii_img.get_header()
+        hdr_2.set_dim_info(1, 0, 2)
+        hdr_2.set_xyzt_units('mm', None)
+        
+        merged = dcmmeta.NiftiWrapper.from_sequence(self.slice_nws)
+        merged_hdr = merged.nii_img.get_header()
+        eq_(merged_hdr.get_dim_info(), (None, None, 2))
+        eq_(merged_hdr.get_xyzt_units(), ('mm', 'unknown'))
+        
+        
 
 #def test_from_time_sequence():
 #    time_nws = []

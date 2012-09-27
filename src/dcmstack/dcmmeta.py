@@ -1540,8 +1540,8 @@ class NiftiWrapper(object):
                     'qform_code' : first_hdr['qform_code'],
                     'sform' : first_hdr.get_sform(),
                     'sform_code' : first_hdr['sform_code'],
-                    'dim_info' : first_hdr.get_dim_info(),
-                    'xyzt_units' : first_hdr.get_xyzt_units(),
+                    'dim_info' : list(first_hdr.get_dim_info()),
+                    'xyzt_units' : list(first_hdr.get_xyzt_units()),
                    }
                    
         try:
@@ -1622,10 +1622,16 @@ class NiftiWrapper(object):
                     hdr_info['sform'] = None
                 if input_hdr['sform_code'] != hdr_info['sform_code']:
                     hdr_info['sform_code'] = None
-                if input_hdr.get_dim_info() != hdr_info['dim_info']:
-                    hdr_info['dim_info'] = None
-                if input_hdr.get_xyzt_units() != hdr_info['xyzt_units']:
-                    hdr_info['xyzt_units'] = None
+                in_dim_info = list(input_hdr.get_dim_info())
+                if in_dim_info != hdr_info['dim_info']:
+                    for idx in xrange(3):
+                        if in_dim_info[idx] != hdr_info['dim_info'][idx]:
+                            hdr_info['dim_info'][idx] = None
+                in_xyzt_units = list(input_hdr.get_xyzt_units())
+                if in_xyzt_units != hdr_info['xyzt_units']:
+                    for idx in xrange(2):
+                        if in_xyzt_units[idx] != hdr_info['xyzt_units'][idx]:
+                            hdr_info['xyzt_units'][idx] = None
                     
                 try:
                     if input_hdr.get_slice_duration() != hdr_info['slice_duration']:
