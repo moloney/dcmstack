@@ -1542,7 +1542,6 @@ class NiftiWrapper(object):
                     'qform_code' : first_hdr['qform_code'],
                     'sform' : first_hdr.get_sform(),
                     'sform_code' : first_hdr['sform_code'],
-                    'slope_intercept' : first_hdr.get_slope_inter(),
                     'dim_info' : first_hdr.get_dim_info(),
                     'xyzt_units' : first_hdr.get_xyzt_units(),
                    }
@@ -1625,8 +1624,6 @@ class NiftiWrapper(object):
                     hdr_info['sform'] = None
                 if input_hdr['sform_code'] != hdr_info['sform_code']:
                     hdr_info['sform_code'] = None
-                if input_hdr.get_slope_inter() != hdr_info['slope_intercept']:
-                    hdr_info['slope_intercept'] = None
                 if input_hdr.get_dim_info() != hdr_info['dim_info']:
                     hdr_info['dim_info'] = None
                 if input_hdr.get_xyzt_units() != hdr_info['xyzt_units']:
@@ -1670,8 +1667,6 @@ class NiftiWrapper(object):
             result_nii.set_sform(hdr_info['sform'], 
                                  int(hdr_info['sform_code']),
                                  update_affine=True)
-        if hdr_info['slope_intercept'] != None:
-            result_hdr.set_slope_inter(*hdr_info['slope_intercept'])
         if hdr_info['dim_info'] != None:
             result_hdr.set_dim_info(*hdr_info['dim_info'])
             slice_dim = hdr_info['dim_info'][2]
