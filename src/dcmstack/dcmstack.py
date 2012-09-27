@@ -977,11 +977,6 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
         The string is formatted with the DICOM meta data and any files with the 
         same result will be added to the same DicomStack.
         
-    opt_key_suffix : str
-        A python format string whose result is appended to the dictionary keys 
-        created by key_format if (and only if) it differs between the source 
-        DICOM files.
-        
     extractor : callable
         Should take a dicom.dataset.Dataset and return a dictionary of the 
         extracted meta data. 

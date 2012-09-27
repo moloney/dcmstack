@@ -1494,7 +1494,7 @@ class NiftiWrapper(object):
         first_nii = first_input.nii_img
         first_hdr = first_nii.get_header()
         shape = first_nii.shape
-        affine = first_hdr.get_best_affine()
+        affine = first_nii.get_affine().copy()
         
         #If dim is None, choose a sane default
         if dim is None:
@@ -1515,6 +1515,17 @@ class NiftiWrapper(object):
                                  "[0, 5).")
             if dim < len(shape) and shape[dim] != 1:
                 raise ValueError('The dimension must be singular or not exist')
+                
+        #Pull out the three axes vectors for validation of other input affines
+        axes = []
+        for axis_idx in xrange(3):
+            axis_vec = affine[:3, axis_idx]
+            if axis_idx == dim:
+                axis_vec = axis_vec.copy()
+                axis_vec /= np.sqrt(np.dot(axis_vec, axis_vec))
+            axes.append(axis_vec)
+        #Pull out the translation
+        trans = affine[:3, 3]            
         
         #Determine the shape of the result data array and create it
         result_shape = list(shape)
@@ -1554,14 +1565,47 @@ class NiftiWrapper(object):
         for dim_idx, dim_size in enumerate(result_shape):
             if dim_size == 1:
                 data_slices[dim_idx] = 0
+        last_trans = None #Keep track of the translation from last input
         for input_idx in range(n_inputs):
             
             input_wrp = seq[input_idx]
             input_nii = input_wrp.nii_img
+            input_aff = input_nii.get_affine()
             input_hdr = input_nii.get_header()
             
-            if not np.allclose(affine, input_hdr.get_best_affine()):
-                raise ValueError('Cannot join images with different affines.')
+            #Check that the affines match appropriately
+            for axis_idx, axis_vec in enumerate(axes):
+                in_vec = input_aff[:3, axis_idx]
+                
+                #If we are joining on this dimension
+                if axis_idx == dim:
+                    #Allow scaling difference as it will be updated later
+                    in_vec = in_vec.copy()
+                    in_vec /= np.sqrt(np.dot(in_vec, in_vec))
+                    
+                    in_trans = input_aff[:3, 3]
+                    if not last_trans is None:
+                        #Must be translated along the axis
+                        trans_diff = in_trans - last_trans
+                        if not np.allclose(trans_diff, 0.0):
+                            trans_diff /= np.sqrt(np.dot(trans_diff, trans_diff))
+                        
+                        if (np.allclose(trans_diff, 0.0) or 
+                            not np.allclose(np.dot(trans_diff, in_vec), 
+                                            1.0, 
+                                            atol=1e-6)
+                           ):
+                            raise ValueError("Slices must be translated along the "
+                                             "normal direction")
+                        
+                    #Update reference to last translation
+                    last_trans = in_trans
+            
+                #Check that axis vectors match
+                if not np.allclose(in_vec, axis_vec):
+                    raise ValueError("Cannot join images with different "
+                                     "orientations.")
+                                     
             
             data_slices[dim] = input_idx
             result_data[data_slices] = input_nii.get_data().squeeze()
@@ -1604,16 +1648,25 @@ class NiftiWrapper(object):
                 except HeaderDataError:
                     hdr_info['slice_times'] = None
             
+        #If we joined along a spatial dim, rescale the appropriate axis
+        if dim < 3:
+            scaled_dim_dir = seq[1].nii_img.get_affine()[:3, 3] - trans
+            affine[:3, dim] = scaled_dim_dir
+            
         #Create the resulting Nifti and wrapper
-        result_nii = nb.Nifti1Image(result_data, np.eye(4))
+        result_nii = nb.Nifti1Image(result_data, affine)
         result_hdr = result_nii.get_header()
         
         #Update the header with any info that is consistent across inputs
         if hdr_info['qform'] != None and hdr_info['qform_code'] != None:
+            if not scaled_dim_dir is None:
+                hdr_info['qform'][:3, dim] = scaled_dim_dir
             result_nii.set_qform(hdr_info['qform'], 
                                  int(hdr_info['qform_code']), 
                                  update_affine=True)
         if hdr_info['sform'] != None and hdr_info['sform_code'] != None:
+            if not scaled_dim_dir is None:
+                hdr_info['sform'][:3, dim] = scaled_dim_dir
             result_nii.set_sform(hdr_info['sform'], 
                                  int(hdr_info['sform_code']),
                                  update_affine=True)

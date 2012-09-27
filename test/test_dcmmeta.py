@@ -1090,7 +1090,9 @@ class TestFromSliceSequence(object):
         self.slice_nws = []
         for idx in xrange(3):
             arr = np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4, 1)
-            nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
+            aff = np.diag((1.1, 1.1, 1.1, 1.0))
+            aff[:3, 3] += [0.0, 0.0, idx * 0.5]
+            nii = nb.Nifti1Image(arr, aff)
             hdr = nii.get_header()
             hdr.set_dim_info(0, 1, 2)
             hdr.set_xyzt_units('mm', 'sec')
@@ -1103,7 +1105,7 @@ class TestFromSliceSequence(object):
         merged = dcmmeta.NiftiWrapper.from_sequence(self.slice_nws)
         eq_(merged.nii_img.shape, (4, 4, 3))
         ok_(np.allclose(merged.nii_img.get_affine(), 
-                        np.diag((1.1, 1.1, 1.1, 1.0)))
+                        np.diag((1.1, 1.1, 0.5, 1.0)))
            )
         eq_(merged.meta_ext.get_values_and_class('EchoTime'),
             (40, ('global', 'const'))
