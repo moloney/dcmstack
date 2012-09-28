@@ -1650,6 +1650,7 @@ class NiftiWrapper(object):
                     hdr_info['slice_times'] = None
             
         #If we joined along a spatial dim, rescale the appropriate axis
+        scaled_dim_dir = None
         if dim < 3:
             scaled_dim_dir = seq[1].nii_img.get_affine()[:3, 3] - trans
             affine[:3, dim] = scaled_dim_dir

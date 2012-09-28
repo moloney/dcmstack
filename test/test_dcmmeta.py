@@ -1085,85 +1085,154 @@ def test_from_dicom():
         (40, ('global', 'const'))
        )
        
-class TestFromSliceSequence(object):
-    def setUp(self):
-        self.slice_nws = []
-        for idx in xrange(3):
-            arr = np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4, 1)
-            aff = np.diag((1.1, 1.1, 1.1, 1.0))
-            aff[:3, 3] += [0.0, 0.0, idx * 0.5]
-            nii = nb.Nifti1Image(arr, aff)
-            hdr = nii.get_header()
+def test_from_2d_slice_to_3d():
+    slice_nws = []
+    for idx in xrange(3):
+        arr = np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4, 1)
+        aff = np.diag((1.1, 1.1, 1.1, 1.0))
+        aff[:3, 3] += [0.0, 0.0, idx * 0.5]
+        nii = nb.Nifti1Image(arr, aff)
+        hdr = nii.get_header()
+        hdr.set_dim_info(0, 1, 2)
+        hdr.set_xyzt_units('mm', 'sec')
+        nw = dcmmeta.NiftiWrapper(nii, True)
+        nw.meta_ext.get_class_dict(('global', 'const'))['EchoTime'] = 40
+        nw.meta_ext.get_class_dict(('global', 'const'))['SliceLocation'] = idx
+        slice_nws.append(nw)
+        
+    merged = dcmmeta.NiftiWrapper.from_sequence(slice_nws, 2)
+    eq_(merged.nii_img.shape, (4, 4, 3))
+    ok_(np.allclose(merged.nii_img.get_affine(), 
+                    np.diag((1.1, 1.1, 0.5, 1.0)))
+       )
+    eq_(merged.meta_ext.get_values_and_class('EchoTime'),
+        (40, ('global', 'const'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
+        (range(3), ('global', 'slices'))
+       )
+    merged_hdr = merged.nii_img.get_header()
+    eq_(merged_hdr.get_dim_info(), (0, 1, 2))
+    eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
+    merged_data = merged.nii_img.get_data()
+    for idx in xrange(3):
+        ok_(np.all(merged_data[:, :, idx] == 
+                   np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4))
+           )
+               
+def test_from_3d_time_to_4d():
+    time_nws = []
+    for idx in xrange(3):
+        arr = np.arange(idx * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4)
+                       ).reshape(4, 4, 4)
+        nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
+        hdr = nii.get_header()
+        hdr.set_dim_info(0, 1, 2)
+        hdr.set_xyzt_units('mm', 'sec')
+        nw = dcmmeta.NiftiWrapper(nii, True)
+        const_meta = nw.meta_ext.get_class_dict(('global', 'const'))
+        const_meta['PatientID'] = 'Test'
+        const_meta['EchoTime'] = idx
+        glb_slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
+        glb_slice_meta['SliceLocation'] = range(4)
+        glb_slice_meta['AcquisitionTime'] = range(idx * 4, (idx + 1) * 4)
+        time_nws.append(nw)
+        
+    merged = dcmmeta.NiftiWrapper.from_sequence(time_nws, 3)
+    eq_(merged.nii_img.shape, (4, 4, 4, 3))
+    ok_(np.allclose(merged.nii_img.get_affine(), 
+                    np.diag((1.1, 1.1, 1.1, 1.0)))
+       )
+    eq_(merged.meta_ext.get_values_and_class('PatientID'),
+        ('Test', ('global', 'const'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('EchoTime'),
+        ([0, 1, 2], ('time', 'samples'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
+        (range(4), ('time', 'slices'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('AcquisitionTime'),
+        (range(4 * 3), ('global', 'slices'))
+       )
+    merged_hdr = merged.nii_img.get_header()
+    eq_(merged_hdr.get_dim_info(), (0, 1, 2))
+    eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
+    merged_data = merged.nii_img.get_data()
+    for idx in xrange(3):
+        ok_(np.all(merged_data[:, :, :, idx] == 
+                   np.arange(idx * (4 * 4 * 4), 
+                             (idx + 1) * (4 * 4 * 4)).reshape(4, 4, 4))
+           )
+           
+def test_from_3d_vector_to_4d():
+    vector_nws = []
+    for idx in xrange(3):
+        arr = np.arange(idx * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4)
+                       ).reshape(4, 4, 4)
+        nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
+        hdr = nii.get_header()
+        hdr.set_dim_info(0, 1, 2)
+        hdr.set_xyzt_units('mm', 'sec')
+        nw = dcmmeta.NiftiWrapper(nii, True)
+        const_meta = nw.meta_ext.get_class_dict(('global', 'const'))
+        const_meta['PatientID'] = 'Test'
+        const_meta['EchoTime'] = idx
+        glb_slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
+        glb_slice_meta['SliceLocation'] = range(4)
+        glb_slice_meta['AcquisitionTime'] = range(idx * 4, (idx + 1) * 4)
+        vector_nws.append(nw)
+        
+    merged = dcmmeta.NiftiWrapper.from_sequence(vector_nws, 4)
+    eq_(merged.nii_img.shape, (4, 4, 4, 1, 3))
+    ok_(np.allclose(merged.nii_img.get_affine(), 
+                    np.diag((1.1, 1.1, 1.1, 1.0)))
+       )
+    eq_(merged.meta_ext.get_values_and_class('PatientID'),
+        ('Test', ('global', 'const'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('EchoTime'),
+        ([0, 1, 2], ('vector', 'samples'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
+        (range(4), ('vector', 'slices'))
+       )
+    eq_(merged.meta_ext.get_values_and_class('AcquisitionTime'),
+        (range(4 * 3), ('global', 'slices'))
+       )
+    merged_hdr = merged.nii_img.get_header()
+    eq_(merged_hdr.get_dim_info(), (0, 1, 2))
+    eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
+    merged_data = merged.nii_img.get_data()
+    for idx in xrange(3):
+        ok_(np.all(merged_data[:, :, :, 0, idx] == 
+                   np.arange(idx * (4 * 4 * 4), 
+                             (idx + 1) * (4 * 4 * 4)).reshape(4, 4, 4))
+           )
+           
+def test_merge_inconsistent_hdr():
+    #Test that inconsistent header data does not make it into the merged
+    #result
+    time_nws = []
+    for idx in xrange(3):
+        arr = np.arange(idx * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4)
+                       ).reshape(4, 4, 4)
+        nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
+        hdr = nii.get_header()
+        if idx == 1:
+            hdr.set_dim_info(1, 0, 2)
+            hdr.set_xyzt_units('mm', None)
+        else:
             hdr.set_dim_info(0, 1, 2)
             hdr.set_xyzt_units('mm', 'sec')
-            nw = dcmmeta.NiftiWrapper(nii, True)
-            nw.meta_ext.get_class_dict(('global', 'const'))['EchoTime'] = 40
-            nw.meta_ext.get_class_dict(('global', 'const'))['SliceLocation'] = idx
-            self.slice_nws.append(nw)
+        nw = dcmmeta.NiftiWrapper(nii, True)
+        time_nws.append(nw)
+    
+    merged = dcmmeta.NiftiWrapper.from_sequence(time_nws)
+    merged_hdr = merged.nii_img.get_header()
+    eq_(merged_hdr.get_dim_info(), (None, None, 2))
+    eq_(merged_hdr.get_xyzt_units(), ('mm', 'unknown'))
         
-    def test_merge(self):
-        merged = dcmmeta.NiftiWrapper.from_sequence(self.slice_nws)
-        eq_(merged.nii_img.shape, (4, 4, 3))
-        ok_(np.allclose(merged.nii_img.get_affine(), 
-                        np.diag((1.1, 1.1, 0.5, 1.0)))
-           )
-        eq_(merged.meta_ext.get_values_and_class('EchoTime'),
-            (40, ('global', 'const'))
-           )
-        eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
-            (range(3), ('global', 'slices'))
-           )
-        merged_hdr = merged.nii_img.get_header()
-        eq_(merged_hdr.get_dim_info(), (0, 1, 2))
-        eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
-        merged_data = merged.nii_img.get_data()
-        for idx in xrange(3):
-            ok_(np.all(merged_data[:, :, idx] == 
-                       np.arange(idx * (4*4), (idx + 1) * (4 * 4)).reshape(4, 4))
-               )
-               
-    def test_merge_inconsistent_hdr(self):
-        #Test that inconsistent header data does not make it into the merged
-        #result
-        nw_2 = self.slice_nws[1]
-        hdr_2 = nw_2.nii_img.get_header()
-        hdr_2.set_dim_info(1, 0, 2)
-        hdr_2.set_xyzt_units('mm', None)
-        
-        merged = dcmmeta.NiftiWrapper.from_sequence(self.slice_nws)
-        merged_hdr = merged.nii_img.get_header()
-        eq_(merged_hdr.get_dim_info(), (None, None, 2))
-        eq_(merged_hdr.get_xyzt_units(), ('mm', 'unknown'))
-        
-        
-
-#def test_from_time_sequence():
-#    time_nws = []
-#    for idx in xrange(3):
-#        arr = np.arange(idx * (4 * 4 * 4), 
-#                        (idx + 1) * (4 * 4 * 4)
-#                       ).reshape(4, 4, 4)
-#        nii = nb.Nifti1Image(arr, np.eye(4))
-#        hdr = nii.get_header()
-#        hdr.set_dim_info(0, 1, 2)
-#        hdr.set_xyzt_units('mm', 'sec')
-#        nw = dcmmeta.NiftiWrapper(nii, True)
-#        nw.meta_ext.get_class_dict(('global', 'const'))['EchoTime'] = idx
-#        slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
-#        slice_meta['SliceLocation'] = range(4)
-#        slice_meta['AcquisitionTime'] = [idx + slice_idx 
-#                                         for slice_idx in xrange(4)
-#                                        ]
-#        
-#        slice_nws.append(nw)
-#        
-#    merged = dcmmeta.NiftiWrapper.from_sequence(slice_nws)
-#    eq_(merged.nii_img.shape, (4, 4, 3))
-#    merged_hdr = merged.nii_img.get_header()
-#    eq_(merged_hdr.get_dim_info(), (0, 1, 2))
-#    eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
-#    merged_data = merged.nii_img.get_data()
-#    for idx in xrange(3):
-#        ok_(np.all(merged_data[:, :, idx] == 
-#                   np.arange(idx * (4*4), (idx + 1) * (4 * 4)).reshape(4, 4))
-#           )
