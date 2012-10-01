@@ -400,7 +400,7 @@ class TestGetData(object):
         data = stack.get_data()
         eq_(data.shape, stack.get_shape())
         eq_(sha256(data).hexdigest(),
-            '4daeb630fce867f96a1dad7962fa74e902e7710d6cd65408bd2164c0278a9671')
+            'ed14cb8694f1c0d542562fecc6fd71bced3810df4fcb857a091c8e8525fbdda6')
             
 class TestGetAffine(object):
     def setUp(self):
