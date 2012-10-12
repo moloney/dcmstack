@@ -844,7 +844,12 @@ def test_from_sequence_4d_time_to_5d():
         ([0, 1, 0, 1, 1, 2, 1, 2], ('global', 'slices')))
     eq_(merged.get_values_and_class('time_slices_missing'),
         ([0, 1, 0, 1, None, None, None, None], ('global', 'slices')))
-    
+
+def test_from_sequence_no_slc():
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), None)
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), None)
+    merged = dcmmeta.DcmMetaExtension.from_sequence([ext1, ext2], 4)
+   
 def test_nifti_wrapper_init():
     nii = nb.Nifti1Image(np.zeros((5, 5, 5)), np.eye(4))
     assert_raises(dcmmeta.MissingExtensionError, 

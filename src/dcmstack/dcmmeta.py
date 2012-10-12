@@ -583,8 +583,11 @@ class DcmMetaExtension(Nifti1Extension):
         result = klass.make_empty(output_shape, affine, slice_dim)
         
         #Need to initialize the result with the first extension in 'seq'
-        use_slices = np.allclose(result.slice_normal, 
-                                 first_input.slice_normal)
+        result_slc_norm = result.slice_normal
+        first_slc_norm = first_input.slice_normal
+        use_slices = (not result_slc_norm is None and
+                      not first_slc_norm is None and 
+                      np.allclose(result_slc_norm, first_slc_norm))
         for classes in first_input.get_valid_classes():
             if classes[1] == 'slices' and not use_slices:
                 continue
@@ -950,7 +953,11 @@ class DcmMetaExtension(Nifti1Extension):
                     self._simplify(key)
     
     def _insert(self, dim, other):
-        use_slices = np.allclose(other.slice_normal, self.slice_normal)
+        self_slc_norm = self.slice_normal
+        other_slc_norm = other.slice_normal
+        use_slices = (not self_slc_norm is None and
+                      not other_slc_norm is None and 
+                      np.allclose(self_slc_norm, other_slc_norm))
         missing_keys = list(set(self.get_keys()) - set(other.get_keys()))
         for other_classes in other.get_valid_classes():
             if other_classes[1] == 'slices' and not use_slices:
