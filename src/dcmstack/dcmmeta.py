@@ -1265,7 +1265,7 @@ class NiftiWrapper(object):
             if len(index) != len(shape):
                 raise IndexError('Incorrect number of indices.')
             for dim, ind_val in enumerate(index):
-                if ind_val < 0 or ind_val >= shape[dim]:
+                if not 0 <= ind_val < shape[dim]:
                     raise IndexError('Index is out of bounds.')
             
             #First try per time/vector sample values
@@ -1361,7 +1361,7 @@ class NiftiWrapper(object):
         slices = [slice(None)] * len(shape)
         for idx in xrange(shape[dim]):
             #Grab the split data, get rid of trailing singular dimensions
-            if dim == len(shape) - 1:
+            if dim >= 3 and dim == len(shape) - 1:
                 slices[dim] = idx
             else:
                 slices[dim] = slice(idx, idx+1)

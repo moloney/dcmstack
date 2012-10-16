@@ -1068,6 +1068,15 @@ class TestSplit(object):
             ok_(np.all(nw_split.nii_img.get_data() == 
                        self.arr[:, :, :, :, split_idx])
                )
+               
+def test_split_keep_spatial():
+    arr = np.arange(3 * 3 * 3).reshape(3, 3, 3) 
+    nii = nb.Nifti1Image(arr, np.eye(4))
+    nw = dcmmeta.NiftiWrapper(nii, True)
+    
+    for split_idx, nw_split in enumerate(nw.split(2)):
+        eq_(nw_split.nii_img.shape, (3, 3, 1))
+    
 
 def test_from_dicom():
     data_dir = path.join(test_dir, 
