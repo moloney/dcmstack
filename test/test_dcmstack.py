@@ -399,6 +399,7 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[1])
         data = stack.get_data()
         eq_(data.shape, stack.get_shape())
+        ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
         eq_(sha256(data).hexdigest(),
             'ed14cb8694f1c0d542562fecc6fd71bced3810df4fcb857a091c8e8525fbdda6')
             
@@ -421,7 +422,7 @@ class TestGetAffine(object):
         ref = np.load(path.join(self.data_dir, 'single_slice_aff.npy'))
         print affine
         print ref
-        ok_(np.all(affine == ref))
+        ok_(np.allclose(affine, ref))
     
     def test_three_dim(self):
         stack = dcmstack.DicomStack()
@@ -429,7 +430,7 @@ class TestGetAffine(object):
         stack.add_dcm(self.inputs[1])
         affine = stack.get_affine()
         ref = np.load(path.join(self.data_dir, 'single_vol_aff.npy'))
-        ok_(np.all(affine == ref))
+        ok_(np.allclose(affine, ref))
     
 class TestToNifti(object):
     
@@ -509,7 +510,7 @@ class TestToNifti(object):
         nii = stack.to_nifti()
         self._chk(nii, 'single_vol')
         
-    def test_two_time_vol(self, embed=False):
+    def test_two_time_vol(self):
         stack = dcmstack.DicomStack(time_order='EchoTime')
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
@@ -518,7 +519,7 @@ class TestToNifti(object):
         nii = stack.to_nifti()
         self._chk(nii, 'two_time_vol')
         
-    def test_two_vector_vol(self, embed=False):
+    def test_two_vector_vol(self):
         stack = dcmstack.DicomStack(vector_order='EchoTime')
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
@@ -526,4 +527,14 @@ class TestToNifti(object):
         stack.add_dcm(self.inputs[3])
         nii = stack.to_nifti()
         self._chk(nii, 'two_vector_vol')
+        
+    def test_allow_dummies(self):
+        del self.inputs[0].Rows
+        del self.inputs[0].Columns
+        stack = dcmstack.DicomStack(allow_dummies=True)
+        stack.add_dcm(self.inputs[0])
+        stack.add_dcm(self.inputs[1])
+        nii = stack.to_nifti()
+        data = nii.get_data()
+        ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
         

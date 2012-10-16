@@ -334,14 +334,16 @@ class DicomOrdering(object):
         
         return val
 
-def _make_dummy(reference, meta):
+def _make_dummy(reference, meta, iop):
     '''Make a "dummy" NiftiWrapper (no valid pixel data).'''
     #Create the dummy data array filled with largest representable value
     data = np.empty_like(reference.nii_img.get_data())
     data[...] = np.iinfo(np.int16).max
     
     #Create the nifti image and set header data
-    nii_img = nb.nifti1.Nifti1Image(data, reference.nii_img.get_affine())
+    aff = reference.nii_img.get_affine().copy()
+    aff[:3, 3] = [iop[1], iop[0], iop[2]]
+    nii_img = nb.nifti1.Nifti1Image(data, aff)
     hdr = nii_img.get_header()
     hdr.set_xyzt_units('mm', 'sec')
     dim_info = {'freq' : None, 
@@ -530,16 +532,16 @@ class DicomStack(object):
                 #We don't have a reference input yet, use this one
                 self._ref_input = nii_wrp
                 #Convert any dummies that we have stashed previously
-                for dummy_meta, dummy_tuple in self._dummies:
-                    dummy_wrp = _make_dummy(self._ref_input, dummy_meta)
+                for dummy_meta, dummy_tuple, iop in self._dummies:
+                    dummy_wrp = _make_dummy(self._ref_input, dummy_meta, iop)
                     self._files_info.append((dummy_wrp, dummy_tuple))
         else:
             if self._ref_input is None:
                 #We don't have a reference input, so stash the dummy for now
-                self._dummies.append((meta, sorting_tuple))
+                self._dummies.append((meta, sorting_tuple, dcm.ImagePositionPatient))
             else:
                 #Convert dummy using the reference input
-                nii_wrp = _make_dummy(self._ref_input, meta)
+                nii_wrp = _make_dummy(self._ref_input, meta, dcm.ImagePositionPatient)
         
         #If we made a NiftiWrapper add it to the stack
         if not nii_wrp is None:
@@ -792,12 +794,12 @@ class DicomStack(object):
         files_per_vol = len(self._files_info) / n_vols
         
         #Pull the DICOM Patient Space affine from the first input
-        aff = self._files_info[0][0].nii_img.get_header().get_best_affine()
+        aff = self._files_info[0][0].nii_img.get_affine()
         
         #If there is more than one file per volume, we need to fix slice scaling
         if files_per_vol > 1:
             first_offset = aff[:3, 3]
-            second_offset = self._files_info[1][0].nii_img.get_header().get_best_affine()[:3,3]
+            second_offset = self._files_info[1][0].nii_img.get_affine()[:3, 3]
             scaled_slc_dir = second_offset - first_offset
             aff[:3, 2] = scaled_slc_dir
         
