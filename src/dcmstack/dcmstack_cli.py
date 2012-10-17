@@ -7,7 +7,7 @@ import os, sys, argparse, string
 from glob import glob
 import dicom
 from . import dcmstack
-from .dcmstack import parse_and_stack, DicomOrdering
+from .dcmstack import parse_and_group, stack_group, DicomOrdering, default_group_keys
 from .dcmmeta import NiftiWrapper
 from . import extract
 
@@ -66,12 +66,9 @@ def main(argv=sys.argv):
     output_opt.add_argument('--dest-dir', default=None, 
                             help=('Destination directory, defaults to the '
                             'source directory.'))
-    output_opt.add_argument('-o', '--output-name', 
-                            default='%(SeriesNumber)03d-%(ProtocolName)s',
+    output_opt.add_argument('-o', '--output-name', default=None,
                             help=('Python format string determining the output '
-                            'filenames based on DICOM tags. Files mapping to '
-                            'the same filename will be put in the same stack. '
-                            'Default: %(default)s'))
+                            'filenames based on DICOM tags.'))
     output_opt.add_argument('--output-ext', default='.nii.gz', 
                             help=('The extension for the output file type. '
                             'Default: %(default)s'))
@@ -84,6 +81,9 @@ def main(argv=sys.argv):
                             'header extension (in JSON format).'))
     
     stack_opt = arg_parser.add_argument_group('Stacking Options')
+    stack_opt.add_argument('-g', '--group-by', default=None, 
+                           help=("Comma seperated list of meta data keys to "
+                           "group input files into stacks with."))
     stack_opt.add_argument('--voxel-order', default='rpi', 
                            help=('Order the voxels so the spatial indices '
                            'start from these directions in patient space. '
@@ -223,6 +223,12 @@ def main(argv=sys.argv):
     if len(args.src_dirs) == 0:
         arg_parser.error('No source directories were provided.')
         
+    #Handle group-by option
+    if not args.group_by is None:
+        group_by = args.group_by.split(',')
+    else:
+        group_by = default_group_keys
+        
     #Handle each source directory individually
     for src_dir in args.src_dirs:
         if not os.path.isdir(src_dir):
@@ -240,25 +246,45 @@ def main(argv=sys.argv):
         if args.verbose:
             print "Found %d source files in the directory" % len(src_paths)
         
-        #Build the stacks for this directory
-        stacks = parse_and_stack(src_paths, args.output_name, extractor, 
-                                 args.force_read, not args.strict, 
-                                 time_order=time_order, 
-                                 vector_order=vector_order, 
-                                 allow_dummies=args.allow_dummies, 
-                                 meta_filter=meta_filter)
+        #Group the files in this directory
+        groups = parse_and_group(src_paths, 
+                                 group_by,
+                                 extractor, 
+                                 args.force_read, 
+                                 not args.strict, 
+                                )
         
         if args.verbose:
-            print "Created %d stacks of DICOM images" % len(stacks)
-        
-        #Write out the stacks
-        for out_fn, stack in stacks.iteritems():
+            print "Found %d groups of DICOM images" % len(groups)
+            
+        for key, group in groups.iteritems():
+            stack = stack_group(group,
+                                warn_on_except=not args.strict,
+                                time_order=time_order, 
+                                vector_order=vector_order, 
+                                allow_dummies=args.allow_dummies, 
+                                meta_filter=meta_filter)
+            meta = group[0][1]
+            if args.output_name is None:
+                out_fmt = []
+                if 'SeriesNumber' in meta:
+                    out_fmt.append('%(SeriesNumber)03d')
+                if 'ProtocolName' in meta:
+                    out_fmt.append('%(ProtocolName)s')
+                elif 'SeriesDescription' in meta:
+                    out_fmt.append('%(SeriesDescription)s')
+                else:
+                    out_fmt = 'series'
+                out_fmt = '-'.join(out_fmt)
+            else:
+                out_fmt = args.output_name
+            out_fn = out_fmt % meta
             out_fn = sanitize_path_comp(out_fn) + args.output_ext
             if args.dest_dir:
                 out_path = os.path.join(args.dest_dir, out_fn)
             else:
                 out_path = os.path.join(src_dir, out_fn)
-
+                
             if args.verbose:
                 print "Writing out stack to path %s" % out_path
 

@@ -960,21 +960,26 @@ class DicomStack(object):
     def to_nifti_wrapper(self, voxel_order=''):
         return NiftiWrapper(self.to_nifti(voxel_order, True))
         
-def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s', 
-                    extractor=None, force=False, warn_on_except=False, 
-                    **stack_args):
-    '''Parse the given dicom files into a dictionary containing one or more 
-    DicomStack objects.
+default_group_keys =  ('SeriesInstanceUID', 
+                       'SeriesNumber', 
+                       'ProtocolName')
+'''Default keys for grouping DICOM files from the same acquisition together.'''
+        
+def parse_and_group(src_paths, group_by=default_group_keys, extractor=None, 
+                    force=False, warn_on_except=False):
+    '''Parse the given dicom files and group them together. Each group is 
+    stored as a (list) value in a dict where the key is a tuple of values 
+    corresponding to the keys in 'group_by'
     
     Parameters
     ----------
     src_paths : sequence
         A list of paths to the source DICOM files.
         
-    key_format : str
-        A python format string used to create the dictionary keys in the result.
-        The string is formatted with the DICOM meta data and any files with the 
-        same result will be added to the same DicomStack.
+    group_by : tuple
+        Meta data keys to group data sets with. Any data set with the same 
+        values for these keys will be grouped together. This tuple of values 
+        will also be the key in the result dictionary.
         
     extractor : callable
         Should take a dicom.dataset.Dataset and return a dictionary of the 
@@ -986,9 +991,13 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
     warn_on_except : bool
         Convert exceptions into warnings, possibly allowing some results to be 
         returned.
-    
-    stack_args : kwargs
-        Keyword arguments to pass to the DicomStack constructor.
+        
+    Returns
+    -------
+    groups : dict
+        A dict mapping tuples of values (corresponding to 'group_by') to groups 
+        of data sets. Each element in the list is a tuple containing the dicom 
+        object, the parsed meta data, and the filename.
     '''
     if extractor is None:
         extractor = default_extractor
@@ -1008,19 +1017,63 @@ def parse_and_stack(src_paths, key_format='%(SeriesNumber)03d-%(ProtocolName)s',
         #Extract the meta data, find the key for results dict, and create the 
         #stack if needed
         meta = extractor(dcm)
-        stack_key = key_format % meta
-        if not stack_key in results:
-            results[stack_key] = DicomStack(**stack_args)
-        
-        #Try to add it to the stack
-        try:
-            results[stack_key].add_dcm(dcm, meta)
+        key = tuple(meta.get(grp_key) for grp_key in group_by)
+        if not key in results:
+            results[key] = []
             
+        results[key].append((dcm, meta, dcm_path))
+        
+    return results
+    
+def stack_group(group, warn_on_except=False, **stack_args):
+    result = DicomStack(**stack_args)
+    for dcm, meta, fn in group:
+        try:
+            result.add_dcm(dcm, meta)
         except Exception, e:
             if warn_on_except:
-                warnings.warn('Error adding file %s to stack %s: %s' % 
-                              (dcm_path, stack_key, str(e)))
+                warnings.warn('Error adding file %s to stack: %s' % 
+                              (fn, str(e)))
             else:
                 raise
+    return result
+    
+def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None, 
+                    force=False, warn_on_except=False, **stack_args):
+    '''Parse the given dicom files into a dictionary containing one or more 
+    DicomStack objects.
+    
+    Parameters
+    ----------
+    src_paths : sequence
+        A list of paths to the source DICOM files.
+        
+    group_by : tuple
+        Meta data keys to group data sets with. Any data set with the same 
+        values for these keys will be grouped together. This tuple of values 
+        will also be the key in the result dictionary.
+        
+    extractor : callable
+        Should take a dicom.dataset.Dataset and return a dictionary of the 
+        extracted meta data. 
+        
+    force : bool
+        Force reading source files even if they do not appear to be DICOM.
+        
+    warn_on_except : bool
+        Convert exceptions into warnings, possibly allowing some results to be 
+        returned.
+    
+    stack_args : kwargs
+        Keyword arguments to pass to the DicomStack constructor.
+    '''
+    results = parse_and_group(src_paths, 
+                              group_by, 
+                              extractor, 
+                              force, 
+                              warn_on_except)
+                              
+    for key, group in results.iteritems():
+        results[key] = stack_group(group, warn_on_except, **stack_args)
     
     return results
