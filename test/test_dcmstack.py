@@ -8,6 +8,7 @@ from hashlib import sha256
 from nose.tools import ok_, eq_, assert_raises
 import numpy as np
 import dicom
+from dicom import datadict
 import nibabel as nb
 
 test_dir = path.dirname(__file__)
@@ -316,12 +317,20 @@ class TestGuessDim(object):
                 if hasattr(in_dcm, key):
                     delattr(in_dcm, key)
         
+    def _get_vr_ord(self, key, ordinate):
+        tag = datadict.keyword_dict[key]
+        vr = datadict.dictionaryVR(tag)
+        if vr == 'TM':
+            return '%06d.000000' % ordinate
+        else:
+            return ordinate
+        
     def test_single_guess(self):
         #Test situations where there is only one possible correct guess
         for key in dcmstack.DicomStack.sort_guesses:
             stack = dcmstack.DicomStack()
             for idx, in_dcm in enumerate(self.inputs):
-                setattr(in_dcm, key, idx)
+                setattr(in_dcm, key, self._get_vr_ord(key, idx))
                 stack.add_dcm(in_dcm)
             eq_(stack.get_shape(), (192, 192, 2, 2))
             for in_dcm in self.inputs:
@@ -332,9 +341,11 @@ class TestGuessDim(object):
         stack = dcmstack.DicomStack()
         for key in dcmstack.DicomStack.sort_guesses[:-1]:
             for in_dcm in self.inputs:
-                setattr(in_dcm, key, 0)
+                setattr(in_dcm, key, self._get_vr_ord(key, 0))
         for idx, in_dcm in enumerate(self.inputs):
-            setattr(in_dcm, dcmstack.DicomStack.sort_guesses[-1], idx)
+            setattr(in_dcm, 
+                    dcmstack.DicomStack.sort_guesses[-1], 
+                    self._get_vr_ord(key, idx) )
             stack.add_dcm(in_dcm)
         eq_(stack.get_shape(), (192, 192, 2, 2))
         

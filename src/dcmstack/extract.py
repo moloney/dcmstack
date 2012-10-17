@@ -236,11 +236,43 @@ unpack_vr_map = {'SL' : 'i',
                  }
 '''Dictionary mapping value representations to corresponding format strings for 
 the struct.unpack function.'''
+        
+def tm_to_seconds(time_str):            
+    '''Convert a DICOM time value (value representation of 'TM') to the number 
+    of seconds past midnight.
+    
+    Parameters
+    ----------
+    time_str : str
+        The DICOM time value string
+        
+    Returns
+    -------
+    A floating point representing the number of seconds past midnight
+    '''
+    #Allow ACR/NEMA style format by removing any colon chars
+    time_str = time_str.replace(':', '')
+        
+    #Only the hours portion is required
+    result = int(time_str[:2]) * 3600
+
+    str_len = len(time_str)
+    if str_len > 2:
+        result += int(time_str[2:4]) * 60
+    if str_len > 4:
+        result += float(time_str[4:])
+    
+    return float(result)
+
+default_conversions = {'DS' : float, 
+                       'IS' : int,
+                       'TM' : tm_to_seconds
+                      }
     
 class MetaExtractor(object):
     '''Callable object for extracting meta data from a dicom dataset'''
     
-    def __init__(self, ignore_rules=None, translators=None, 
+    def __init__(self, ignore_rules=None, translators=None, conversions=None,
                  warn_on_trans_except=True):
         '''Initialize a `MetaExtractor` with a set of ignore rules and 
         translators. 
@@ -257,6 +289,10 @@ class MetaExtractor(object):
             DICOM element into a dictionary. Overrides any ignore rules. If 
             None the module default is used.
             
+        conversions : dict
+            Mapping of DICOM value representation (VR) strings to callables
+            that perform some conversion on the value
+            
         warn_on_trans_except : bool
             Convert any exceptions from translators into warnings.
         '''
@@ -268,6 +304,10 @@ class MetaExtractor(object):
             self.translators = default_translators
         else:
             self.translators = translators
+        if conversions is None:
+            self.conversions = default_conversions
+        else:
+            self.conversions = conversions
         self.warn_on_trans_except = warn_on_trans_except
                 
     def _get_elem_key(self, elem):
@@ -293,21 +333,17 @@ class MetaExtractor(object):
                 return struct.unpack(unpack_vr_map[elem.VR], elem.value)[0]
             else:
                 return list(struct.unpack(unpack_vr_map[elem.VR], elem.value))
-                
+        
+        if elem.VR in self.conversions:
+            if elem.VM == 1:
+                return self.conversions[elem.VR](elem.value)
+            else:
+                return [self.conversions[elem.VR](val) for val in elem.value]
+           
         if elem.VM == 1:
-            if elem.VR == 'DS':
-                return float(elem.value)
-            elif elem.VR == 'IS':
-                return int(elem.value)
-            else:
-                return elem.value
+            return elem.value
         else:
-            if elem.VR == 'DS':
-                return [float(val) for val in elem.value]
-            elif elem.VR == 'IS':
-                return [int(val) for val in elem.value]
-            else:
-                return elem.value[:]
+            return elem.value[:]
         
     def __call__(self, dcm):
         '''Extract the meta data from a DICOM dataset.

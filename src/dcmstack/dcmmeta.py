@@ -1419,28 +1419,9 @@ class NiftiWrapper(object):
             The path to the Nifti file to load. 
         '''
         return klass(nb.load(path))
-        
+      
     @classmethod
-    def from_dicom(klass, dcm_data, meta_dict=None):
-        '''Create a NiftiWrapper from a single DICOM dataset.
-        
-        Parameters
-        ----------
-        dcm_data : dicom.dataset.Dataset
-            The DICOM dataset to convert into a NiftiWrapper.
-            
-        meta_dict : dict
-            An optional dictionary of meta data extracted from `dcm_data`. See 
-            the `extract` module for generating this dict.
-           
-        See Also
-        --------
-        dcmstack.parse_and_stack : Convert a collection of DICOM datasets.
-        '''
-        #Work around until nibabel supports pydicom >= 0.9.7
-        patch_dcm_ds_is(dcm_data)
-        
-        dcm_wrp = wrapper_from_data(dcm_data)
+    def from_dicom_wrapper(klass, dcm_wrp, meta_dict=None):
         data = dcm_wrp.get_data()
         
         #The Nifti patient space flips the x and y directions
@@ -1473,6 +1454,26 @@ class NiftiWrapper(object):
             result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
         
         return result
+      
+    @classmethod
+    def from_dicom(klass, dcm_data, meta_dict=None):
+        '''Create a NiftiWrapper from a single DICOM dataset.
+        
+        Parameters
+        ----------
+        dcm_data : dicom.dataset.Dataset
+            The DICOM dataset to convert into a NiftiWrapper.
+            
+        meta_dict : dict
+            An optional dictionary of meta data extracted from `dcm_data`. See 
+            the `extract` module for generating this dict.
+           
+        See Also
+        --------
+        dcmstack.parse_and_stack : Convert a collection of DICOM datasets.
+        '''
+        dcm_wrp = wrapper_from_data(dcm_data)
+        return klass.from_dicom_wrapper(dcm_wrp, meta_dict)
         
     @classmethod
     def from_sequence(klass, seq, dim=None):

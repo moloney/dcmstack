@@ -13,6 +13,7 @@ from .dcmmeta import DcmMetaExtension, NiftiWrapper
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from .extract import default_extractor
+    from nibabel.nicom.dicomwrappers import wrapper_from_data
 
 def make_key_regex_filter(exclude_res, force_include_res=None):
     '''Make a meta data filter using regular expressions.
@@ -483,10 +484,11 @@ class DicomStack(object):
             The provided `dcm` has the same slice location and time/vector 
             values.
 
-        '''
-        
+        '''                
         if meta is None:
             meta = default_extractor(dcm)
+
+        dw = wrapper_from_data(dcm)
 
         is_dummy = self._chk_congruent(meta)
         
@@ -494,14 +496,7 @@ class DicomStack(object):
         self._repetition_times.add(meta.get('RepetitionTime'))
         
         #Pull the info used for sorting
-        if 'CsaImage.SliceNormalVector' in meta:
-            slice_dir = np.array(meta['CsaImage.SliceNormalVector'])
-        else:
-            slice_dir = np.cross(meta['ImageOrientationPatient'][:3],
-                                 meta['ImageOrientationPatient'][3:],
-                                )
-        slice_pos = np.dot(slice_dir, 
-                           np.array(meta['ImagePositionPatient']))
+        slice_pos = dw.slice_indicator
         self._slice_pos_vals.add(slice_pos)
         time_val = None
         if self._time_order:
@@ -527,7 +522,7 @@ class DicomStack(object):
         #Create a NiftiWrapper for this input if possible
         nii_wrp = None
         if not is_dummy:
-            nii_wrp = NiftiWrapper.from_dicom(dcm, meta)
+            nii_wrp = NiftiWrapper.from_dicom_wrapper(dw, meta)
             if self._ref_input is None:
                 #We don't have a reference input yet, use this one
                 self._ref_input = nii_wrp
@@ -886,7 +881,7 @@ class DicomStack(object):
                         None)
         if files_per_vol > 1 and has_acq_time:
             #Pull out the relative slice times for the first volume
-            slice_times = np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime']) 
+            slice_times = np.array([file_info[0]['AcquisitionTime'] 
                                     for file_info in self._files_info[:n_slices]]
                                   )
             slice_times -= np.min(slice_times)
@@ -898,7 +893,7 @@ class DicomStack(object):
                 end_slice = start_slice + n_slices
                 slices_info = self._files_info[start_slice:end_slice]
                 vol_slc_times = \
-                    np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime']) 
+                    np.array([file_info[0]['AcquisitionTime'] 
                               for file_info in slices_info]
                             )
                 vol_slc_times -= np.min(vol_slc_times)
