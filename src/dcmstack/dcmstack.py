@@ -7,6 +7,9 @@ from copy import deepcopy
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
+from nibabel.orientations import (io_orientation, 
+                                  apply_orientation, 
+                                  inv_ornt_aff)
 import numpy as np
 from .dcmmeta import DcmMetaExtension, NiftiWrapper
 
@@ -89,39 +92,85 @@ default_meta_filter = make_key_regex_filter(default_key_excl_res,
                                             default_key_incl_res)
 '''Default meta_filter for `DicomStack`.'''
 
-def closest_ortho_pat_axis(direction):
-    '''
-    Determine the closest orthographic patient axis for the given direction.
+def ornt_transform(start_ornt, end_ornt):
+    '''Return the orientation that transforms from `start_ornt` to `end_ornt`.
     
     Parameters
     ----------
-    direction : array
-        A direction vector with three dimensions in Nifti patient space (RAS).
+    start_ornt : (n,2) orientation array
+        Initial orientation.
         
+    end_ornt : (n,2) orientation array
+        Final orientation.
+       
     Returns
     -------
-    A two character code coresponding to the orientation in terms of the 
-    closest orthogonal patient axis (eg. 'lr' would mean from (l)eft to 
-    (r)ight).
+    orientations : (p, 2) ndarray
+       The orientation that will transform the `start_ornt` to the `end_ornt`.
     '''
-    if (abs(direction[0]) >= abs(direction[1]) and 
-        abs(direction[0]) >= abs(direction[2])):
-        if direction[0] < 0.0:
-            return 'rl'
+    start_ornt = np.asarray(start_ornt)
+    end_ornt = np.asarray(end_ornt)
+    if start_ornt.shape != end_ornt.shape:
+        raise ValueError("The orientations must have the same shape")
+    if start_ornt.shape[1] != 2:
+        raise ValueError("Invalid shape for an orientation: %s" % 
+                         start_ornt.shape)
+    result = np.empty_like(start_ornt)
+    for end_in_idx, (end_out_idx, end_flip) in enumerate(end_ornt):
+        for start_in_idx, (start_out_idx, start_flip) in enumerate(start_ornt):
+            if end_out_idx == start_out_idx:
+                if start_flip == end_flip:
+                    flip = 1
+                else:
+                    flip = -1
+                result[end_in_idx, :] = [start_in_idx, flip]
+                break
         else:
-            return 'lr'
-    elif (abs(direction[1]) >= abs(direction[0]) and 
-          abs(direction[1]) >= abs(direction[2])):
-        if direction[1] < 0.0:
-            return 'ap'
-        else:
-            return 'pa'
-    elif (abs(direction[2]) >= abs(direction[0]) and 
-          abs(direction[2]) >= abs(direction[1])):
-        if direction[2] < 0.0:
-            return 'si'
-        else:
-            return 'is'
+            raise ValueError("Unable to find out axis %d in start_ornt" % 
+                             end_out_idx)
+    return result
+    
+def axcodes2ornt(axcodes, labels=None):
+    """ Convert axis codes `axcodes` to an orientation
+
+    Parameters
+    ----------
+    axcodes : (N,) tuple
+        axis codes - see ornt2axcodes docstring
+    labels : optional, None or sequence of (2,) sequences
+        (2,) sequences are labels for (beginning, end) of output axis.  That 
+        is, if the first element in `axcodes` is ``front``, and the second 
+        (2,) sequence in `labels` is ('back', 'front') then the first 
+        row of `ornt` will be ``[1, 1]``. If None, equivalent to 
+        ``(('L','R'),('P','A'),('I','S'))`` - that is - RAS axes.
+
+    Returns
+    -------
+    ornt : (N,2) array-like
+        oritation array - see io_orientation docstring
+
+    Examples
+    --------
+    >>> axcodes2ornt(('F', 'L', 'U'), (('L','R'),('B','F'),('D','U')))
+    [[1, 1],[0,-1],[2,1]]
+    """
+    
+    if labels is None:
+        labels = zip('LPI', 'RAS')
+    
+    n_axes = len(axcodes)
+    ornt = np.ones((n_axes, 2), dtype=np.int8) * np.nan
+    for code_idx, code in enumerate(axcodes):
+        for label_idx, codes in enumerate(labels):
+            if code is None:
+                continue
+            if code in codes:
+                if code == codes[0]:
+                    ornt[code_idx, :] = [label_idx, -1]
+                else:
+                    ornt[code_idx, :] = [label_idx, 1]
+                break
+    return ornt
 
 def reorder_voxels(vox_array, affine, voxel_order):
     '''Reorder the given voxel array and corresponding affine. 
@@ -147,22 +196,19 @@ def reorder_voxels(vox_array, affine, voxel_order):
     out_aff : array
         A new array with the updated affine
         
-    perm : tuple
-        A tuple with the permuted dimension indices
+    ornt_tran : tuple
+        The orientation transform used to update the orientation.
+        
     '''
-    #Take a copy of affine so that we return a new array even when nothing is 
-    #changed
-    affine = affine.copy()
-    
     #Check if voxel_order is valid
-    voxel_order = voxel_order.lower()
+    voxel_order = voxel_order.upper()
     if len(voxel_order) != 3:
         raise ValueError('The voxel_order must contain three characters')
-    dcm_axes = ['lr', 'ap', 'si']
+    dcm_axes = ['LR', 'AP', 'SI']
     for char in voxel_order:
-        if not char in 'lrapis':
+        if not char in 'LRAPSI':
             raise ValueError('The characters in voxel_order must be one '
-                             'of: l,r,a,p,i,s')
+                             'of: L,R,A,P,I,S')
         for idx, axis in enumerate(dcm_axes):
             if char in axis:
                 del dcm_axes[idx]
@@ -177,59 +223,15 @@ def reorder_voxels(vox_array, affine, voxel_order):
         raise ValueError('The affine must be 4x4')
     
     #Pull the current index directions from the affine
-    index_dirs = [affine[:3, 0].copy(),
-                  affine[:3, 1].copy(),
-                  affine[:3, 2].copy()
-                 ]
-    for i in range(3):
-        index_dirs[i] /= np.sqrt(np.dot(index_dirs[i], index_dirs[i]))
+    orig_ornt = io_orientation(affine)
+    new_ornt = axcodes2ornt(voxel_order)
+    ornt_trans = ornt_transform(orig_ornt, new_ornt)
+    vox_array = apply_orientation(vox_array, ornt_trans)
+    inv_aff_trans = inv_ornt_aff(ornt_trans, vox_array.shape)
+    aff_trans = np.linalg.inv(inv_aff_trans)
+    affine = np.dot(affine, aff_trans)
     
-    #Track some information about the three spatial axes
-    axes = [{'ortho_axis' : closest_ortho_pat_axis(index_dirs[0]),
-             'num_samples' : vox_array.shape[0],
-             'orig_idx' : 0,
-            },
-            {'ortho_axis' : closest_ortho_pat_axis(index_dirs[1]),
-             'num_samples' : vox_array.shape[1],
-             'orig_idx' : 1
-            },
-            {'ortho_axis' : closest_ortho_pat_axis(index_dirs[2]),
-             'num_samples' : vox_array.shape[2],
-             'orig_idx' : 2,
-            }
-           ]
-    
-    #Reorder data as specifed by voxel_order, updating the affine
-    slice_lst = []
-    for dest_index, axis_char in enumerate(voxel_order):
-        for orig_index, axis in enumerate(axes):
-            if axis_char in axis['ortho_axis']:
-                if dest_index != orig_index:
-                    vox_array = vox_array.swapaxes(dest_index, orig_index)
-                    swap_trans = np.eye(4)
-                    swap_trans[:, orig_index], swap_trans[:, dest_index] = \
-                        (swap_trans[:, dest_index].copy(), 
-                         swap_trans[:, orig_index].copy())
-                    affine = np.dot(affine, swap_trans)
-                    axes[orig_index], axes[dest_index] = \
-                        (axes[dest_index], axes[orig_index])
-                if axis_char == axis['ortho_axis'][1]:
-                    vox_array = vox_array[slice_lst + 
-                                          [slice(None, None, -1), Ellipsis]]
-                    rev_mat = np.eye(4)
-                    rev_mat[dest_index, dest_index] = -1
-                    rev_mat[dest_index,3] = (axis['num_samples']-1)
-                    affine = np.dot(affine, rev_mat)
-                    axis['ortho_axis'] = (axis['ortho_axis'][1] + 
-                                          axis['ortho_axis'][0])
-                break
-        slice_lst.append(slice(None))
-
-    permutation = (axes[0]['orig_idx'], 
-                   axes[1]['orig_idx'], 
-                   axes[2]['orig_idx'])
-
-    return (vox_array, affine, permutation)
+    return (vox_array, affine, ornt_trans)
 
 def dcm_time_to_sec(time_str):
     '''Convert a DICOM time value (value representation of 'TM') to the number 
@@ -800,7 +802,7 @@ class DicomStack(object):
         
         return aff
         
-    def to_nifti(self, voxel_order='rpi', embed_meta=False):
+    def to_nifti(self, voxel_order='LAS', embed_meta=False):
         '''Returns a NiftiImage with the data and affine from the stack.
         
         Parameters
@@ -831,18 +833,18 @@ class DicomStack(object):
         files_per_vol = len(self._files_info) / n_vols 
         
         #Reorder the voxel data if requested
-        permutation = (0, 1, 2)
-        orig_slice_dir = affine[:3,2]
+        permutation = [0, 1, 2]
+        slice_dim = 2
         if voxel_order:
-            data, affine, permutation = reorder_voxels(data, 
-                                                       affine, 
-                                                       voxel_order)
-                                                           
-        #Reverse file order in each volume's files if we flipped slice order
-        #This will keep the slice times and meta data order correct
-        if files_per_vol > 1:
-            new_slice_dir = affine[:3, permutation.index(2)]
-            if np.allclose(-orig_slice_dir, new_slice_dir):
+            data, affine, ornt_trans = reorder_voxels(data, 
+                                                      affine, 
+                                                      voxel_order)
+            permutation, flips = zip(*ornt_trans)
+            slice_dim = permutation.index(2)
+            
+            #Reverse file order in each volume's files if we flipped slice order
+            #This will keep the slice times and meta data order correct
+            if files_per_vol > 1 and flips[slice_dim] == -1:
                 self._shape_dirty = True
                 for vol_idx in xrange(n_vols):
                     start = vol_idx * files_per_vol
@@ -852,8 +854,6 @@ class DicomStack(object):
                                                                       start - 1, 
                                                                       -1)
                                                    ]
-            else:
-                assert np.allclose(orig_slice_dir, new_slice_dir)
         
         #Create the nifti image using the data array
         nifti_image = nb.Nifti1Image(data, affine)
@@ -863,7 +863,6 @@ class DicomStack(object):
         nifti_header.set_xyzt_units('mm', 'msec')
         if len(self._repetition_times) == 1 and not None in self._repetition_times:
             nifti_header['pixdim'][4] = list(self._repetition_times)[0]
-        slice_dim = permutation.index(2)
         dim_info = {'freq' : None, 'phase' : None, 'slice' : slice_dim}
         if len(self._phase_enc_dirs) == 1 and not None in self._phase_enc_dirs:
             phase_dir = list(self._phase_enc_dirs)[0]

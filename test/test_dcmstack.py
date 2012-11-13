@@ -10,6 +10,7 @@ import numpy as np
 import dicom
 from dicom import datadict
 import nibabel as nb
+from nibabel.orientations import aff2axcodes
 
 test_dir = path.dirname(__file__)
 src_dir = path.normpath(path.join(test_dir, '../src'))
@@ -26,14 +27,6 @@ def test_key_regex_filter():
         ok_(not filt('test2', 1))
         ok_(not filt('2 another', 1))
         ok_(not filt('another test', 1))
-        
-def test_closest_ortho_pat_axis():
-    eq_(dcmstack.closest_ortho_pat_axis((0.9, 0.1, 0.1)), 'lr')
-    eq_(dcmstack.closest_ortho_pat_axis((-0.9, 0.1, 0.1)), 'rl')
-    eq_(dcmstack.closest_ortho_pat_axis((0.1, 0.9, 0.1)), 'pa')
-    eq_(dcmstack.closest_ortho_pat_axis((0.1, -0.9, 0.1)), 'ap')
-    eq_(dcmstack.closest_ortho_pat_axis((0.1, 0.1, 0.9)), 'is')
-    eq_(dcmstack.closest_ortho_pat_axis((0.1, 0.1, -0.9)), 'si')
     
 class TestReorderVoxels(object):
     def setUp(self):
@@ -77,16 +70,13 @@ class TestReorderVoxels(object):
                      )
                      
     def test_no_op(self):
-        vox_order = [dcmstack.closest_ortho_pat_axis(self.affine[:3, idx])[0] 
-                     for idx in range(3)
-                    ]
-        vox_order = ''.join(vox_order)                             
-        vox_array, affine, perm = dcmstack.reorder_voxels(self.vox_array, 
-                                                          self.affine, 
-                                                          vox_order)
+        vox_order = ''.join(aff2axcodes(self.affine))
+        vox_array, affine, ornt_trans = dcmstack.reorder_voxels(self.vox_array, 
+                                                                self.affine, 
+                                                                vox_order)
         ok_((vox_array == self.vox_array).all())
         ok_((affine == self.affine).all())
-        eq_(perm, (0, 1, 2))
+        ok_(np.allclose(ornt_trans, [[0, 1], [1, 1], [2, 1]]))
         eq_(np.may_share_memory(affine, self.affine), False)
         
 def test_dcm_time_to_sec():
