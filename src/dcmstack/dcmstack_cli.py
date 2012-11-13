@@ -84,7 +84,7 @@ def main(argv=sys.argv):
     stack_opt.add_argument('-g', '--group-by', default=None, 
                            help=("Comma seperated list of meta data keys to "
                            "group input files into stacks with."))
-    stack_opt.add_argument('--voxel-order', default='rpi', 
+    stack_opt.add_argument('--voxel-order', default='LAS', 
                            help=('Order the voxels so the spatial indices '
                            'start from these directions in patient space. '
                            'The directions in patient space should be given '

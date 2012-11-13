@@ -97,7 +97,9 @@ class DcmMetaExtension(Nifti1Extension):
     
     @property
     def reorient_transform(self):
-        '''The transformation due to reorientation'''
+        '''The transformation due to reorientation of the data array. Can be 
+        used to update directional DICOM meta data (after converting to RAS if 
+        needed) into the same space as the affine.'''
         if self._content['dcmmeta_reorient_transform'] is None:
             return None
         return np.array(self._content['dcmmeta_reorient_transform'])
@@ -114,7 +116,8 @@ class DcmMetaExtension(Nifti1Extension):
     
     @property
     def affine(self):
-        '''The affine associated with the per-slice meta data.'''
+        '''The affine associated with the meta data. If this differs from the 
+        image affine, the per-slice meta data will not be used. '''
         return np.array(self._content['dcmmeta_affine'])
         
     @affine.setter
@@ -138,7 +141,8 @@ class DcmMetaExtension(Nifti1Extension):
     
     @property
     def shape(self):
-        '''The shape of the data associated with the meta data'''
+        '''The shape of the data associated with the meta data. Defines the 
+        number of values for the meta data classifications.'''
         return tuple(self._content['dcmmeta_shape'])
     
     @shape.setter
@@ -498,7 +502,8 @@ class DcmMetaExtension(Nifti1Extension):
         return result
     
     @classmethod
-    def make_empty(klass, shape, affine, reorient_transform, slice_dim=None):
+    def make_empty(klass, shape, affine, reorient_transform=None, 
+                   slice_dim=None):
         '''Make an empty DcmMetaExtension.
         
         Parameters
@@ -507,7 +512,11 @@ class DcmMetaExtension(Nifti1Extension):
             The shape of the data associated with this extension.
             
         affine : array
-            The affine for the data associated with this extension.
+            The RAS affine for the data associated with this extension.
+            
+        reorient_transform : array
+            The transformation matrix representing any reorientation of the 
+            data array.
             
         slice_dim : int
             The index of the slice dimension for the data associated with this 
@@ -516,7 +525,8 @@ class DcmMetaExtension(Nifti1Extension):
         Returns
         -------
         result : DcmMetaExtension
-            An empty (but valid) DcmMetaExtension.
+            An empty DcmMetaExtension with the required values set to the 
+            given arguments.
         
         '''
         result = klass(dcm_meta_ecode, '{}')
@@ -627,7 +637,16 @@ class DcmMetaExtension(Nifti1Extension):
         
         #Add the other extensions, updating the shape as we go
         for input_ext in seq[1:]:
-            if not np.allclose(input_ext.reorient_transform, reorient_transform):
+            #If the affines or reorient_transforms don't match, we set the 
+            #reorient_transform to None as we can not reliably use it to update 
+            #directional meta data
+            if ((reorient_transform is None or 
+                 input_ext.reorient_transform is None) or 
+                not (np.allclose(input_ext.affine, affine) or 
+                     np.allclose(input_ext.reorient_transform, 
+                                 reorient_transform)
+                    )
+               ):
                 reorient_transform = None
             result._insert(dim, input_ext)
             shape[dim] += 1
@@ -1090,8 +1109,8 @@ class DcmMetaExtension(Nifti1Extension):
             if local_vals != other_vals:
                 self._change_class(key, (sample_base, 'samples'))
                 local_vals = self.get_values(key)
-                other_vals = other._get_changed_class(key, (sample_base, 
-                                                            'samples')
+                other_vals = other._get_changed_class(key, 
+                                                      (sample_base, 'samples')
                                                      )
                 local_vals.extend(other_vals)
         elif classes == (sample_base, 'samples'):
@@ -1208,7 +1227,7 @@ class NiftiWrapper(object):
                 self.meta_ext = \
                     DcmMetaExtension.make_empty(self.nii_img.shape, 
                                                 hdr.get_best_affine(),
-                                                np.eye(4),
+                                                None,
                                                 slice_dim)
                 hdr.extensions.append(self.meta_ext)
             else:
@@ -1482,7 +1501,8 @@ class NiftiWrapper(object):
         
         #Embed the meta data extension
         result = klass(nii_img, make_empty=True)
-        result.meta_ext.reorient_transform = np.diag([-1., -1., 1., 1.])
+        
+        result.meta_ext.reorient_transform = np.eye(4)
         if meta_dict:
             result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
         

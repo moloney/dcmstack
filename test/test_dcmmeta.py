@@ -38,7 +38,7 @@ def test_is_repeating():
     assert_raises(ValueError, dcmmeta.is_repeating, [0, 1, 0, 1], 5)
     
 def test_get_valid_classes():
-    ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), np.eye(4))
+    ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4))
     eq_(ext.get_valid_classes(), (('global', 'const'), ('global', 'slices')))
     
     ext.shape = (2, 2, 2, 2)
@@ -204,10 +204,7 @@ def test_dcmmeta_affine():
     ok_(np.allclose(ext.affine, np.eye(4)))
     
 def test_dcmmeta_slice_dim():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
-                                              np.eye(4), 
-                                              np.eye(4), 
-                                              None)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4))
     eq_(ext.slice_dim, None)
     assert_raises(ValueError, 
                   setattr, 
@@ -219,10 +216,7 @@ def test_dcmmeta_slice_dim():
     eq_(ext.slice_dim, 2)
     
 def test_dcmmeta_shape():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
-                                              np.eye(4), 
-                                              np.eye(4), 
-                                              None)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4))
     eq_(ext.shape, (64, 64, 2))
     assert_raises(ValueError, 
                   setattr, 
@@ -234,10 +228,7 @@ def test_dcmmeta_shape():
     eq_(ext.shape, (128, 128, 64))
     
 def test_dcmmeta_version():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
-                                              np.eye(4), 
-                                              np.eye(4), 
-                                              None)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4))
     eq_(ext.version, dcmmeta._meta_version)
     ext.version = 1.0
     eq_(ext.version, 1.0)
@@ -893,14 +884,8 @@ def test_from_sequence_4d_time_to_5d():
         ([0, 1, 0, 1, None, None, None, None], ('global', 'slices')))
 
 def test_from_sequence_no_slc():
-    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), 
-                                               np.eye(4), 
-                                               np.eye(4),
-                                               None)
-    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), 
-                                               np.eye(4), 
-                                               np.eye(4),
-                                               None)
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4))
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4))
     merged = dcmmeta.DcmMetaExtension.from_sequence([ext1, ext2], 4)
    
 def test_nifti_wrapper_init():
@@ -909,7 +894,7 @@ def test_nifti_wrapper_init():
                   dcmmeta.NiftiWrapper,
                   nii)
     hdr = nii.get_header()
-    ext = dcmmeta.DcmMetaExtension.make_empty((5, 5, 5), np.eye(4), np.eye(4))
+    ext = dcmmeta.DcmMetaExtension.make_empty((5, 5, 5), np.eye(4))
     hdr.extensions.append(ext)
     nw = dcmmeta.NiftiWrapper(nii)
     eq_(nw.meta_ext, ext)

@@ -839,17 +839,14 @@ class DicomStack(object):
         #Reorder the voxel data if requested
         permutation = [0, 1, 2]
         slice_dim = 2
-        reorient_transform = np.diag([-1., -1., 1., 1.])
+        reorient_transform = np.eye(4)
         if voxel_order:
             (data, 
              affine,
-             aff_trans,
+             reorient_transform,
              ornt_trans) = reorder_voxels(data, affine, voxel_order)
             permutation, flips = zip(*ornt_trans)
             slice_dim = permutation.index(2)
-            
-            #Update the reorient_transform
-            reorient_transform = np.dot(reorient_transform, aff_trans)
             
             #Reverse file order in each volume's files if we flipped slice order
             #This will keep the slice times and meta data order correct
