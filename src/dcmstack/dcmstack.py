@@ -196,7 +196,10 @@ def reorder_voxels(vox_array, affine, voxel_order):
     out_aff : array
         A new array with the updated affine
         
-    ornt_tran : tuple
+    reorient_transform : array
+        The transform used to update the affine.
+        
+    ornt_trans : tuple
         The orientation transform used to update the orientation.
         
     '''
@@ -231,7 +234,7 @@ def reorder_voxels(vox_array, affine, voxel_order):
     aff_trans = np.linalg.inv(inv_aff_trans)
     affine = np.dot(affine, aff_trans)
     
-    return (vox_array, affine, ornt_trans)
+    return (vox_array, affine, aff_trans, ornt_trans)
 
 def dcm_time_to_sec(time_str):
     '''Convert a DICOM time value (value representation of 'TM') to the number 
@@ -364,6 +367,7 @@ def _make_dummy(reference, meta, iop):
     
     #Embed the meta data extension
     result = NiftiWrapper(nii_img, make_empty=True)
+    result.meta_ext.reorient_transform = np.diag([-1., -1., 1., 1.])
     result.meta_ext.get_class_dict(('global', 'const')).update(meta)
     
     return result
@@ -835,12 +839,17 @@ class DicomStack(object):
         #Reorder the voxel data if requested
         permutation = [0, 1, 2]
         slice_dim = 2
+        reorient_transform = np.diag([-1., -1., 1., 1.])
         if voxel_order:
-            data, affine, ornt_trans = reorder_voxels(data, 
-                                                      affine, 
-                                                      voxel_order)
+            (data, 
+             affine,
+             aff_trans,
+             ornt_trans) = reorder_voxels(data, affine, voxel_order)
             permutation, flips = zip(*ornt_trans)
             slice_dim = permutation.index(2)
+            
+            #Update the reorient_transform
+            reorient_transform = np.dot(reorient_transform, aff_trans)
             
             #Reverse file order in each volume's files if we flipped slice order
             #This will keep the slice times and meta data order correct
@@ -948,6 +957,7 @@ class DicomStack(object):
             meta_ext.shape = data.shape
             meta_ext.slice_dim = slice_dim
             meta_ext.affine = nifti_header.get_best_affine()
+            meta_ext.reorient_transform = reorient_transform
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)

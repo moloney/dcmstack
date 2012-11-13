@@ -20,7 +20,7 @@ with warnings.catch_warnings():
 
 dcm_meta_ecode = 0
 
-_meta_version = 0.5
+_meta_version = 0.6
 
 def is_constant(sequence, period=None):
     '''Returns true if all elements in (each period of) the sequence are equal. 
@@ -94,6 +94,23 @@ class DcmMetaExtension(Nifti1Extension):
     '''Nifti extension for storing a summary of the meta data from the source 
     DICOM files.
     '''
+    
+    @property
+    def reorient_transform(self):
+        '''The transformation due to reorientation'''
+        if self._content['dcmmeta_reorient_transform'] is None:
+            return None
+        return np.array(self._content['dcmmeta_reorient_transform'])
+        
+    @reorient_transform.setter
+    def reorient_transform(self, value):
+        if not value is None and value.shape != (4, 4):
+            raise ValueError("The reorient_transform must be none or (4,4) "
+            "array")
+        if value is None:
+            self._content['dcmmeta_reorient_transform'] = None
+        else:
+            self._content['dcmmeta_reorient_transform'] = value.tolist()
     
     @property
     def affine(self):
@@ -233,6 +250,7 @@ class DcmMetaExtension(Nifti1Extension):
         return n_vals
         
     _req_base_keys = set(('dcmmeta_affine', 
+                          'dcmmeta_reorient_transform',
                           'dcmmeta_slice_dim',
                           'dcmmeta_shape',
                           'dcmmeta_version',
@@ -439,7 +457,8 @@ class DcmMetaExtension(Nifti1Extension):
         while result_shape[-1] == 1 and len(result_shape) > 3:
             result_shape = result_shape[:-1]
         result = self.make_empty(result_shape, 
-                                 self.affine, 
+                                 self.affine,
+                                 self.reorient_transform,
                                  self.slice_dim
                                 )
         
@@ -479,7 +498,7 @@ class DcmMetaExtension(Nifti1Extension):
         return result
     
     @classmethod
-    def make_empty(klass, shape, affine, slice_dim=None):
+    def make_empty(klass, shape, affine, reorient_transform, slice_dim=None):
         '''Make an empty DcmMetaExtension.
         
         Parameters
@@ -518,6 +537,7 @@ class DcmMetaExtension(Nifti1Extension):
         result._content['dcmmeta_shape'] = []
         result.shape = shape
         result.affine = affine
+        result.reorient_transform = reorient_transform
         result.slice_dim = slice_dim
         result.version = _meta_version
         
@@ -580,7 +600,10 @@ class DcmMetaExtension(Nifti1Extension):
         if slice_dim is None:
             slice_dim = first_input.slice_dim
             
-        result = klass.make_empty(output_shape, affine, slice_dim)
+        result = klass.make_empty(output_shape, 
+                                  affine, 
+                                  None, 
+                                  slice_dim)
         
         #Need to initialize the result with the first extension in 'seq'
         result_slc_norm = result.slice_normal
@@ -598,12 +621,20 @@ class DcmMetaExtension(Nifti1Extension):
         shape = list(result.shape)
         shape[dim] = 1
         result.shape = shape
+
+        #Initialize reorient transform
+        reorient_transform = first_input.reorient_transform
         
         #Add the other extensions, updating the shape as we go
         for input_ext in seq[1:]:
+            if not np.allclose(input_ext.reorient_transform, reorient_transform):
+                reorient_transform = None
             result._insert(dim, input_ext)
             shape[dim] += 1
             result.shape = shape
+            
+        #Set the reorient transform 
+        result.reorient_transform = reorient_transform
             
         #Try simplifying any keys in global slices
         for key in result.get_class_dict(('global', 'slices')).keys():
@@ -1177,6 +1208,7 @@ class NiftiWrapper(object):
                 self.meta_ext = \
                     DcmMetaExtension.make_empty(self.nii_img.shape, 
                                                 hdr.get_best_affine(),
+                                                np.eye(4),
                                                 slice_dim)
                 hdr.extensions.append(self.meta_ext)
             else:
@@ -1450,6 +1482,7 @@ class NiftiWrapper(object):
         
         #Embed the meta data extension
         result = klass(nii_img, make_empty=True)
+        result.meta_ext.reorient_transform = np.diag([-1., -1., 1., 1.])
         if meta_dict:
             result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
         

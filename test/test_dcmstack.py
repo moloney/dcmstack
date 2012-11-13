@@ -71,11 +71,15 @@ class TestReorderVoxels(object):
                      
     def test_no_op(self):
         vox_order = ''.join(aff2axcodes(self.affine))
-        vox_array, affine, ornt_trans = dcmstack.reorder_voxels(self.vox_array, 
-                                                                self.affine, 
-                                                                vox_order)
+        (vox_array, 
+         affine, 
+         aff_trans, 
+         ornt_trans) = dcmstack.reorder_voxels(self.vox_array, 
+                                               self.affine, 
+                                               vox_order)
         ok_((vox_array == self.vox_array).all())
         ok_((affine == self.affine).all())
+        ok_((aff_trans == np.eye(4)).all())
         ok_(np.allclose(ornt_trans, [[0, 1], [1, 1], [2, 1]]))
         eq_(np.may_share_memory(affine, self.affine), False)
         

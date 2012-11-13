@@ -38,7 +38,7 @@ def test_is_repeating():
     assert_raises(ValueError, dcmmeta.is_repeating, [0, 1, 0, 1], 5)
     
 def test_get_valid_classes():
-    ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4))
+    ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), np.eye(4))
     eq_(ext.get_valid_classes(), (('global', 'const'), ('global', 'slices')))
     
     ext.shape = (2, 2, 2, 2)
@@ -71,14 +71,20 @@ def test_get_valid_classes():
        )
        
 def test_get_mulitplicity_4d():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 11), np.eye(4), 2)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 11), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              2)
     eq_(ext.get_multiplicity(('global', 'const')), 1)
     eq_(ext.get_multiplicity(('global', 'slices')), 7 * 11)
     eq_(ext.get_multiplicity(('time', 'samples')), 11)
     eq_(ext.get_multiplicity(('time', 'slices')), 7)
     
 def test_get_mulitplicity_4d_vec():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 1, 11), np.eye(4), 2)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 1, 11), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              2)
     eq_(ext.get_multiplicity(('global', 'const')), 1)
     eq_(ext.get_multiplicity(('global', 'slices')), 7 * 11)
     eq_(ext.get_multiplicity(('vector', 'samples')), 11)
@@ -87,6 +93,7 @@ def test_get_mulitplicity_4d_vec():
 def test_get_mulitplicity_5d():
     ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 7, 11, 13), 
                                               np.eye(4), 
+                                              np.eye(4),
                                               2
                                              )
     eq_(ext.get_multiplicity(('global', 'const')), 1)
@@ -99,6 +106,7 @@ def test_get_mulitplicity_5d():
 class TestCheckValid(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2, 3, 4), 
+                                                       np.eye(4), 
                                                        np.eye(4), 
                                                        2)
     
@@ -182,6 +190,7 @@ class TestCheckValid(object):
 def test_dcmmeta_affine():
     ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
                                               np.diag([1, 2, 3, 4]), 
+                                              np.eye(4), 
                                               2
                                              )
     ok_(np.allclose(ext.affine, np.diag([1, 2, 3, 4])))
@@ -195,7 +204,10 @@ def test_dcmmeta_affine():
     ok_(np.allclose(ext.affine, np.eye(4)))
     
 def test_dcmmeta_slice_dim():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), None)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              None)
     eq_(ext.slice_dim, None)
     assert_raises(ValueError, 
                   setattr, 
@@ -207,7 +219,10 @@ def test_dcmmeta_slice_dim():
     eq_(ext.slice_dim, 2)
     
 def test_dcmmeta_shape():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), None)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              None)
     eq_(ext.shape, (64, 64, 2))
     assert_raises(ValueError, 
                   setattr, 
@@ -219,19 +234,28 @@ def test_dcmmeta_shape():
     eq_(ext.shape, (128, 128, 64))
     
 def test_dcmmeta_version():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), None)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              None)
     eq_(ext.version, dcmmeta._meta_version)
     ext.version = 1.0
     eq_(ext.version, 1.0)
     
 def test_dcmmeta_slice_norm():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), 2)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              2)
     ok_(np.allclose(ext.slice_normal, [0, 0, 1]))
     ext.slice_dim = 1
     ok_(np.allclose(ext.slice_normal, [0, 1, 0]))
     
 def test_dcmmeta_n_slices():
-    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), np.eye(4), 2)
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2), 
+                                              np.eye(4), 
+                                              np.eye(4), 
+                                              2)
     eq_(ext.n_slices, 2)
     ext.slice_dim = 1
     eq_(ext.n_slices, 64)
@@ -240,6 +264,7 @@ class TestGetKeysClassesValues(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2, 3, 4), 
                                                        np.eye(4), 
+                                                       np.eye(4),
                                                        2
                                                       )
         self.keys = []
@@ -284,6 +309,7 @@ class TestFiltering(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 2, 3, 4), 
                                                        np.eye(4), 
+                                                       np.eye(4), 
                                                        2
                                                       )
         
@@ -315,6 +341,7 @@ class TestFiltering(object):
 class TestSimplify(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
+                                                       np.eye(4),
                                                        np.eye(4),
                                                        2
                                                       )
@@ -406,6 +433,7 @@ class TestSimplify(object):
 class TestGetSubset(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
+                                                       np.eye(4), 
                                                        np.eye(4), 
                                                        2
                                                       )
@@ -660,6 +688,7 @@ class TestChangeClass(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((2, 2, 3, 5, 7), 
                                                        np.eye(4), 
+                                                       np.eye(4), 
                                                        2
                                                       )
         #Add an element to every classification
@@ -749,11 +778,17 @@ class TestChangeClass(object):
     
 
 def test_from_sequence_2d_to_3d():
-    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), np.eye(4), 2)
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), 
+                                               np.eye(4),
+                                               np.eye(4), 
+                                               2)
     ext1.get_class_dict(('global', 'const'))['const'] = 1
     ext1.get_class_dict(('global', 'const'))['var'] = 1
     ext1.get_class_dict(('global', 'const'))['missing'] = 1
-    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), np.eye(4), 2)
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 1), 
+                                               np.eye(4), 
+                                               np.eye(4), 
+                                               2)
     ext2.get_class_dict(('global', 'const'))['const'] = 1
     ext2.get_class_dict(('global', 'const'))['var'] = 2
     
@@ -767,14 +802,20 @@ def test_from_sequence_2d_to_3d():
         
 def test_from_sequence_3d_to_4d():
     for dim_name, dim in (('time', 3), ('vector', 4)):
-        ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), 2)
+        ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), 
+                                                   np.eye(4), 
+                                                   np.eye(4), 
+                                                   2)
         ext1.get_class_dict(('global', 'const'))['global_const_const'] = 1
         ext1.get_class_dict(('global', 'const'))['global_const_var'] = 1
         ext1.get_class_dict(('global', 'const'))['global_const_missing'] = 1
         ext1.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1]
         ext1.get_class_dict(('global', 'slices'))['global_slices_var'] = [0, 1]
         ext1.get_class_dict(('global', 'slices'))['global_slices_missing'] = [0, 1]
-        ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), 2)
+        ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), 
+                                                   np.eye(4),
+                                                   np.eye(4), 
+                                                   2)
         ext2.get_class_dict(('global', 'const'))['global_const_const'] = 1
         ext2.get_class_dict(('global', 'const'))['global_const_var'] = 2
         ext2.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1]
@@ -795,7 +836,10 @@ def test_from_sequence_3d_to_4d():
             ([0, 1, None, None], ('global', 'slices')))
 
 def test_from_sequence_4d_time_to_5d():
-    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2, 2), np.eye(4), 2)
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2, 2), 
+                                               np.eye(4), 
+                                               np.eye(4),
+                                               2)
     ext1.get_class_dict(('global', 'const'))['global_const_const'] = 1
     ext1.get_class_dict(('global', 'const'))['global_const_var'] = 1
     ext1.get_class_dict(('global', 'const'))['global_const_missing'] = 1
@@ -809,7 +853,10 @@ def test_from_sequence_4d_time_to_5d():
     ext1.get_class_dict(('time', 'slices'))['time_slices_var'] = [0, 1]
     ext1.get_class_dict(('time', 'slices'))['time_slices_missing'] = [0, 1]
     
-    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2, 2), np.eye(4), 2)
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2, 2), 
+                                               np.eye(4), 
+                                               np.eye(4), 
+                                               2)
     ext2.get_class_dict(('global', 'const'))['global_const_const'] = 1
     ext2.get_class_dict(('global', 'const'))['global_const_var'] = 2
     ext2.get_class_dict(('global', 'slices'))['global_slices_const'] = [0, 1, 2, 3]
@@ -846,8 +893,14 @@ def test_from_sequence_4d_time_to_5d():
         ([0, 1, 0, 1, None, None, None, None], ('global', 'slices')))
 
 def test_from_sequence_no_slc():
-    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), None)
-    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), np.eye(4), None)
+    ext1 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), 
+                                               np.eye(4), 
+                                               np.eye(4),
+                                               None)
+    ext2 = dcmmeta.DcmMetaExtension.make_empty((2, 2, 2), 
+                                               np.eye(4), 
+                                               np.eye(4),
+                                               None)
     merged = dcmmeta.DcmMetaExtension.from_sequence([ext1, ext2], 4)
    
 def test_nifti_wrapper_init():
@@ -856,7 +909,7 @@ def test_nifti_wrapper_init():
                   dcmmeta.NiftiWrapper,
                   nii)
     hdr = nii.get_header()
-    ext = dcmmeta.DcmMetaExtension.make_empty((5, 5, 5), np.eye(4))
+    ext = dcmmeta.DcmMetaExtension.make_empty((5, 5, 5), np.eye(4), np.eye(4))
     hdr.extensions.append(ext)
     nw = dcmmeta.NiftiWrapper(nii)
     eq_(nw.meta_ext, ext)
