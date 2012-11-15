@@ -264,10 +264,9 @@ def dcm_time_to_sec(time_str):
     return float(result)
 
 class IncongruentImageError(Exception):
-    '''An exception denoting that a DICOM with incorrect size or orientation 
-    was passed to `DicomStack.add_dcm`.'''
-    
     def __init__(self, msg):
+        '''An exception denoting that a DICOM with incorrect size or orientation 
+        was passed to `DicomStack.add_dcm`.'''
         self.msg = msg
         
     def __str__(self):
@@ -280,18 +279,17 @@ class ImageCollisionError(Exception):
         return 'The image collides with one already in the stack'
         
 class InvalidStackError(Exception):
-    '''An exception denoting that a `DicomStack` is not currently valid'''
     def __init__(self, msg):
+        '''An exception denoting that a `DicomStack` is not currently valid'''
         self.msg = msg
     
     def __str__(self):
         return 'The DICOM stack is not valid: %s' % self.msg
 
 class DicomOrdering(object):
-    '''Object defining an ordering for a set of dicom datasets.'''
-    
     def __init__(self, key, abs_ordering=None, abs_as_str=False):
-        '''Create a DicomOrdering with the given DICOM element keyword. 
+        '''Object defining an ordering for a set of dicom datasets. Create a 
+        DicomOrdering with the given DICOM element keyword. 
         
         Parameters
         ----------
@@ -373,14 +371,6 @@ def _make_dummy(reference, meta, iop):
     return result
 
 class DicomStack(object):
-    '''Defines a method for stacking together DICOM data sets into a multi 
-    dimensional volume. 
-    
-    Tailored towards creating NiftiImage output, but can also just create numpy 
-    arrays. Can summarize all of the meta data from the input DICOM data sets 
-    into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
-    '''
-    
     sort_guesses = ['EchoTime',
                     'InversionTime',
                     'RepetitionTime',
@@ -396,8 +386,13 @@ class DicomStack(object):
     
     def __init__(self, time_order=None, vector_order=None, 
                  allow_dummies=False, meta_filter=None):
-        '''Initialize a DicomStack object. 
-        
+        '''Defines a method for stacking together DICOM data sets into a multi 
+        dimensional volume. 
+           
+        Tailored towards creating NiftiImage output, but can also just create numpy 
+        arrays. Can summarize all of the meta data from the input DICOM data sets 
+        into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
+    
         Parameters
         ----------
         time_order : str or DicomOrdering

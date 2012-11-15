@@ -1,19 +1,25 @@
+.. -*- rest -*-
+.. vim:syntax=rest
+
 ========
 dcmstack
 ========
 
 This package provides DICOM to Nifti conversion with the added ability 
-to extract meta data from the source DICOMs and inject it into a Nifti 
-header extension or write it out as a JSON formatted text file.
+to extract and summarize meta data from the source DICOMs. The meta data
+can be injected it into a Nifti header extension or written out as a JSON 
+formatted text file.
 
 Documentation
 -------------
 
 To build the documentation you must install sphinx.
 
-You can build the documentation with:
+You can build the documentation by running the "make" command in the 
+"doc" directory. For example, to create the HTML documentation you would 
+do:
 
-$ python setup.py build_sphinx
+$ make html
 
 And then view doc/_build/html/index.html with a web browser.
 

@@ -2,15 +2,15 @@ Introduction
 ============
 
 DcmStack allows series of DICOM images to be stacked into multi-dimensional 
-volumes. These volumes can be written out as Nifti files with an optional 
-header extension (the *DcmMeta* extension) containing all of the meta data 
-from the source DICOM files.
+arrays. These arrays can be written out as Nifti files with an optional 
+header extension (the *DcmMeta* extension) containing a summary of all the 
+meta data from the source DICOM files.
 
 Dependencies
 ------------
 
-DcmStack has been developed and tested on Python 2.7. Python version 2.6
-may be compatible.
+DcmStack works with Python 2.6 and 2.7.  With Python 2.6 it is not possible 
+to maintain the order of meta data elements when reading back the JSON.
 
 DcmStack requires the packages pydicom_ (>=0.9.7) and NiBabel_.
 
@@ -50,7 +50,8 @@ Here we use the verbose flab (*-v*) to show what is going on behind the
 scenes. To embed the DcmMeta header extension we need to use the *--embed* 
 option. For more information see :doc:`CLI_Tutorial`.
 
-Performing the conversion from Python requires a few extra steps:
+Performing the conversion from Python code requires a few extra steps
+but is also much more flexible:
 
 .. code-block:: python
     
@@ -58,7 +59,8 @@ Performing the conversion from Python requires a few extra steps:
     >>> from glob import glob
     >>> src_dcms = glob('032-MPRAGEAXTI900Pre/*.dcm')
     >>> stacks = dcmstack.parse_and_stack(src_dcms)
-    >>> nii = stacks['032-MPRAGE AX TI900 Pre'].to_nifti()
+    >>> stack = stacks.values[0]
+    >>> nii = stack.to_nifti()
     >>> nii.to_filename('output.nii.gz')
 
 The *parse_and_stack* function has many optional arguments that closely 
@@ -75,7 +77,7 @@ commands.
 
 .. code-block:: console
 
-    $ nitool lookup InversionTime 032-MPRAGEAXTI900Pre/032-MPRAGE_AX_TI900_Pre.nii.gz 
+    $ nitool lookup InversionTime 032-MPRAGE_AX_TI900_Pre.nii.gz 
     900.0
 
 Here we use the *lookup* sub command to lookup up the value for 
@@ -87,7 +89,7 @@ To work with the extended Nifti files from Python, use the *NiftiWrapper* class.
 .. code-block:: python
 
     >>> from dcmstack import dcmmeta
-    >>> nii_wrp = dcmmeta.NiftiWrapper.from_filename('032-MPRAGEAXTI900Pre/032-MPRAGE_AX_TI900_Pre.nii.gz')
+    >>> nii_wrp = dcmmeta.NiftiWrapper.from_filename('032-MPRAGE_AX_TI900_Pre.nii.gz')
     >>> nii_wrp.get_meta('InversionTime')
     900.0
     

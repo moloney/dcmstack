@@ -86,9 +86,10 @@ csa_image_trans = Translator('CsaImage',
 '''Translator for the CSA image sub header.'''
 
 class PhoenixParseError(Exception):
-    '''Exception indicating a error parsing a line from the Phoenix Protocol.
-    '''
     def __init__(self, line):
+        '''Exception indicating a error parsing a line from the Phoenix 
+        Protocol.
+        '''
         self.line = line
         
     def __str__(self):
@@ -270,12 +271,13 @@ default_conversions = {'DS' : float,
                       }
     
 class MetaExtractor(object):
-    '''Callable object for extracting meta data from a dicom dataset'''
+    ''''''
     
     def __init__(self, ignore_rules=None, translators=None, conversions=None,
                  warn_on_trans_except=True):
-        '''Initialize a `MetaExtractor` with a set of ignore rules and 
-        translators. 
+        '''Callable object for extracting meta data from a dicom dataset. 
+        Initialize with a set of ignore rules, translators, and type 
+        conversions. 
         
         Parameters
         ----------

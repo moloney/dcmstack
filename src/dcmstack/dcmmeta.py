@@ -81,9 +81,8 @@ def is_repeating(sequence, period):
     return True
 
 class InvalidExtensionError(Exception):
-    '''Exception denoting than a DcmMetaExtension is invalid.'''
-    
     def __init__(self, msg):
+        '''Exception denoting than a DcmMetaExtension is invalid.'''
         self.msg = msg
     
     def __str__(self):
@@ -91,9 +90,11 @@ class InvalidExtensionError(Exception):
         
 
 class DcmMetaExtension(Nifti1Extension):
-    '''Nifti extension for storing a summary of the meta data from the source 
-    DICOM files.
-    '''
+    def __init__(self, *args, **kwargs):
+        '''Nifti extension for storing a summary of the meta data from the source 
+        DICOM files.
+        '''
+        super(DcmMetaExtension, self).__init__(*args, **kwargs)
     
     @property
     def reorient_transform(self):
@@ -1184,12 +1185,12 @@ def patch_dcm_ds_is(dcm):
         
 
 class NiftiWrapper(object):
-    '''Wraps a Nifti1Image object containing a DcmMetaExtension header 
-    extension. Provides access to the meta data and the ability to split or 
-    merge the data array while updating the meta data.'''
+    ''''''
 
     def __init__(self, nii_img, make_empty=False):
-        '''Initialize wrapper from Nifti1Image object. 
+        '''Wraps a Nifti1Image object containing a DcmMeta header extension. 
+        Provides access to the meta data and the ability to split or merge the 
+        data array while updating the meta data.
         
         Parameters
         ----------

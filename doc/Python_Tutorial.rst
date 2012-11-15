@@ -22,8 +22,7 @@ If you have an aquisition that you would like to turn into a single
 
 If you are unsure how many stacks you want from a collection of DICOM data 
 sets then you should use the *parse_and_stack* function. This will group 
-together source DICOM data sets based on the *key_format* and *opt_key_suffix* 
-parameters.
+together data sets from the same DICOM series.
 
 .. code-block:: python
     
@@ -31,26 +30,28 @@ parameters.
     >>> from glob import glob
     >>> src_paths = glob('dicom_data/*.dcm')
     >>> stacks = dcmstack.parse_and_stack(src_paths)
+    
+Any keyword arguments for the *DicomStack* constructor can also be passed 
+to *parse_and_stack*.
+
 
 Specifying Time and Vector Order
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-By default, if there is more than one 3D volume in the stack they will be 
-ordered along the fourth (time) dimension using 'AcquisitionTime'. To order 
-them differently or to order them along the fifth (vector) dimension, specify 
-the *time_order* and/or *vector_order* to the *DicomStack* constructor. Any 
-keyword arguments for the *DicomStack* constructor can also be passed to 
-*parse_and_stack*.
+By default, if there is more than one 3D volume in the stack the software 
+will try to guess the meta key to sort the fourth (time) dimension. To 
+specify the meta data key for the fourth dimension or stack along the fifth 
+(vector) dimension, use the *time_order* and *vector_order* arguments to the 
+*DicomStack* constructor. 
 
 Grouping Datasets
 ^^^^^^^^^^^^^^^^^
 
-The *parse_and_stack* function takes two format strings as arguments: 
-*key_format* and *opt_key_suffix*. These format strings determine the keys 
-in the returned dictionary. The meta data from each source DICOM is used to 
-format these strings and the result determines which stack it will be added 
-to. The result of formatting *opt_key_suffix* is appended to the result of 
-formatting *key_format* if (and only if) it varies across inputs.
+The *parse_and_stack* function groups data sets using a tuple of meta data 
+keys provided as the argument *group_by*. The default values should group 
+datasets from the same series into the same stack. The result is a 
+dictionary where the keys are the matching tuples of meta data values, and 
+the values are the are the corresponding stacks.
 
 Using DicomStack Objects
 ------------------------
@@ -72,15 +73,19 @@ The meta data from the source DICOM data sets can be summarized into a
 either pass True for the *embed_meta* parameter to *DicomStack.to_nifti* or 
 you can immediately get a *NiftiWrapper* with *DicomStack.to_nifti_wrapper*.
 
-By default the meta data is filtered to minimize the chance of including any 
-PHI.  This filtering can be controlled with the *meta_filter* parameter to 
-the *DicomStack* constructor.
+By default the meta data is filtered to reduce the chance of including 
+private health information.  This filtering can be controlled with the 
+*meta_filter* parameter to the *DicomStack* constructor.
+
+**IT IS YOUR RESPONSABILITY TO KNOW IF THERE IS PRIVATE HEALTH INFORMATION 
+IN THE RESULTING FILE AND TREAT SUCH FILES APPROPRIATELY.**
 
 Creating NiftiWrapper Objects
 -----------------------------
 
-The *NiftiWrapper* class can be used to work with extended Nifti files. As 
-mentioned above, these can be created directly from a *DicomStack*.
+The *NiftiWrapper* class can be used to work with extended Nifti files. 
+It wraps a *Nifti1Image* from the *nibabel* package. As mentioned above, 
+these can be created directly from a *DicomStack*.
 
 .. code-block:: python
     
@@ -103,24 +108,21 @@ constructor or by passing the path to a Nifti file to
 Using NiftiWrapper Objects
 --------------------------
 
-The *NiftiWrapper* objects have two attributes: *nii_img* (the *Nifti1Image* 
-being wrapped) and *meta_ext* (the *DcmMetaExtension*).
+The *NiftiWrapper* objects have attribute *nii_img* pointing to the 
+*Nifti1Image* being wrapped and the attribute *meta_ext* pointing to the 
+*DcmMetaExtension*. There are also a number of methods for working with 
+the image data and meta data together. For example merging or splitting 
+the data set along the time axis.
 
+Looking Up Meta Data
+^^^^^^^^^^^^^^^^^^^^
 Meta data that is constant can be accessed with dict-style lookups. The more 
 general access method is *get_meta* which can optionally take an index into 
 the voxel array in order to provide access to varying meta data.
 
 .. code-block:: python
     
-    >>> import dcmstack, dicom
-    >>> from glob import glob
-    >>> src_paths = glob('032-MPRAGEAXTI900Pre/*.dcm')
-    >>> my_stack = dcmstack.DicomStack()
-    >>> for src_path in src_paths:
-    ...     src_dcm = dicom.read_file(src_path)
-    ...     my_stack.add_dcm(src_dcm)
-    ...
-    >>> nii_wrp = my_stack.to_nifti_wrapper()
+    >>> nii_wrp = NiftiWrapper.from_filename('032-MPRAGEAXTI900Pre.nii.gz')
     >>> nii_wrp['InversionTime']
     900.0
     >>> nii_wrp.get_meta('InversionTime')
@@ -136,4 +138,41 @@ the voxel array in order to provide access to varying meta data.
     >>> nii_wrp.get_meta('InstanceNumber', index=(0,0,1))
     2
 
+Merging and Splitting Data Sets
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+We can create a *NiftiWrapper* by merging a sequence of *NiftiWrapper* 
+objects using the class method *from_sequence*. Conversely, we can split 
+a *NiftiWrapper* into a sequence if *NiftiWrapper* objects using the 
+method *split*.
+
+.. code-block:: python
     
+    >>> from dcmstack.dcmmeta import NiftiWrapper
+    >>> nw1 = NiftiWrapper.from_filename('img1.nii.gz')
+    >>> nw2 = NiftiWrapper.from_filename('img2.nii.gz')
+    >>> print nw1.nii_img.get_shape()
+    (384, 512, 60)
+    >>> print nw2.nii_img.get_shape()
+    (384, 512, 60)
+    >>> print nw1.get_meta('EchoTime')
+    11.0
+    >>> print nw2.get_meta('EchoTime')
+    87.0
+    >>> merged = NiftiWrapper.from_sequence([nw1, nw2])
+    >>> print merged.nii_img.get_shape()
+    (384, 512, 60, 2)
+    >>> print merged.get_meta('EchoTime', index=(0,0,0,0)
+    11.0
+    >>> print merged.get_meta('EchoTime', index=(0,0,0,1)
+    87.0
+    >>> splits = list(merge.split())
+    >>> print splits[0].nii_img.get_shape()
+    (384, 512, 60)
+    >>> print splits[1].nii_img.get_shape()
+    (384, 512, 60)
+    >>> print splits[0].get_meta('EchoTime')
+    11.0
+    >>> print splits[1].get_meta('EchoTime')
+    87.0
+
+ 

@@ -27,11 +27,12 @@ sys.path.insert(0, os.path.abspath('../src/'))
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc',  
               'sphinx.ext.coverage',
+              'sphinx.ext.autosummary',
               'numpydoc',
              ]
 
 #Include both the class doc string and the __init__ docstring
-autoclass_content = 'both'
+autoclass_content = 'init'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

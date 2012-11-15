@@ -22,8 +22,8 @@ then embedded into the Nifti header. The meta data keys are the keywords
 from the DICOM standard. For details on the DcmMeta extension see 
 :doc:`DcmMeta_Extension`.
 
-The meta data is filtered using regular expressions to minimize the chance 
-of including any PHI (Private Health Information). There are two types of 
+The meta data is filtered using regular expressions to reduce the chance 
+of including PHI (Private Health Information). There are two types of 
 regular expressions used for filtering: 'exclude' and 'include' expressions. 
 Any meta data where the key matches an exclude expression will be excluded,
 **unless** it also matches an include expression. That is to say that the 
@@ -40,34 +40,30 @@ By default, any private DICOM elements are ignored unless there is a
 *--disable-translator* option. To include private elements that don't have 
 a translator use the *--extract-private* option.
 
+**IT IS YOUR RESPONSABILITY TO KNOW IF THERE IS PRIVATE HEALTH INFORMATION 
+IN THE RESULTING FILE AND TREAT SUCH FILES APPROPRIATELY.**
 
 Output Names and Grouping
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The output name is determined by one or more Python format strings. The 
-format strings are formatted with the meta data attributes for each input 
-file, and every file with the same resulting output name is grouped 
-together into a stack. 
-
-The output name is primarily determined by the *--output-format* option. 
-The default output format is '%(SeriesNumber)03d-%(ProtocolName)s'. 
-
-There is also the *--opt-suffix* option. The result of this format string 
-will be appended to the result of the *--output-format* option if and 
-only if it differs between input DICOM files. The default optional suffix 
-is 'TE_%(EchoTime).3f' which will produce multiple outputs for multi echo 
-series.
+All DICOM files from the same series will grouped into a stack together. 
+The output file name is determined by a Python format string that is 
+formatted with the meta data. This can be specified with the 
+*--output-format* option. By default the program will try to figure out 
+an appropriate format string for the available meta data. Generally this 
+will be the 'SeriesNumber' followed by the 'ProtocolName' or 
+'SeriesDescription' (or just the word "series").
 
 Ordering Time and Vector Dimensions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In addition to the three spatial dimensions, Nifti images can have time and 
-(less commonly) vector dimensions. By default, if there is more than one 
-volume they will be ordered along the time dimension using 'AcquisitionTime'. 
-If this is not desired, a different attribute can be provided using the 
-*--time-var* (*-t*) option. If you want to create a vector dimension use the 
-*--vector-var* (*-v*) option followed by the attribute to use to order the 
-volumes along that dimension.
+(less commonly) vector dimensions. By default, the software will try to 
+guess the appropriate meta data key for sorting the time dimension. If you 
+would like to specify the meta data key, or stack along the vector 
+dimension, you can do so with the *--time-var* (*-t*) and 
+*--vector-var* (*-v*) options. Both options take a meta data key as an 
+argument.
 
 If there isn't an attribute that can be used with a simple ascending order to 
 sort along these dimensions, the *--time-order* or *--vector-order* options 
@@ -102,10 +98,10 @@ Voxel Order
 While the affine transform stored in the Nifti allows a mapping from voxel 
 indices to patient space, some programs do not make use of the affine 
 information. To provide a similar orientation in these programs we reorder 
-voxels in the same manner as dcm2nii. This results in the row, column and 
-slice indices starting from the most right, posterior, inferior corner 
-relative to patient space. This can be overridden with the *--voxel-order* 
-option. 
+voxels in the same manner as dcm2nii. This results in the positive row, 
+column, and slice directions pointing toward the left, anterior, and 
+superior (LAS) patient directions. This can be overridden with the 
+*--voxel-order* option. 
 
 Working with Extended Nifti Files
 ---------------------------------
@@ -129,12 +125,12 @@ data will be considered.
 
 .. code-block:: console
     
-    $ nitool lookup InversionTime 032-MPRAGEAXTI900Pre/032-MPRAGE_AX_TI900_Pre.nii.gz 
+    $ nitool lookup InversionTime 032-MPRAGE_AX_TI900_Pre.nii.gz 
     900.0
-    $ nitool lookup InstanceNumber 032-MPRAGEAXTI900Pre/032-MPRAGE_AX_TI900_Pre.nii.gz 
-    $ nitool lookup InstanceNumber --index 0,0,0 032-MPRAGEAXTI900Pre/032-MPRAGE_AX_TI900_Pre.nii.gz 
+    $ nitool lookup InstanceNumber 032-MPRAGE_AX_TI900_Pre.nii.gz 
+    $ nitool lookup InstanceNumber --index 0,0,0 032-MPRAGE_AX_TI900_Pre.nii.gz 
     1
-    $ nitool lookup InstanceNumber --index 0,0,1 032-MPRAGEAXTI900Pre/032-MPRAGE_AX_TI900_Pre.nii.gz 
+    $ nitool lookup InstanceNumber --index 0,0,1 032-MPRAGE_AX_TI900_Pre.nii.gz 
     2
 
 In the above example 'InversionTime' is contant across the Nifti and so an 
@@ -168,5 +164,18 @@ destination path is given the result will print to stdout. A DcmMeta extension
 can be embedded into a Nifti file using the *embed* sub command. If no input 
 file is given it will be read from stdin. For details about the DcmMeta 
 extension see :doc:`DcmMeta_Extension`.
+
+Injecting Meta Data
+^^^^^^^^^^^^^^^^^^^
+
+If you want to inject some new meta data into the header extension you can use 
+the *inject* command.  You need to specify the meta data classification, key, 
+and values. For example, to set a globally constant element with the key 
+'PatientID' and the value 'Subject_001':
+
+.. code-block:: console
+    
+    $ nitool inject 032-MPRAGE_AX_TI900_Pre.nii.gz global const PatientID Subject_001
+
 
 
