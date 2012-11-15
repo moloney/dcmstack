@@ -267,7 +267,7 @@ def tm_to_seconds(time_str):
 
 default_conversions = {'DS' : float, 
                        'IS' : int,
-                       'TM' : tm_to_seconds
+                       #'TM' : tm_to_seconds
                       }
     
 class MetaExtractor(object):
