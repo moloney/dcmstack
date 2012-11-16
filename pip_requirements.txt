@@ -1,3 +1,4 @@
 dcmstack
 pydicom >= 0.9.7
 numpydoc
+mock
