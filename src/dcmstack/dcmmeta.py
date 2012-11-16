@@ -1471,6 +1471,18 @@ class NiftiWrapper(object):
       
     @classmethod
     def from_dicom_wrapper(klass, dcm_wrp, meta_dict=None):
+        '''Create a NiftiWrapper from a nibabel DicomWrapper.
+        
+        Parameters
+        ----------
+        dcm_wrap : nicom.dicomwrappers.DicomWrapper
+            The dataset to convert into a NiftiWrapper.
+            
+        meta_dict : dict
+            An optional dictionary of meta data extracted from `dcm_data`. See 
+            the `extract` module for generating this dict.
+           
+        '''
         data = dcm_wrp.get_data()
         
         #The Nifti patient space flips the x and y directions
@@ -1519,9 +1531,6 @@ class NiftiWrapper(object):
             An optional dictionary of meta data extracted from `dcm_data`. See 
             the `extract` module for generating this dict.
            
-        See Also
-        --------
-        dcmstack.parse_and_stack : Convert a collection of DICOM datasets.
         '''
         dcm_wrp = wrapper_from_data(dcm_data)
         return klass.from_dicom_wrapper(dcm_wrp, meta_dict)
