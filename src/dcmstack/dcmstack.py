@@ -882,7 +882,7 @@ class DicomStack(object):
                         None)
         if files_per_vol > 1 and has_acq_time:
             #Pull out the relative slice times for the first volume
-            slice_times = np.array([file_info[0]['AcquisitionTime'] 
+            slice_times = np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime'])
                                     for file_info in self._files_info[:n_slices]]
                                   )
             slice_times -= np.min(slice_times)
@@ -894,7 +894,7 @@ class DicomStack(object):
                 end_slice = start_slice + n_slices
                 slices_info = self._files_info[start_slice:end_slice]
                 vol_slc_times = \
-                    np.array([file_info[0]['AcquisitionTime'] 
+                    np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime'])
                               for file_info in slices_info]
                             )
                 vol_slc_times -= np.min(vol_slc_times)
