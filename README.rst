@@ -13,6 +13,8 @@ formatted text file.
 Documentation
 -------------
 
+Documentation can be read online: https://dcmstack.readthedocs.org/en/latest/
+
 To build the documentation you must install sphinx.
 
 You can build the documentation by running the "make" command in the 
