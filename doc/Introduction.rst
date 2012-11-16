@@ -1,16 +1,16 @@
 Introduction
 ============
 
-DcmStack allows series of DICOM images to be stacked into multi-dimensional 
-arrays. These arrays can be written out as Nifti files with an optional 
-header extension (the *DcmMeta* extension) containing a summary of all the 
-meta data from the source DICOM files.
+The *dcmstack* software allows series of DICOM images to be stacked into 
+multi-dimensional arrays. These arrays can be written out as Nifti files with 
+an optional header extension (the *DcmMeta* extension) containing a summary 
+of all the meta data from the source DICOM files.
 
 Dependencies
 ------------
 
-DcmStack works with Python 2.6 and 2.7.  With Python 2.6 it is not possible 
-to maintain the order of meta data elements when reading back the JSON.
+Either Python 2.6 or 2.7 is required.  With Python 2.6 it is not possible 
+to maintain the order of meta data keys when reading back the JSON.
 
 DcmStack requires the packages pydicom_ (>=0.9.7) and NiBabel_.
 
@@ -29,8 +29,8 @@ downloaded .zip file.
 Basic Conversion 
 ----------------
 
-DcmStack is a python package (*dcmstack*) with two command line interfaces 
-(*dcmstack* and *nitool*).
+The software consists of the python package (*dcmstack*) with two command 
+line interfaces (*dcmstack* and *nitool*).
 
 It is recommended that you sort your DICOM data into directories (at least 
 per study, but perferably by series) before conversion.

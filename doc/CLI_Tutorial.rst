@@ -1,7 +1,7 @@
 CLI Tutorial
 ============
 
-DcmStack has two command line interfaces: *dcmstack* and *nitool*. The 
+The software has two command line interfaces: *dcmstack* and *nitool*. The 
 *dcmstack* command is used for converting DICOM data to Nifti files with 
 the optional DcmMeta extension.  The *nitool* command is used to work 
 with these exteneded Nifti files.

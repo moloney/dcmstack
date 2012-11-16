@@ -13,7 +13,7 @@ formatted text file.
 Documentation
 -------------
 
-Documentation can be read online: https://dcmstack.readthedocs.org/en/latest/
+Documentation can be read online: https://dcmstack.readthedocs.org/en/v0.6/
 
 You can buuld the HTML documentation under build/sphinx/html with:
 
@@ -39,16 +39,15 @@ Or if you already have the *nose* package installed you can use the
 
 $ nosetests
 
-
 Installing
 ----------
 
 You can install the *.zip* or *.tar.gz* package with the *easy_install* 
 command.
 
-$ easy_install dcmstack-0.6.0.zip
+$ easy_install dcmstack-0.6.zip
 
-Or you can decompress the package and in the top level directory run:
+Or you can uncompress the package and in the top level directory run:
 
 $ python setup.py install
 

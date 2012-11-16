@@ -1,7 +1,7 @@
 Python Tutorial
 ===============
 
-This is a brief overview of how to use the dcmstack Python package. For 
+This is a brief overview of how to use the *dcmstack* Python package. For 
 details refer to :doc:`modules`.
 
 Creating DicomStack Objects
@@ -175,4 +175,27 @@ method *split*.
     >>> print splits[1].get_meta('EchoTime')
     87.0
 
- 
+Accessing the the DcmMetaExtension
+----------------------------------
+
+It is generally recommended that meta data is accessed through the 
+*NiftiWrapper* class since it can do some checks between the meta data
+and the image data. For example, it will make sure the dimensions and 
+slice direction have not changed before using varying meta data.
+
+However certain actions are much easier when accessing the meta data 
+extension directly.
+
+.. code-block:: python
+    
+    >>> from dcmstack.dcmmeta import NiftiWrapper
+    >>> nw1 = NiftiWrapper.from_filename('img.nii.gz')
+    >>> nw.meta_ext.shape
+    >>> (384, 512, 60, 2)
+    >>> print nw.meta_ext.get_values('EchoTime')
+    [11.0, 87.0]
+    >>> print nw.meta_ext.get_classification('EchoTime')
+    ('time', 'samples')
+    
+    
+    
