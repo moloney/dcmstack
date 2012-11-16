@@ -287,25 +287,25 @@ class InvalidStackError(Exception):
         return 'The DICOM stack is not valid: %s' % self.msg
 
 class DicomOrdering(object):
+    '''Object defining an ordering for a set of dicom datasets. Create a 
+    DicomOrdering with the given DICOM element keyword. 
+    
+    Parameters
+    ----------
+    key : str
+        The DICOM keyword to use for ordering the datasets
+        
+    abs_ordering : sequence
+        A sequence specifying the absolute order for values corresponding 
+        to the `key`. Instead of ordering by the value associated with the 
+        `key`, the index of the value in this sequence will be used.
+    
+    abs_as_str : bool
+        If true, the values will be converted to strings before looking up 
+        the index in `abs_ordering`.
+    '''
+    
     def __init__(self, key, abs_ordering=None, abs_as_str=False):
-        '''Object defining an ordering for a set of dicom datasets. Create a 
-        DicomOrdering with the given DICOM element keyword. 
-        
-        Parameters
-        ----------
-        key : str
-            The DICOM keyword to use for ordering the datasets
-            
-        abs_ordering : sequence
-            A sequence specifying the absolute order for values corresponding 
-            to the `key`. Instead of ordering by the value associated with the 
-            `key`, the index of the value in this sequence will be used.
-        
-        abs_as_str : bool
-            If true, the values will be converted to strings before looking up 
-            the index in `abs_ordering`.
-            
-        '''
         self.key = key
         self.abs_ordering = abs_ordering
         self.abs_as_str = abs_as_str
@@ -371,6 +371,38 @@ def _make_dummy(reference, meta, iop):
     return result
 
 class DicomStack(object):
+    '''Defines a method for stacking together DICOM data sets into a multi 
+    dimensional volume. 
+       
+    Tailored towards creating NiftiImage output, but can also just create numpy 
+    arrays. Can summarize all of the meta data from the input DICOM data sets 
+    into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
+
+    Parameters
+    ----------
+    time_order : str or DicomOrdering
+        The DICOM keyword or DicomOrdering object specifying how to order 
+        the DICOM data sets along the time dimension.
+
+    vector_order : str or DicomOrdering
+        The DICOM keyword or DicomOrdering object specifying how to order 
+        the DICOM data sets along the vector dimension.
+    
+    allow_dummies : bool
+        If True then data sets without pixel data can be added to the stack.
+        The "dummy" voxels will have the maximum representable value for 
+        the datatype.
+    
+    meta_filter : callable
+        A callable that takes a meta data key and value, and returns True if 
+        that meta data element should be excluded from the DcmMeta extension.
+        
+    Notes
+    -----
+    If both time_order and vector_order are None, the time_order will be 
+    guessed based off the data sets.
+    '''
+        
     sort_guesses = ['EchoTime',
                     'InversionTime',
                     'RepetitionTime',
@@ -386,37 +418,6 @@ class DicomStack(object):
     
     def __init__(self, time_order=None, vector_order=None, 
                  allow_dummies=False, meta_filter=None):
-        '''Defines a method for stacking together DICOM data sets into a multi 
-        dimensional volume. 
-           
-        Tailored towards creating NiftiImage output, but can also just create numpy 
-        arrays. Can summarize all of the meta data from the input DICOM data sets 
-        into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
-    
-        Parameters
-        ----------
-        time_order : str or DicomOrdering
-            The DICOM keyword or DicomOrdering object specifying how to order 
-            the DICOM data sets along the time dimension.
-
-        vector_order : str or DicomOrdering
-            The DICOM keyword or DicomOrdering object specifying how to order 
-            the DICOM data sets along the vector dimension.
-        
-        allow_dummies : bool
-            If True then data sets without pixel data can be added to the stack.
-            The "dummy" voxels will have the maximum representable value for 
-            the datatype.
-        
-        meta_filter : callable
-            A callable that takes a meta data key and value, and returns True if 
-            that meta data element should be excluded from the DcmMeta extension.
-            
-        Notes
-        -----
-        If both time_order and vector_order are None, the time_order will be 
-        guessed based off the data sets.
-        '''
         if isinstance(time_order, str):
             self._time_order = DicomOrdering(time_order)
         else:
@@ -959,6 +960,9 @@ class DicomStack(object):
         return nifti_image
         
     def to_nifti_wrapper(self, voxel_order=''):
+        '''Convienance method. Calls `to_nifti` and returns a `NiftiWrapper` 
+        generated from the result.
+        '''
         return NiftiWrapper(self.to_nifti(voxel_order, True))
         
 default_group_keys =  ('SeriesInstanceUID', 

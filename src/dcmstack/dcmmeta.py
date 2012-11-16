@@ -90,11 +90,9 @@ class InvalidExtensionError(Exception):
         
 
 class DcmMetaExtension(Nifti1Extension):
-    def __init__(self, *args, **kwargs):
-        '''Nifti extension for storing a summary of the meta data from the source 
-        DICOM files.
-        '''
-        super(DcmMetaExtension, self).__init__(*args, **kwargs)
+    '''Nifti extension for storing a summary of the meta data from the source 
+    DICOM files.
+    '''
     
     @property
     def reorient_transform(self):
@@ -1185,29 +1183,28 @@ def patch_dcm_ds_is(dcm):
         
 
 class NiftiWrapper(object):
-    ''''''
+    '''Wraps a Nifti1Image object containing a DcmMeta header extension. 
+    Provides access to the meta data and the ability to split or merge the 
+    data array while updating the meta data.
+    
+    Parameters
+    ----------
+    nii_img : nibabel.nifti1.Nifti1Image
+        The Nifti1Image to wrap.
+        
+    make_empty : bool
+        If True an empty DcmMetaExtension will be created if none is found.
+        
+    Raises
+    ------
+    MissingExtensionError
+        No valid DcmMetaExtension was found. 
+    
+    ValueError
+        More than one valid DcmMetaExtension was found.
+    '''
 
     def __init__(self, nii_img, make_empty=False):
-        '''Wraps a Nifti1Image object containing a DcmMeta header extension. 
-        Provides access to the meta data and the ability to split or merge the 
-        data array while updating the meta data.
-        
-        Parameters
-        ----------
-        nii_img : nibabel.nifti1.Nifti1Image
-            The Nifti1Image to wrap.
-            
-        make_empty : bool
-            If True an empty DcmMetaExtension will be created if none is found.
-            
-        Raises
-        ------
-        MissingExtensionError
-            No valid DcmMetaExtension was found. 
-        
-        ValueError
-            More than one valid DcmMetaExtension was found.
-        '''
         self.nii_img = nii_img
         hdr = nii_img.get_header()
         self.meta_ext = None

@@ -59,9 +59,21 @@ Encoding
 The dictionaries of summarized meta data are encoded with JSON. A small amount 
 of "meta meta" data that describes the DcmMeta extension is also included. 
 This includes the affine ('dcmmeta_affine'), shape ('dcmmeta_shape'), any 
-reorientation transform ('dcmmeta_reorient_transform'), and  slice dimension 
+reorientation transform ('dcmmeta_reorient_transform'), and the slice dimension 
 ('dcmmeta_slice_dim') of the data described by the meta data. A version number 
 for the DcmMeta extension ('dcmmeta_version') is also included.
+
+The affine, shape, and slice dimension are used to determine if varying meta 
+data is still valid. For example, if the image affine no longer matches 
+the meta data affine (i.e. the image has been coregistered) then we cannot 
+directly match the per-slice meta data values to slices of the data array.
+
+The reorientation transform can be used to update directional meta data to 
+match the image orientation. This transform encodes any reordering of the 
+voxel data that occured during conversion. If the image affine does not match 
+the meta data affine, then an additional transformation needs to be done after 
+applying the reorientation transform (from the meta data space to the image 
+space).
 
 Example
 -------

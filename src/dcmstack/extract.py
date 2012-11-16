@@ -271,33 +271,32 @@ default_conversions = {'DS' : float,
                       }
     
 class MetaExtractor(object):
-    ''''''
+    '''Callable object for extracting meta data from a dicom dataset. 
+    Initialize with a set of ignore rules, translators, and type 
+    conversions. 
+    
+    Parameters
+    ----------
+    ignore_rules : sequence
+        A sequence of callables, each of which should take a DICOM element 
+        and return True if it should be ignored. If None the module 
+        default is used.
+        
+    translators : sequence
+        A sequence of `Translator` objects each of which can convert a 
+        DICOM element into a dictionary. Overrides any ignore rules. If 
+        None the module default is used.
+        
+    conversions : dict
+        Mapping of DICOM value representation (VR) strings to callables
+        that perform some conversion on the value
+        
+    warn_on_trans_except : bool
+        Convert any exceptions from translators into warnings.
+    '''
     
     def __init__(self, ignore_rules=None, translators=None, conversions=None,
                  warn_on_trans_except=True):
-        '''Callable object for extracting meta data from a dicom dataset. 
-        Initialize with a set of ignore rules, translators, and type 
-        conversions. 
-        
-        Parameters
-        ----------
-        ignore_rules : sequence
-            A sequence of callables, each of which should take a DICOM element 
-            and return True if it should be ignored. If None the module 
-            default is used.
-            
-        translators : sequence
-            A sequence of `Translator` objects each of which can convert a 
-            DICOM element into a dictionary. Overrides any ignore rules. If 
-            None the module default is used.
-            
-        conversions : dict
-            Mapping of DICOM value representation (VR) strings to callables
-            that perform some conversion on the value
-            
-        warn_on_trans_except : bool
-            Convert any exceptions from translators into warnings.
-        '''
         if ignore_rules is None:
             self.ignore_rules = default_ignore_rules
         else:            
