@@ -15,11 +15,13 @@ Documentation
 
 Documentation can be read online: https://dcmstack.readthedocs.org/en/latest/
 
-To build the documentation you must install sphinx.
+You can buuld the HTML documentation under build/sphinx/html with:
 
-You can build the documentation by running the "make" command in the 
-"doc" directory. For example, to create the HTML documentation you would 
-do:
+$ python setup.py build_sphinx
+
+If you have the *sphinx* and *numpydoc* packages and a *make* command you 
+can build the documentation by running the *make* command in the *doc/* 
+directory. For example, to create the HTML documentation you would do:
 
 $ make html
 
@@ -28,16 +30,25 @@ And then view doc/_build/html/index.html with a web browser.
 Running Tests
 -------------
 
-To run the test cases you must install nose
-
-You can run the automated tests with:
+You can run the tests with:
 
 $ python setup.py test
+
+Or if you already have the *nose* package installed you can use the 
+*nosetests* command in the top level directory:
+
+$ nosetests
 
 
 Installing
 ----------
 
-You can install this package with:
+You can install the *.zip* or *.tar.gz* package with the *easy_install* 
+command.
+
+$ easy_install dcmstack-0.6.0.zip
+
+Or you can decompress the package and in the top level directory run:
 
 $ python setup.py install
+

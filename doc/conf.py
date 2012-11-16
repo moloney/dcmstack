@@ -14,11 +14,13 @@
 import sys, os
 
 #Mock unavailable packages for ReadTheDocs
-import mock
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if on_rtd:
+    import mock
  
-MOCK_MODULES = ['numpy', 'nibabel']
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+    MOCK_MODULES = ['numpy', 'nibabel']
+    for mod_name in MOCK_MODULES:
+        sys.modules[mod_name] = mock.Mock()
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
