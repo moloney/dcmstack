@@ -15,7 +15,7 @@ elif sys.version_info < (2, 7):
 
 setup(name='dcmstack',
       description='Stack DICOM images into volumes',
-      version='0.6',
+      version='0.7.dev',
       author='Brendan Moloney',
       author_email='moloney@ohsu.edu',
       packages=find_packages('src'),
