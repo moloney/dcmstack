@@ -22,7 +22,7 @@ setup(name='dcmstack',
       package_dir = {'':'src'},
       install_requires=install_requires,
       extras_require = {
-                        'doc':  ["sphinx"],
+                        'doc':  ["sphinx", "numpydoc"],
                         'test': ["nose"],
                        },
       entry_points = {'console_scripts' : \
