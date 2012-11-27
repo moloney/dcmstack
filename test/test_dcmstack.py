@@ -83,6 +83,36 @@ class TestReorderVoxels(object):
         ok_(np.allclose(ornt_trans, [[0, 1], [1, 1], [2, 1]]))
         eq_(np.may_share_memory(affine, self.affine), False)
         
+    def test_reorder(self):
+        (vox_array, 
+         affine, 
+         aff_trans, 
+         ornt_trans) = dcmstack.reorder_voxels(self.vox_array, 
+                                               self.affine, 
+                                               'PRS')
+        ok_(np.all(vox_array == np.array([[[[4, 5], 
+                                            [6, 7]],
+                                           [[12, 13], 
+                                            [14,15]]
+                                          ],
+                                          [[[0, 1], 
+                                            [2, 3]],
+                                           [[8, 9], 
+                                            [10, 11]]
+                                          ]
+                                         ]
+                                        )
+                  )
+           )
+        print affine
+        ok_(np.allclose(affine, 
+                        np.array([[0,1,0,0],
+                                  [-1,0,0,1],
+                                  [0,0,1,0],
+                                  [0,0,0,1]])
+                       )
+           )
+        
 def test_dcm_time_to_sec():
     eq_(dcmstack.dcm_time_to_sec('100235.123456'), 36155.123456)
     eq_(dcmstack.dcm_time_to_sec('100235'), 36155)
