@@ -13,7 +13,7 @@ formatted text file.
 Documentation
 -------------
 
-Documentation can be read online: https://dcmstack.readthedocs.org/en/v0.6/
+Documentation can be read online: https://dcmstack.readthedocs.org/
 
 You can buuld the HTML documentation under build/sphinx/html with:
 
