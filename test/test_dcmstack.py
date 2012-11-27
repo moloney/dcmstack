@@ -104,10 +104,26 @@ class TestReorderVoxels(object):
                                         )
                   )
            )
-        print affine
         ok_(np.allclose(affine, 
                         np.array([[0,1,0,0],
                                   [-1,0,0,1],
+                                  [0,0,1,0],
+                                  [0,0,0,1]])
+                       )
+           )
+           
+    def test_aniso_reorder(self):
+        self.vox_array = self.vox_array.reshape(2, 4, 2)
+        self.affine = np.eye(4)
+        (vox_array, 
+         affine, 
+         aff_trans, 
+         ornt_trans) = dcmstack.reorder_voxels(self.vox_array, 
+                                               self.affine, 
+                                               'PLS')
+        ok_(np.allclose(affine, 
+                        np.array([[0,-1,0,1],
+                                  [-1,0,0,3],
                                   [0,0,1,0],
                                   [0,0,0,1]])
                        )
