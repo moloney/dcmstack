@@ -123,7 +123,7 @@ def ornt_transform(start_ornt, end_ornt):
                     flip = 1
                 else:
                     flip = -1
-                result[end_in_idx, :] = [start_in_idx, flip]
+                result[start_in_idx, :] = [end_in_idx, flip]
                 break
         else:
             raise ValueError("Unable to find out axis %d in start_ornt" % 
@@ -230,8 +230,7 @@ def reorder_voxels(vox_array, affine, voxel_order):
     new_ornt = axcodes2ornt(voxel_order)
     ornt_trans = ornt_transform(orig_ornt, new_ornt)
     vox_array = apply_orientation(vox_array, ornt_trans)
-    inv_aff_trans = inv_ornt_aff(ornt_trans, vox_array.shape)
-    aff_trans = np.linalg.inv(inv_aff_trans)
+    aff_trans = inv_ornt_aff(ornt_trans, vox_array.shape)
     affine = np.dot(affine, aff_trans)
     
     return (vox_array, affine, aff_trans, ornt_trans)
