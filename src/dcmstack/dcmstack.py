@@ -229,9 +229,9 @@ def reorder_voxels(vox_array, affine, voxel_order):
     orig_ornt = io_orientation(affine)
     new_ornt = axcodes2ornt(voxel_order)
     ornt_trans = ornt_transform(orig_ornt, new_ornt)
+    orig_shape = vox_array.shape
     vox_array = apply_orientation(vox_array, ornt_trans)
-    inv_ornt_trans = ornt_transform(new_ornt, orig_ornt)
-    aff_trans = np.linalg.inv(inv_ornt_aff(inv_ornt_trans, vox_array.shape))
+    aff_trans = inv_ornt_aff(ornt_trans, orig_shape)
     affine = np.dot(affine, aff_trans)
     
     return (vox_array, affine, aff_trans, ornt_trans)
