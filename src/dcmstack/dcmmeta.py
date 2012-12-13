@@ -22,6 +22,24 @@ dcm_meta_ecode = 0
 
 _meta_version = 0.6
 
+_req_base_keys_map= {0.5 : set(('dcmmeta_affine', 
+                                'dcmmeta_slice_dim',
+                                'dcmmeta_shape',
+                                'dcmmeta_version',
+                                'global',
+                                )
+                               ),
+                     0.6 : set(('dcmmeta_affine', 
+                                'dcmmeta_reorient_transform',
+                                'dcmmeta_slice_dim',
+                                'dcmmeta_shape',
+                                'dcmmeta_version',
+                                'global',
+                                )
+                               ),
+                    }
+'''Minimum required keys in the base dictionaty to be considered valid'''
+
 def is_constant(sequence, period=None):
     '''Returns true if all elements in (each period of) the sequence are equal. 
     
@@ -251,16 +269,6 @@ class DcmMetaExtension(Nifti1Extension):
                 n_vals = shape[4]
                 
         return n_vals
-        
-    _req_base_keys = set(('dcmmeta_affine', 
-                          'dcmmeta_reorient_transform',
-                          'dcmmeta_slice_dim',
-                          'dcmmeta_shape',
-                          'dcmmeta_version',
-                          'global',
-                         )
-                        )
-    '''Minimum required keys in the base dictionaty to be considered valid'''
     
     def check_valid(self):
         '''Check if the extension is valid.
@@ -273,7 +281,7 @@ class DcmMetaExtension(Nifti1Extension):
             classification.
         '''
         #Check for the required base keys in the json data
-        if not self._req_base_keys <= set(self._content):
+        if not _req_base_keys_map[self.version] <= set(self._content):
             raise InvalidExtensionError('Missing one or more required keys')
             
         #Check the orientation/shape/version
