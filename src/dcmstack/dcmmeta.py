@@ -759,7 +759,11 @@ class DcmMetaExtension(Nifti1Extension):
         for dest_cls in dests:
             if dest_cls[0] in self._content:
                 period = self._get_const_period(curr_class, dest_cls)
-                if is_constant(values, period):
+                #If the period is one, the two classifications have the 
+                #same multiplicity so we are dealing with a degenerate 
+                #case (i.e. single slice data). Just change the 
+                #classification to the "simpler" one in this case
+                if period == 1 or is_constant(values, period):
                     if period is None:
                         self.get_class_dict(dest_cls)[key] = \
                             values[0]

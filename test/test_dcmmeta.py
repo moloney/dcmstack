@@ -420,7 +420,20 @@ class TestSimplify(object):
         
         eq_(self.ext._simplify('Test1'), True)
         eq_(self.ext.get_classification('Test1'), ('global', 'const'))
-    
+
+def test_simp_sngl_slc_5d():
+    ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 1, 3, 5), 
+                                              np.eye(4),
+                                              np.eye(4),
+                                              2
+                                             )
+    glob_slc = ext.get_class_dict(('global', 'slices'))
+    glob_slc['test1'] = range(15)
+    ext._simplify('test1')
+    eq_(ext.get_values_and_class('test1'), 
+        (range(15), ('time','samples'))
+       )
+
 class TestGetSubset(object):
     def setUp(self):
         self.ext = dcmmeta.DcmMetaExtension.make_empty((64, 64, 3, 5, 7), 
