@@ -267,6 +267,7 @@ def tm_to_seconds(time_str):
 
 default_conversions = {'DS' : float, 
                        'IS' : int,
+                       'AT' : str,
                        #'TM' : tm_to_seconds
                       }
     
