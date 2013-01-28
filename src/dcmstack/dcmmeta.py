@@ -1504,6 +1504,8 @@ class NiftiWrapper(object):
         if len(data.shape) == 2:
             data = data.reshape(data.shape + (1,))
         
+        if data.dtype =='object':
+            data = data.astype(int)
         #Create the nifti image and set header data
         nii_img = nb.nifti1.Nifti1Image(data, affine)
         hdr = nii_img.get_header()
