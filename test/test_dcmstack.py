@@ -561,6 +561,13 @@ class TestToNifti(object):
         nii = stack.to_nifti()
         self._chk(nii, 'single_vol')
         
+    def test_slice_dim_reorient(self):
+        stack = dcmstack.DicomStack()
+        stack.add_dcm(self.inputs[0])
+        stack.add_dcm(self.inputs[1])
+        nii = stack.to_nifti(voxel_order='SAR')
+        self._chk(nii, 'single_vol_SAR')   
+        
     def test_two_time_vol(self):
         stack = dcmstack.DicomStack(time_order='EchoTime')
         stack.add_dcm(self.inputs[0])
