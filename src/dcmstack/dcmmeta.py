@@ -117,6 +117,8 @@ class DcmMetaExtension(Nifti1Extension):
         '''The transformation due to reorientation of the data array. Can be 
         used to update directional DICOM meta data (after converting to RAS if 
         needed) into the same space as the affine.'''
+        if self.version < 0.6:
+            return None
         if self._content['dcmmeta_reorient_transform'] is None:
             return None
         return np.array(self._content['dcmmeta_reorient_transform'])
