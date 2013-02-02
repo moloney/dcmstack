@@ -842,6 +842,7 @@ class DicomStack(object):
              reorient_transform,
              ornt_trans) = reorder_voxels(data, affine, voxel_order)
             permutation, flips = zip(*ornt_trans)
+            permutation = [int(val) for val in permutation]
             
             #Reverse file order in each volume's files if we flipped slice order
             #This will keep the slice times and meta data order correct
@@ -857,7 +858,7 @@ class DicomStack(object):
                                                    ]
             
             #Update the slice dim
-            slice_dim = permutation.index(2)
+            slice_dim = permutation[2]
         
         #Create the nifti image using the data array
         nifti_image = nb.Nifti1Image(data, affine)
@@ -871,11 +872,11 @@ class DicomStack(object):
         if len(self._phase_enc_dirs) == 1 and not None in self._phase_enc_dirs:
             phase_dir = list(self._phase_enc_dirs)[0]
             if phase_dir == 'ROW':
-                dim_info['phase'] = permutation.index(1)
-                dim_info['freq'] = permutation.index(0)
+                dim_info['phase'] = permutation[1]
+                dim_info['freq'] = permutation[0]
             else:
-                dim_info['phase'] = permutation.index(0)
-                dim_info['freq'] = permutation.index(1)
+                dim_info['phase'] = permutation[0]
+                dim_info['freq'] = permutation[1]
         nifti_header.set_dim_info(**dim_info)
         n_slices = data.shape[slice_dim]
         
