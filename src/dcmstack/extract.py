@@ -271,6 +271,19 @@ default_conversions = {'DS' : float,
                        #'TM' : tm_to_seconds
                       }
     
+def make_unicode(in_str):
+    '''Try to convetrt in_str to unicode'''
+    for encoding in ('utf8', 'latin1'):
+        try:
+            result = unicode(in_str, encoding=encoding)
+        except UnicodeDecodeError:
+            pass
+        else:
+            break
+    else:
+        raise ValueError("Unable to determine string encoding: %s" % in_str)
+    return result
+
 class MetaExtractor(object):
     '''Callable object for extracting meta data from a dicom dataset. 
     Initialize with a set of ignore rules, translators, and type 
@@ -452,6 +465,13 @@ class MetaExtractor(object):
             for name, value in meta.iteritems():
                 name = '%s.%s' % (trans_name, name)
                 result[name] = value
+                
+        #Make sure all string values are unicode
+        for name, value in result.iteritems():
+            if isinstance(value, str):
+                result[name] = make_unicode(value)
+            elif isinstance(value, list) and isinstance(value[0], str):
+                result[name] = [make_unicode(val) for val in value]
                     
         return result
 
