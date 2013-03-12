@@ -257,6 +257,9 @@ def main(argv=sys.argv):
         if args.verbose:
             print "Found %d groups of DICOM images" % len(groups)
             
+        if len(groups) == 0:
+            print "No DICOM files found in %s" % src_dir            
+            
         for key, group in groups.iteritems():
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
