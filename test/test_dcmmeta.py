@@ -1301,3 +1301,26 @@ def test_merge_inconsistent_hdr():
     eq_(merged_hdr.get_dim_info(), (None, None, 2))
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'unknown'))
         
+def test_merge_with_slc_and_without():
+    #Test merging two data sets where one has per slice meta and other does not
+    input_nws = []
+    for idx in xrange(2):
+        arr = np.arange(idx * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4)
+                       ).reshape(4, 4, 4)
+        nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
+        hdr = nii.get_header()
+        if idx == 0:
+            hdr.set_dim_info(0, 1, 2)
+        hdr.set_xyzt_units('mm', 'sec')
+        nw = dcmmeta.NiftiWrapper(nii, True)
+        const_meta = nw.meta_ext.get_class_dict(('global', 'const'))
+        const_meta['PatientID'] = 'Test'
+        const_meta['EchoTime'] = idx
+        if idx == 0:
+            glb_slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
+            glb_slice_meta['SliceLocation'] = range(4)
+            glb_slice_meta['AcquisitionTime'] = range(idx * 4, (idx + 1) * 4)
+        input_nws.append(nw)
+        
+    merged = dcmmeta.NiftiWrapper.from_sequence(input_nws)
