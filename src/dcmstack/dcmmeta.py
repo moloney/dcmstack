@@ -818,7 +818,7 @@ class DcmMetaExtension(Nifti1Extension):
     '''Classification mapping showing allowed changes when increasing the 
     multiplicity.'''        
         
-    def _get_changed_class(self, key, new_class):
+    def _get_changed_class(self, key, new_class, slice_dim=None):
         '''Get an array of values corresponding to a single meta data 
         element with its classification changed by increasing its 
         multiplicity. This will preserve all the meta data and allow easier
@@ -838,6 +838,9 @@ class DcmMetaExtension(Nifti1Extension):
             per_slice = curr_class[1] == 'slices'
         if new_class in self.get_valid_classes():
             new_mult = self.get_multiplicity(new_class)
+            #Only way we get 0 for mult is if slice dim is undefined
+            if new_mult == 0:
+                new_mult = self.shape[slice_dim]
         else:
             new_mult = 1
         mult_fact = new_mult / curr_mult
@@ -1018,14 +1021,20 @@ class DcmMetaExtension(Nifti1Extension):
     def _insert(self, dim, other):
         self_slc_norm = self.slice_normal
         other_slc_norm = other.slice_normal
+        
+        #If we are not using slice meta data, temporarily remove it from the 
+        #other dcmmeta object
         use_slices = (not self_slc_norm is None and
                       not other_slc_norm is None and 
                       np.allclose(self_slc_norm, other_slc_norm))
+        other_slc_meta = {}
+        if not use_slices:
+            for classes in other.get_valid_classes():
+                if classes[1] == 'slices':
+                    other_slc_meta[classes] = other.get_class_dict(classes)
+                    other._content[classes[0]][classes[1]] = {}
         missing_keys = list(set(self.get_keys()) - set(other.get_keys()))
         for other_classes in other.get_valid_classes():
-            if other_classes[1] == 'slices' and not use_slices:
-                continue
-            
             other_keys = other.get_class_dict(other_classes).keys()
             
             #Treat missing keys as if they were in global const and have a value
@@ -1034,12 +1043,13 @@ class DcmMetaExtension(Nifti1Extension):
                 other_keys += missing_keys
             
             #When possible, reclassify our meta data so it matches the other
-            #classificatoin
+            #classification
             for key in other_keys:
                 local_classes = self.get_classification(key)
                 if local_classes != other_classes:
                     local_allow = self._preserving_changes[local_classes]
                     other_allow = self._preserving_changes[other_classes]
+                   
                     if other_classes in local_allow:
                         self._change_class(key, other_classes)
                     elif not local_classes in other_allow:
@@ -1061,10 +1071,17 @@ class DcmMetaExtension(Nifti1Extension):
                     self._insert_sample(key, other, 'time')
                 elif dim == 4:
                     self._insert_sample(key, other, 'vector')
+        
+        #Restore per slice meta if needed
+        if not use_slices:
+            for classes in other.get_valid_classes():
+                if classes[1] == 'slices':
+                    other._content[classes[0]][classes[1]] = \
+                        other_slc_meta[classes]
                
     def _insert_slice(self, key, other):
         local_vals, classes = self.get_values_and_class(key)
-        other_vals = other._get_changed_class(key, classes)
+        other_vals = other._get_changed_class(key, classes, self.slice_dim)
 
 
         #Handle some common / simple insertions with special cases
@@ -1075,7 +1092,8 @@ class DcmMetaExtension(Nifti1Extension):
                         self._change_class(key, (dest_base, 'slices'))
                         other_vals = other._get_changed_class(key, 
                                                               (dest_base, 
-                                                               'slices')
+                                                               'slices'),
+                                                               self.slice_dim
                                                              )
                         self.get_values(key).extend(other_vals)
                         break
@@ -1086,7 +1104,9 @@ class DcmMetaExtension(Nifti1Extension):
             if classes != ('global', 'slices'):
                 self._change_class(key, ('global', 'slices'))
                 local_vals = self.get_class_dict(('global', 'slices'))[key]
-                other_vals = other._get_changed_class(key, ('global', 'slices'))
+                other_vals = other._get_changed_class(key, 
+                                                      ('global', 'slices'),
+                                                      self.slice_dim)
             
             #Need to interleave slices from different volumes
             n_slices = self.n_slices
@@ -1109,21 +1129,22 @@ class DcmMetaExtension(Nifti1Extension):
             
     def _insert_non_slice(self, key, other):
         local_vals, classes = self.get_values_and_class(key)
-        other_vals = other._get_changed_class(key, classes)
+        other_vals = other._get_changed_class(key, classes, self.slice_dim)
         
         if local_vals != other_vals:
             del self.get_class_dict(classes)[key]
             
     def _insert_sample(self, key, other, sample_base):
         local_vals, classes = self.get_values_and_class(key)
-        other_vals = other._get_changed_class(key, classes)
+        other_vals = other._get_changed_class(key, classes, self.slice_dim)
         
         if classes == ('global', 'const'):
             if local_vals != other_vals:
                 self._change_class(key, (sample_base, 'samples'))
                 local_vals = self.get_values(key)
                 other_vals = other._get_changed_class(key, 
-                                                      (sample_base, 'samples')
+                                                      (sample_base, 'samples'),
+                                                      self.slice_dim
                                                      )
                 local_vals.extend(other_vals)
         elif classes == (sample_base, 'samples'):
@@ -1132,7 +1153,9 @@ class DcmMetaExtension(Nifti1Extension):
             if classes != ('global', 'slices'):
                 self._change_class(key, ('global', 'slices'))
                 local_vals = self.get_values(key)
-                other_vals = other._get_changed_class(key, ('global', 'slices'))
+                other_vals = other._get_changed_class(key, 
+                                                      ('global', 'slices'), 
+                                                      self.slice_dim)
             
             shape = self.shape
             n_dims = len(shape)
