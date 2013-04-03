@@ -551,21 +551,21 @@ class TestToNifti(object):
     def test_single_slice(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
-        nii = stack.to_nifti()
+        nii = stack.to_nifti(embed_meta=True)
         self._chk(nii, 'single_slice')
         
     def test_single_vol(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti()
+        nii = stack.to_nifti(embed_meta=True)
         self._chk(nii, 'single_vol')
         
     def test_slice_dim_reorient(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti(voxel_order='SAR')
+        nii = stack.to_nifti(voxel_order='SAR', embed_meta=True)
         self._chk(nii, 'single_vol_SAR')   
         
     def test_two_time_vol(self):
@@ -574,7 +574,7 @@ class TestToNifti(object):
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
-        nii = stack.to_nifti()
+        nii = stack.to_nifti(embed_meta=True)
         self._chk(nii, 'two_time_vol')
         
     def test_two_vector_vol(self):
@@ -583,7 +583,7 @@ class TestToNifti(object):
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
-        nii = stack.to_nifti()
+        nii = stack.to_nifti(embed_meta=True)
         self._chk(nii, 'two_vector_vol')
         
     def test_allow_dummies(self):
@@ -592,7 +592,7 @@ class TestToNifti(object):
         stack = dcmstack.DicomStack(allow_dummies=True)
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti()
+        nii = stack.to_nifti(embed_meta=True)
         data = nii.get_data()
         ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
         

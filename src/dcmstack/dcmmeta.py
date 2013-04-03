@@ -711,6 +711,15 @@ class DcmMeta(OrderedDict):
                 
         return True
     
+    def __deepcopy__(self, memo):
+        result = DcmMeta(self.shape, 
+                         self.affine, 
+                         self.reorient_transform, 
+                         self.slice_dim)
+        for classification in self.get_valid_classes():
+            result[classification] = deepcopy(self[classification])
+        return result
+    
     def _get_const_period(self, src_cls, dest_cls):
         '''Get the period over which we test for const-ness with for the 
         given classification change.'''
@@ -733,6 +742,8 @@ class DcmMeta(OrderedDict):
         of values). Results are ordered from smallest to largest increase in 
         number of values'''
         valid_classes = self.get_valid_classes()
+        if classification == None:
+            return valid_classes
         if classification == 'per_slice':
             return [None]
         if classification == 'per_volume':

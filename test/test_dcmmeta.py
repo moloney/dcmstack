@@ -637,10 +637,11 @@ def test_from_sequence_2d_to_3d():
     ext1 = dcmmeta.DcmMeta((2, 2, 1), np.eye(4), np.eye(4), 2)
     ext1['const']['const_test'] = 1
     ext1['const']['var_test'] = 1
-    ext1['const']['missing_test'] = 1
+    ext1['const']['missing_test1'] = 1
     ext2 = dcmmeta.DcmMeta((2, 2, 1), np.eye(4), np.eye(4), 2)
     ext2['const']['const_test'] = 1
     ext2['const']['var_test'] = 2
+    ext2['const']['missing_test2'] = 1
     
     merged = dcmmeta.DcmMeta.from_sequence([ext1, ext2], 2)
     merged.check_valid()
@@ -648,8 +649,10 @@ def test_from_sequence_2d_to_3d():
     eq_(merged.get_values('const_test'), 1)
     eq_(merged.get_classification('var_test'), 'per_slice')
     eq_(merged.get_values('var_test'), [1,2])
-    eq_(merged.get_classification('missing_test'), 'per_slice')
-    eq_(merged.get_values('missing_test'), [1,None])
+    eq_(merged.get_classification('missing_test1'), 'per_slice')
+    eq_(merged.get_values('missing_test1'), [1, None])
+    eq_(merged.get_classification('missing_test2'), 'per_slice')
+    eq_(merged.get_values('missing_test2'), [None, 1])
         
 def test_from_sequence_3d_to_4d():
     for dim in (3, 4):

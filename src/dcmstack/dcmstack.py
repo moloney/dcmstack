@@ -11,7 +11,7 @@ from nibabel.orientations import (io_orientation,
                                   apply_orientation, 
                                   inv_ornt_aff)
 import numpy as np
-from .dcmmeta import DcmMetaExtension, NiftiWrapper
+from .dcmmeta import DcmMeta, DcmMetaExtension, NiftiWrapper
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
@@ -923,7 +923,7 @@ class DicomStack(object):
                     end_slice = start_slice + n_slices
                     exts = [file_info[0].meta_ext
                             for file_info in self._files_info[start_slice:end_slice]]
-                    meta = DcmMetaExtension.from_sequence(exts, 2)
+                    meta = DcmMeta.from_sequence(exts, 2)
                     vol_meta.append(meta)
             else:
                 vol_meta = [file_info[0].meta_ext 
@@ -936,15 +936,15 @@ class DicomStack(object):
                     for vec_idx in xrange(data.shape[4]):
                         start_idx = vec_idx * data.shape[3]
                         end_idx = start_idx + data.shape[3]
-                        meta = DcmMetaExtension.from_sequence(\
+                        meta = DcmMeta.from_sequence(\
                             vol_meta[start_idx:end_idx], 3)
                         vec_meta.append(meta)
                 else:
                     vec_meta = vol_meta
                         
-                meta_ext = DcmMetaExtension.from_sequence(vec_meta, 4)
+                meta_ext = DcmMeta.from_sequence(vec_meta, 4)
             elif len(data.shape) == 4:
-                meta_ext = DcmMetaExtension.from_sequence(vol_meta, 3)
+                meta_ext = DcmMeta.from_sequence(vol_meta, 3)
             else:
                 meta_ext = vol_meta[0]
                 if meta_ext is file_info[0].meta_ext:
@@ -957,7 +957,8 @@ class DicomStack(object):
                     
             #Filter and embed the meta data
             meta_ext.filter_meta(self._meta_filter)
-            nifti_header.extensions = Nifti1Extensions([meta_ext])
+            nifti_ext = DcmMetaExtension.from_dcmmeta(meta_ext)
+            nifti_header.extensions = Nifti1Extensions([nifti_ext])
 
         nifti_image.update_header()
         return nifti_image
