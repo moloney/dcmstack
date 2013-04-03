@@ -366,7 +366,7 @@ def _make_dummy(reference, meta, iop):
     #Embed the meta data extension
     result = NiftiWrapper(nii_img, make_empty=True)
     result.meta_ext.reorient_transform = np.diag([-1., -1., 1., 1.])
-    result.meta_ext.get_class_dict(('global', 'const')).update(meta)
+    result.meta_ext['const'].update(meta)
     
     return result
 

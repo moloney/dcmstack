@@ -140,6 +140,7 @@ class DcmMeta(OrderedDict):
             The index of the slice dimension for the data associated with this 
             extension
         '''
+        super(DcmMeta, self).__init__()
         self.shape = shape
         self.affine = affine
         self.reorient_transform = reorient_transform
@@ -186,7 +187,7 @@ class DcmMeta(OrderedDict):
             raise ValueError("There must be at least two dimensions")
         if len(value) == 2:
             value = value + (1,)
-        self['dcmmeta_shape'][:] = value
+        self['dcmmeta_shape'] = value
     
     @property
     def reorient_transform(self):
@@ -265,7 +266,7 @@ class DcmMeta(OrderedDict):
 
     per_sample_re = re.compile('per_sample_([0-9]+)')
     
-    def get_per_sample_dim(classification):
+    def get_per_sample_dim(self, classification):
         if not classification in self.get_valid_classes():
             raise ValueError("Invalid classification: %s" % classification)
         
@@ -326,7 +327,7 @@ class DcmMeta(OrderedDict):
                                         "current version.")
                                         
         #Check for the required base keys in the json data
-        if not _req_base_keys_map[self.version] <= set(self._content):
+        if not _req_base_keys_map[self.version] <= set(self):
             raise InvalidExtensionError('Missing one or more required keys')
             
         #Check the orientation/shape/version
@@ -343,7 +344,7 @@ class DcmMeta(OrderedDict):
         #number of values
         valid_classes = self.get_valid_classes()
         for classification in valid_classes:
-            if not classification in self._content:
+            if not classification in self:
                 raise InvalidExtensionError('Missing required classification ' 
                                             '%s' % classification)
             cls_dict = self[classification]
@@ -354,7 +355,7 @@ class DcmMeta(OrderedDict):
                     if n_vals != cls_n_vals:
                         msg = (('Incorrect number of values for key %s with '
                                 'classification %s, expected %d found %d') %
-                               (key, classes, cls_n_vals, n_vals)
+                               (key, classification, cls_n_vals, n_vals)
                               )
                         raise InvalidExtensionError(msg)
                         
@@ -436,6 +437,93 @@ class DcmMeta(OrderedDict):
                     filtered.append(key)
             for key in filtered:
                 del curr_dict[key]
+    
+    def simplify(self, key):
+        '''Try to simplify (reduce the number of values) of a single meta data 
+        element by changing its classification. Return True if the 
+        classification is changed, otherwise False. Lookks for values that are 
+        constant over some period. Constant elements with a value of None will 
+        be deleted.
+        
+        You should only need to call this after adding some meta data yourself.
+        '''
+        curr_class = self.get_classification(key)
+        values = self[curr_class][key]
+        
+        if curr_class == 'const':
+            #If the class is const then just delete it if the value is None
+            if not values is None:
+                return False
+        elif curr_class.startswith('per_sample'):
+            #If the class is per sample, can only become const
+            if is_constant(values):
+                if values[0] != None:
+                    self['const'][key] = values[0]
+            else:
+                return False
+        elif curr_class == 'per_volume':
+            #Can become const or per sample
+            if is_constant(values):
+                if values[0] != None:
+                    self['const'][key] = values[0]
+            else:
+                shape = self.shape
+                simp_vals = []
+                for dim in xrange(len(shape) - 1, 2, -1):
+                    dest_class = 'per_sample_%d' % dim
+                    if not dest_class in self.get_valid_classes():
+                        return False
+                    for sample_idx in xrange(shape[dim]):
+                        sub_vals = self._per_volume_subset(key, 
+                                                           dim, 
+                                                           sample_idx)
+                        if is_constant(sub_vals):
+                            simp_vals.append(sub_vals[0])
+                        else:
+                            break
+                    else:
+                        self[dest_class][key] = simp_vals
+                        break
+                else:
+                    return False
+        else:
+            #Can become const, per sample, or per volume
+            if is_constant(values):
+                if values[0] != None:
+                    self['const'][key] = values[0]
+            else:
+                shape = self.shape
+                simp_vals = []
+                simp_found = False
+                #Try any per sample classifications
+                for dim in xrange(len(shape) - 1, 2, -1):
+                    dest_class = 'per_sample_%d' % dim
+                    if not dest_class in self.get_valid_classes():
+                        break
+                    for sample_idx in xrange(shape[dim]):
+                        sub_vals = self._per_slice_subset(key, 
+                                                          dim, 
+                                                          sample_idx)
+                        if is_constant(sub_vals):
+                            simp_vals.append(sub_vals[0])
+                        else:
+                            break
+                    else:
+                        self[dest_class][key] = simp_vals
+                        simp_found = True
+                        break
+                if not simp_found:
+                    n_slices = self.n_slices
+                    if (n_slices == 1 or 
+                        (not n_slices is None and 
+                         is_constant(values, n_slices))):
+                        self['per_volume'][key] = values[::n_slices]
+                    else:
+                        return False
+                
+        #The element was reclassified, delete original and return True
+        del self[curr_class][key]
+        return True
     
     def get_subset(self, dim, idx):
         '''Get a DcmMeta object containing a subset of the meta data 
@@ -572,7 +660,7 @@ class DcmMeta(OrderedDict):
         for input_ext in seq[1:]:
             #If the affines or reorient_transforms don't match, we set the 
             #reorient_transform to None as we can not reliably use it to update 
-            #directional meta data
+            #all of the directional meta data
             if ((reorient_transform is None or 
                  input_ext.reorient_transform is None) or 
                 not np.allclose(input_ext.affine, affine) or 
@@ -587,9 +675,12 @@ class DcmMeta(OrderedDict):
         #Set the reorient transform 
         result.reorient_transform = reorient_transform
             
-        #Try simplifying any keys in global slices
+        #Try simplifying all of the keys classified as per slice/volume
+        if 'per_volume' in result.get_valid_classes():
+            for key in result['per_volume'].keys():
+                result.simplify(key)
         for key in result['per_slice'].keys():
-            result._simplify(key)
+            result.simplify(key)
             
         return result
         
@@ -635,48 +726,6 @@ class DcmMeta(OrderedDict):
                 result *= dim_size
             return result
         assert False #Should take one of the above branches
-    
-    def _simplify(self, key):
-        '''Try to simplify (reduce the number of values) of a single meta data 
-        element by changing its classification. Return True if the 
-        classification is changed, otherwise False. 
-        
-        Looks for values that are constant over some period. Constant elements 
-        with a value of None will be deleted.
-        '''
-        curr_class = self.get_classification(key)
-        values = self[curr_class][key]
-        
-        if curr_class == 'const':
-            #If the class is const then just delete it if the value is None
-            if not values is None:
-                return False
-        elif is_constant(values):
-            self['const'][key] = values[0]
-        else:
-            #Test if the values are constant for each sample along the 
-            #non-spatial dimensions
-            if curr_class == 'per_slice':
-                start_dim = 3
-            else:
-                start_dim = self.get_per_sample_dim(curr_class) + 1
-            n_dims = len(self.shape)
-            for dim_idx in xrange(start_dim, n_dims):
-                dest_class = 'per_sample_%d' % dim_idx
-                period = self._get_const_period(curr_class, dest_class)
-                #If the period is one, the two classifications have the 
-                #same multiplicity so we are dealing with a degenerate 
-                #case (i.e. single slice data). Just change the 
-                #classification to the "simpler" one in this case
-                if period == 1 or is_constant(values, period):
-                    self[dest_cls][key] = values[::period]
-                    break
-            else:
-                return False
-        
-        #The element was reclassified, delete original and return True
-        del self[curr_class][key]
-        return True
 
     def _get_preserving_changes(self, classification):
         '''Get a list of classifications we can change to from 
@@ -685,7 +734,7 @@ class DcmMeta(OrderedDict):
         number of values'''
         valid_classes = self.get_valid_classes()
         if classification == 'per_slice':
-            return None
+            return [None]
         if classification == 'per_volume':
             return ['per_slice']
         if classification == 'const':
@@ -713,6 +762,8 @@ class DcmMeta(OrderedDict):
         if curr_class is None:
             values = None
             curr_n_vals = 1
+            if new_class == 'const':
+                return values
         else:
             values = self[curr_class][key]
             curr_n_vals = self.get_n_vals(curr_class)
@@ -722,9 +773,9 @@ class DcmMeta(OrderedDict):
         
         if new_class in self.get_valid_classes():
             new_n_vals = self.get_n_vals(new_class)
-            #Only way we get 0 for n_vals is if slice dim is undefined, so we 
-            #require the slice_dim argument
-            if new_n_vals == 0:
+            #Only way we get None for n_vals is if slice dim is undefined, so 
+            #we require the slice_dim argument
+            if new_n_vals == None:
                 new_n_vals = self.shape[slice_dim]
         else:
             new_n_vals = 1
@@ -734,8 +785,8 @@ class DcmMeta(OrderedDict):
             
         result = []
         for value in values:
-            result.extend([deepcopy(value)] * mult_fact)
-            
+            result.extend([deepcopy(value) for idx in xrange(mult_fact)])
+        
         return result
         
     def _change_class(self, key, new_class):
@@ -744,7 +795,7 @@ class DcmMeta(OrderedDict):
         curr_class = self.get_classification(key)
         self[new_class][key] = self._get_changed_class(key, new_class)
         if not curr_class is None:
-            del self.get_class_dict(curr_class)[key]
+            del self[curr_class][key]
     
     def _copy_slice(self, other, idx):
         '''Get a copy of the meta data from the 'other' instance with 
@@ -764,7 +815,7 @@ class DcmMeta(OrderedDict):
             if len(subset_vals) == 1:
                 subset_vals = subset_vals[0]
             self[dest_class][key] = deepcopy(subset_vals)
-            self._simplify(key)
+            self.simplify(key)
 
     def _per_slice_subset(self, key, dim, idx):
         '''Get a subset of the meta data values with the classificaion 
@@ -787,7 +838,7 @@ class DcmMeta(OrderedDict):
             #Otherwise we need to iterate over higher dimensions
             result = []
             slc_offset = idx * slices_per_sample[dim - 3]
-            higher_dim_iters = [xrange(size) for size in shape[dim:]]            
+            higher_dim_iters = [xrange(size) for size in shape[dim+1:]]
             for higher_indices in itertools.product(*higher_dim_iters):
                 start_idx = slc_offset
                 higher_dim = dim + 1
@@ -806,7 +857,7 @@ class DcmMeta(OrderedDict):
         shape = self.shape
         n_dims = len(shape)
         vols_per_sample = [1]
-        for dim_idx in xrange(4, n_dims):
+        for dim_idx in xrange(3, n_dims-1):
             vols_per_sample.append(vols_per_sample[-1] * shape[dim_idx])
         if dim == n_dims - 1:
             #If dim is the last non-spatial dimension, just take contiguous set
@@ -817,7 +868,7 @@ class DcmMeta(OrderedDict):
             #Otherwise we need to iterate over higher dimensions
             result = []
             vol_offset = idx * vols_per_sample[dim - 3]
-            higher_dim_iters = [xrange(size) for size in shape[dim:]]            
+            higher_dim_iters = [xrange(size) for size in shape[dim+1:]]
             for higher_indices in itertools.product(*higher_dim_iters):
                 start_idx = vol_offset
                 higher_dim = dim + 1
@@ -838,7 +889,7 @@ class DcmMeta(OrderedDict):
             for key, vals in other['per_slice'].iteritems():
                 subset_vals = other._per_slice_subset(key, dim, idx)
                 self['per_slice'][key] = deepcopy(subset_vals)
-                self._simplify(key)
+                self.simplify(key)
         elif src_class == 'per_volume':
             #Per volume meta data may become constant
             if not 'per_volume' in self.get_valid_classes():
@@ -846,10 +897,10 @@ class DcmMeta(OrderedDict):
                     self['const'][key] = deepcopy(vals[idx])
             else:
                 #Otherwise we take a subset of the per_volume meta
-                for key, vals in other['per_slice'].iteritems():
+                for key, vals in other['per_volume'].iteritems():
                     subset_vals = other._per_volume_subset(key, dim, idx)
                     self['per_volume'][key] = deepcopy(subset_vals)
-                    self._simplify(key)
+                    self.simplify(key)
         elif src_class == 'per_sample_%d' % dim:
             #Per sample meta on the split dim becomes constant
             for key, vals in other[src_class].iteritems():
@@ -863,7 +914,7 @@ class DcmMeta(OrderedDict):
                 dest_class = 'per_volume'
             for key, vals in other[src_class].iteritems():
                 self[dest_class][key] = deepcopy(vals)
-                self._simplify(key)
+                self.simplify(key)
     
     def _insert(self, dim, other):
         '''Insert the meta data from 'other' along the given 'dim'.'''
@@ -969,24 +1020,32 @@ class DcmMeta(OrderedDict):
         curr_class = self.get_classification(key)
         local_vals = self[curr_class][key]
         other_vals = other._get_changed_class(key, curr_class, self.slice_dim)
-        
+        shape = self.shape
+        n_dims = len(shape)
+            
         if curr_class == 'const':
             #If the element was const for both, but values don't match, we 
             #change the classification to per volume/sample
             if local_vals != other_vals:
-                new_class = 'per_sample_%d' % dim
-                if not new_class in self.get_valid_classes():
+                #Need to calculate this here instead of using the 
+                #get_valid_classes method as the dim we are joining on will be 
+                #singular initially
+                n_extra_spatial = 0
+                for dim_idx in xrange(3, n_dims):
+                    if shape[dim_idx] != 1 or dim_idx == dim:
+                        n_extra_spatial += 1
+                if n_extra_spatial > 1:
+                    new_class = 'per_sample_%d' % dim
+                else:
                     new_class = 'per_volume'
                 self._change_class(key, new_class)
-                local_vals = self.get_values(key)
+                local_vals = self[new_class][key]
                 other_vals = other._get_changed_class(key, 
                                                       new_class,
                                                       self.slice_dim
                                                      )
                 local_vals.extend(other_vals)
         elif curr_class == 'per_slice':
-            shape = self.shape
-            n_dims = len(shape)
             if dim == n_dims - 1:
                 #If we are inserting along the last dim, we can just extend 
                 #the list of values
@@ -1023,7 +1082,7 @@ class DcmMeta(OrderedDict):
                 if local_vals == other_vals:
                     return
                 self._change_class(key, 'per_volume')
-                local_vals = self.get_values(key)
+                local_vals = self['per_volume'][key]
                 other_vals = other._get_changed_class(key, 
                                                       'per_volume',
                                                       self.slice_dim
@@ -1056,7 +1115,7 @@ class DcmMeta(OrderedDict):
                     loc_start += n_vol_self
                     oth_start += n_vol_other
                     
-                self['per_slice'][key] = intlv
+                self['per_volume'][key] = intlv
             
 class DcmMetaExtension(Nifti1Extension):
     def _unmangle(self, value):
@@ -1071,13 +1130,12 @@ class DcmMetaExtension(Nifti1Extension):
         '''Go from runtime representation to extension data.'''
         return json.dumps(value, indent=4)
         
-    def get_dcmmeta(self):
-        return self._content
-        
     @classmethod
     def from_dcmmeta(cls, dcmmeta):
-        result = cls
-        cls._content = dcmmeta
+        #Call constructor with empty json, then set the runtime representation
+        result = cls(dcm_meta_ecode, '{}')
+        result._content = dcmmeta
+        return result 
             
 #Add our extension to nibabel
 nb.nifti1.extension_codes.add_codes(((dcm_meta_ecode, 
@@ -1148,10 +1206,10 @@ class NiftiWrapper(object):
         for extension in hdr.extensions:
             if extension.get_code() == dcm_meta_ecode:
                 try:
-                    meta_ext = extension.get_dcmmeta()
+                    meta_ext = extension.get_content()
                     meta_ext.check_valid()
                 except InvalidExtensionError, e:
-                    print "Found candidate extension, but invalid: %s" % e
+                    warnings.warn("Found candidate extension, but invalid: %s" % e)
                 else:
                     if not self.meta_ext is None:
                         raise ValueError('More than one valid DcmMeta '
@@ -1284,7 +1342,7 @@ class NiftiWrapper(object):
         hdr = self.nii_img.get_header()
         target_idx = None
         for idx, ext in enumerate(hdr.extensions):
-            if id(ext.get_dcmmeta()) == id(self.meta_ext):
+            if id(ext.get_content()) == id(self.meta_ext):
                 target_idx = idx
                 break
         else:
@@ -1693,11 +1751,11 @@ class NiftiWrapper(object):
         
         #Create the meta data extension and insert it
         seq_exts = [elem.meta_ext for elem in seq]
-        result_meta = DcmMetaExtension.from_sequence(seq_exts, 
-                                                     dim, 
-                                                     affine,
-                                                     slice_dim)
-        result_ext = DcmMetaExtension.get_dcmmeta(result_meta)
+        result_meta = DcmMeta.from_sequence(seq_exts, 
+                                            dim, 
+                                            affine,
+                                            slice_dim)
+        result_ext = DcmMetaExtension.from_dcmmeta(result_meta)
         result_hdr.extensions.append(result_ext)
         
         return NiftiWrapper(result_nii)
