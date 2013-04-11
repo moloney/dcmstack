@@ -259,7 +259,9 @@ def main(argv=sys.argv):
             
         if len(groups) == 0:
             print "No DICOM files found in %s" % src_dir            
-            
+        
+        out_idx = 0
+        generated_outs = set()
         for key, group in groups.iteritems():
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
@@ -268,6 +270,8 @@ def main(argv=sys.argv):
                                 allow_dummies=args.allow_dummies, 
                                 meta_filter=meta_filter)
             meta = group[0][1]
+            
+            #Build an appropriate output format string if none was specified
             if args.output_name is None:
                 out_fmt = []
                 if 'SeriesNumber' in meta:
@@ -281,8 +285,16 @@ def main(argv=sys.argv):
                 out_fmt = '-'.join(out_fmt)
             else:
                 out_fmt = args.output_name
-            out_fn = out_fmt % meta
-            out_fn = sanitize_path_comp(out_fn) + args.output_ext
+            
+            #Get the output filename from the format string, make sure the 
+            #result is unique for this source directory
+            out_fn = sanitize_path_comp(out_fmt % meta)
+            if out_fn in generated_outs:
+                out_fn += '-%03d' % out_idx
+            generated_outs.add(out_fn)
+            out_idx += 1
+            out_fn = out_fn + args.output_ext
+            
             if args.dest_dir:
                 out_path = os.path.join(args.dest_dir, out_fn)
             else:
@@ -310,7 +322,7 @@ def main(argv=sys.argv):
                     nii_wrp.remove_extension()
                                  
             nii.to_filename(out_path)
-                
+    
     return 0
 
 if __name__ == '__main__':

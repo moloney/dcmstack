@@ -970,7 +970,8 @@ class DicomStack(object):
         
 default_group_keys =  ('SeriesInstanceUID', 
                        'SeriesNumber', 
-                       'ProtocolName')
+                       'ProtocolName',
+                       'ImageOrientationPatient')
 '''Default keys for grouping DICOM files from the same acquisition together.'''
         
 def parse_and_group(src_paths, group_by=default_group_keys, extractor=None, 
@@ -1022,10 +1023,15 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
             else:
                 raise
             
-        #Extract the meta data, find the key for results dict, and create the 
-        #stack if needed
+        #Extract the meta data and group 
         meta = extractor(dcm)
-        key = tuple(meta.get(grp_key) for grp_key in group_by)
+        key_list = []
+        for grp_key in group_by:
+            key_elem = meta.get(grp_key)
+            if isinstance(key_elem, list):
+                key_elem = tuple(key_elem)
+            key_list.append(key_elem)
+        key = tuple(key_list)
         if not key in results:
             results[key] = []
             
