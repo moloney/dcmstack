@@ -320,8 +320,17 @@ def main(argv=sys.argv):
                 
                 if not args.embed_meta:
                     nii_wrp.remove_extension()
+                    
+                del nii_wrp
                                  
             nii.to_filename(out_path)
+            
+            del key
+            del group
+            del stack
+            del meta
+            del nii
+        del groups
     
     return 0
 
