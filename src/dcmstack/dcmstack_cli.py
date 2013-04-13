@@ -147,10 +147,6 @@ def main(argv=sys.argv):
     
     args = arg_parser.parse_args(argv[1:])
     
-    #Start with the module defaults
-    ignore_rules = extract.default_ignore_rules
-    translators = extract.default_translators
-    
     #Check if we are just listing the translators
     if args.list_translators:
         for translator in translators:
@@ -166,27 +162,38 @@ def main(argv=sys.argv):
         for regex in dcmstack.default_key_incl_res:
             print '\t' + regex
         return 0
-    
-    #Disable translators if requested
-    if args.disable_translator:
-        if args.disable_translator.lower() == 'all':
-            translators = tuple()
-        else:
-            try:
-                disable_tags = parse_tags(args.disable_translator)
-            except:
-                arg_parser.error('Invalid tag format to --disable-translator.')
-            new_translators = []
-            for translator in translators:
-                if not translator.tag in disable_tags:
-                    new_translators.append(translator)
-            translators = new_translators
-    
-    #Include non-translated private elements if requested
-    if args.extract_private:
-        ignore_rules = [extract.ignore_non_ascii_bytes]
-    
-    extractor = extract.MetaExtractor(ignore_rules, translators)
+        
+    #Check if we are generating meta data
+    gen_meta = args.embed_meta or args.dump_meta
+
+    if gen_meta:
+        #Start with the module defaults
+        ignore_rules = extract.default_ignore_rules
+        translators = extract.default_translators
+        
+        #Disable translators if requested
+        if args.disable_translator:
+            if args.disable_translator.lower() == 'all':
+                translators = tuple()
+            else:
+                try:
+                    disable_tags = parse_tags(args.disable_translator)
+                except:
+                    arg_parser.error('Invalid tag format to --disable-translator.')
+                new_translators = []
+                for translator in translators:
+                    if not translator.tag in disable_tags:
+                        new_translators.append(translator)
+                translators = new_translators
+        
+        #Include non-translated private elements if requested
+        if args.extract_private:
+            ignore_rules = [extract.ignore_non_ascii_bytes]
+        
+        extractor = extract.MetaExtractor(ignore_rules, translators)
+        
+    else:
+        extractor = extract.minimal_extractor   
     
     #Add include/exclude regexes to meta filter
     include_regexes = dcmstack.default_key_incl_res
@@ -196,7 +203,7 @@ def main(argv=sys.argv):
     if args.exclude_regex:
         exclude_regexes += args.exclude_regex
     meta_filter = dcmstack.make_key_regex_filter(exclude_regexes, 
-                                                 include_regexes)   
+                                                 include_regexes)
     
     #Figure out time and vector ordering
     if args.time_var:
@@ -303,8 +310,7 @@ def main(argv=sys.argv):
             if args.verbose:
                 print "Writing out stack to path %s" % out_path
 
-            nii = stack.to_nifti(args.voxel_order, 
-                                 args.embed_meta or args.dump_meta)
+            nii = stack.to_nifti(args.voxel_order, gen_meta)
             
             if args.dump_meta:
                 nii_wrp = NiftiWrapper(nii)
