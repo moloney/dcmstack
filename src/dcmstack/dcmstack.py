@@ -15,7 +15,6 @@ from .dcmmeta import DcmMeta, DcmMetaExtension, NiftiWrapper
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
-    from .extract import default_extractor
     from nibabel.nicom.dicomwrappers import wrapper_from_data
 
 def make_key_regex_filter(exclude_res, force_include_res=None):
@@ -370,6 +369,13 @@ def _make_dummy(reference, meta, iop):
     
     return result
 
+default_group_keys =  ('SeriesInstanceUID', 
+                       'SeriesNumber', 
+                       'ProtocolName',
+                       'ImageOrientationPatient')
+'''Default keys for grouping DICOM files that belong in the same 
+multi-dimensional array together.'''
+
 class DicomStack(object):
     '''Defines a method for stacking together DICOM data sets into a multi 
     dimensional volume. 
@@ -415,6 +421,20 @@ class DicomStack(object):
                    ]
     '''The meta data keywords used when trying to guess the sorting order. 
     Keys that come earlier in the list are given higher priority.'''
+    
+    minimal_keys = set(sort_guesses + 
+                       ['Rows', 
+                        'Columns', 
+                        'PixelSpacing',
+                        'ImageOrientationPatient',
+                        'InPlanePhaseEncodingDirection',
+                        'RepetitionTime',
+                        'AcquisitionTime'
+                       ] +
+                       list(default_group_keys)
+                      )
+    '''Set of minimal meta data keys that should be provided if they exist in 
+    the source DICOM files.'''
     
     def __init__(self, time_order=None, vector_order=None, 
                  allow_dummies=False, meta_filter=None):
@@ -488,6 +508,7 @@ class DicomStack(object):
 
         '''                
         if meta is None:
+            from .extract import default_extractor
             meta = default_extractor(dcm)
 
         dw = wrapper_from_data(dcm)
@@ -969,11 +990,6 @@ class DicomStack(object):
         '''
         return NiftiWrapper(self.to_nifti(voxel_order, True))
         
-default_group_keys =  ('SeriesInstanceUID', 
-                       'SeriesNumber', 
-                       'ProtocolName')
-'''Default keys for grouping DICOM files from the same acquisition together.'''
-        
 def parse_and_group(src_paths, group_by=default_group_keys, extractor=None, 
                     force=False, warn_on_except=False):
     '''Parse the given dicom files and group them together. Each group is 
@@ -1009,6 +1025,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         object, the parsed meta data, and the filename.
     '''
     if extractor is None:
+        from .extract import default_extractor
         extractor = default_extractor
         
     results = {}
@@ -1023,10 +1040,15 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
             else:
                 raise
             
-        #Extract the meta data, find the key for results dict, and create the 
-        #stack if needed
+        #Extract the meta data and group 
         meta = extractor(dcm)
-        key = tuple(meta.get(grp_key) for grp_key in group_by)
+        key_list = []
+        for grp_key in group_by:
+            key_elem = meta.get(grp_key)
+            if isinstance(key_elem, list):
+                key_elem = tuple(key_elem)
+            key_list.append(key_elem)
+        key = tuple(key_list)
         if not key in results:
             results[key] = []
             

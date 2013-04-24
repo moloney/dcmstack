@@ -147,10 +147,6 @@ def main(argv=sys.argv):
     
     args = arg_parser.parse_args(argv[1:])
     
-    #Start with the module defaults
-    ignore_rules = extract.default_ignore_rules
-    translators = extract.default_translators
-    
     #Check if we are just listing the translators
     if args.list_translators:
         for translator in translators:
@@ -166,27 +162,38 @@ def main(argv=sys.argv):
         for regex in dcmstack.default_key_incl_res:
             print '\t' + regex
         return 0
-    
-    #Disable translators if requested
-    if args.disable_translator:
-        if args.disable_translator.lower() == 'all':
-            translators = tuple()
-        else:
-            try:
-                disable_tags = parse_tags(args.disable_translator)
-            except:
-                arg_parser.error('Invalid tag format to --disable-translator.')
-            new_translators = []
-            for translator in translators:
-                if not translator.tag in disable_tags:
-                    new_translators.append(translator)
-            translators = new_translators
-    
-    #Include non-translated private elements if requested
-    if args.extract_private:
-        ignore_rules = [extract.ignore_non_ascii_bytes]
-    
-    extractor = extract.MetaExtractor(ignore_rules, translators)
+        
+    #Check if we are generating meta data
+    gen_meta = args.embed_meta or args.dump_meta
+
+    if gen_meta:
+        #Start with the module defaults
+        ignore_rules = extract.default_ignore_rules
+        translators = extract.default_translators
+        
+        #Disable translators if requested
+        if args.disable_translator:
+            if args.disable_translator.lower() == 'all':
+                translators = tuple()
+            else:
+                try:
+                    disable_tags = parse_tags(args.disable_translator)
+                except:
+                    arg_parser.error('Invalid tag format to --disable-translator.')
+                new_translators = []
+                for translator in translators:
+                    if not translator.tag in disable_tags:
+                        new_translators.append(translator)
+                translators = new_translators
+        
+        #Include non-translated private elements if requested
+        if args.extract_private:
+            ignore_rules = [extract.ignore_non_ascii_bytes]
+        
+        extractor = extract.MetaExtractor(ignore_rules, translators)
+        
+    else:
+        extractor = extract.minimal_extractor   
     
     #Add include/exclude regexes to meta filter
     include_regexes = dcmstack.default_key_incl_res
@@ -196,7 +203,7 @@ def main(argv=sys.argv):
     if args.exclude_regex:
         exclude_regexes += args.exclude_regex
     meta_filter = dcmstack.make_key_regex_filter(exclude_regexes, 
-                                                 include_regexes)   
+                                                 include_regexes)
     
     #Figure out time and vector ordering
     if args.time_var:
@@ -259,7 +266,9 @@ def main(argv=sys.argv):
             
         if len(groups) == 0:
             print "No DICOM files found in %s" % src_dir            
-            
+        
+        out_idx = 0
+        generated_outs = set()
         for key, group in groups.iteritems():
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
@@ -268,6 +277,8 @@ def main(argv=sys.argv):
                                 allow_dummies=args.allow_dummies, 
                                 meta_filter=meta_filter)
             meta = group[0][1]
+            
+            #Build an appropriate output format string if none was specified
             if args.output_name is None:
                 out_fmt = []
                 if 'SeriesNumber' in meta:
@@ -281,8 +292,16 @@ def main(argv=sys.argv):
                 out_fmt = '-'.join(out_fmt)
             else:
                 out_fmt = args.output_name
-            out_fn = out_fmt % meta
-            out_fn = sanitize_path_comp(out_fn) + args.output_ext
+            
+            #Get the output filename from the format string, make sure the 
+            #result is unique for this source directory
+            out_fn = sanitize_path_comp(out_fmt % meta)
+            if out_fn in generated_outs:
+                out_fn += '-%03d' % out_idx
+            generated_outs.add(out_fn)
+            out_idx += 1
+            out_fn = out_fn + args.output_ext
+            
             if args.dest_dir:
                 out_path = os.path.join(args.dest_dir, out_fn)
             else:
@@ -291,8 +310,7 @@ def main(argv=sys.argv):
             if args.verbose:
                 print "Writing out stack to path %s" % out_path
 
-            nii = stack.to_nifti(args.voxel_order, 
-                                 args.embed_meta or args.dump_meta)
+            nii = stack.to_nifti(args.voxel_order, gen_meta)
             
             if args.dump_meta:
                 nii_wrp = NiftiWrapper(nii)
@@ -308,9 +326,18 @@ def main(argv=sys.argv):
                 
                 if not args.embed_meta:
                     nii_wrp.remove_extension()
+                    
+                del nii_wrp
                                  
             nii.to_filename(out_path)
-                
+            
+            del key
+            del group
+            del stack
+            del meta
+            del nii
+        del groups
+    
     return 0
 
 if __name__ == '__main__':

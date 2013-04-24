@@ -6,7 +6,7 @@ from collections import namedtuple, defaultdict
 import dicom
 from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
-
+from .dcmstack import DicomStack
 try:
     from collections import OrderedDict
 except ImportError:
@@ -476,6 +476,18 @@ class MetaExtractor(object):
                 result[name] = [make_unicode(val) for val in value]
                     
         return result
+
+def minimal_extractor(dcm):
+    '''Meta data extractor that just extracts the minimal set of keys needed 
+    by DicomStack objects.
+    '''
+    result = {}
+    for key in DicomStack.minimal_keys:
+        try:
+            result[key] = dcm.__getattr__(key)
+        except AttributeError:
+            pass
+    return result
 
 default_extractor = MetaExtractor()
 '''The default `MetaExtractor`.'''

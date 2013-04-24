@@ -15,7 +15,7 @@ Documentation
 
 Documentation can be read online: https://dcmstack.readthedocs.org/
 
-You can buuld the HTML documentation under build/sphinx/html with:
+You can build the HTML documentation under build/sphinx/html with:
 
 $ python setup.py build_sphinx
 
