@@ -208,90 +208,6 @@ class InvalidStackError(Exception):
     def __str__(self):
         return 'The DICOM stack is not valid: %s' % self.msg
 
-class DicomOrdering(object):
-    '''Object defining an ordering for a set of dicom datasets. Create a 
-    DicomOrdering with the given DICOM element keyword. 
-    
-    Parameters
-    ----------
-    key : str
-        The DICOM keyword to use for ordering the datasets
-        
-    abs_ordering : sequence
-        A sequence specifying the absolute order for values corresponding 
-        to the `key`. Instead of ordering by the value associated with the 
-        `key`, the index of the value in this sequence will be used.
-    
-    abs_as_str : bool
-        If true, the values will be converted to strings before looking up 
-        the index in `abs_ordering`.
-    '''
-    
-    def __init__(self, key, abs_ordering=None, abs_as_str=False):
-        self.key = key
-        self.abs_ordering = abs_ordering
-        self.abs_as_str = abs_as_str
-        
-    def get_ordinate(self, ds):
-        '''Get the ordinate for the given DICOM data set.
-        
-        Parameters
-        ----------
-        ds : dict like
-            The DICOM data set we want the ordinate of. Should allow 
-            dict like access where DICOM keywords return the corresponing 
-            value.
-            
-        Returns
-        -------
-        An ordinate for the data set. If `abs_ordering` is None then this will 
-        just be the value for the keyword `key`. Otherwise it will be an 
-        integer.        
-        '''
-        try:
-            val = ds[self.key]
-        except KeyError:
-            return None
-            
-        if self.abs_ordering:
-            if self.abs_as_str:
-                val = str(val)
-            return self.abs_ordering.index(val)
-        
-        return val
-
-def _make_dummy(reference, meta, iop):
-    '''Make a "dummy" NiftiWrapper (no valid pixel data).'''
-    #Create the dummy data array filled with largest representable value
-    data = np.empty_like(reference.nii_img.get_data())
-    data[...] = np.iinfo(np.int16).max
-    
-    #Create the nifti image and set header data
-    aff = reference.nii_img.get_affine().copy()
-    aff[:3, 3] = [iop[1], iop[0], iop[2]]
-    nii_img = nb.nifti1.Nifti1Image(data, aff)
-    hdr = nii_img.get_header()
-    hdr.set_xyzt_units('mm', 'sec')
-    dim_info = {'freq' : None, 
-                'phase' : None, 
-                'slice' : 2
-               }
-    if 'InplanePhaseEncodingDirection' in meta:
-        if meta['InplanePhaseEncodingDirection'] == 'ROW':
-            dim_info['phase'] = 1
-            dim_info['freq'] = 0
-        else:
-            dim_info['phase'] = 0
-            dim_info['freq'] = 1
-    hdr.set_dim_info(**dim_info)
-    
-    #Embed the meta data extension
-    result = NiftiWrapper(nii_img, make_empty=True)
-    result.meta_ext.reorient_transform = np.diag([-1., -1., 1., 1.])
-    result.meta_ext['const'].update(meta)
-    
-    return result
-
 default_group_keys =  ('SeriesInstanceUID', 
                        'SeriesNumber', 
                        'ProtocolName',
@@ -305,22 +221,17 @@ class DicomStack(object):
        
     Tailored towards creating NiftiImage output, but can also just create numpy 
     arrays. Can summarize all of the meta data from the input DICOM data sets 
-    into a Nifti header extension (see `dcmmeta.DcmMetaExtension`).
+    into a Nifti header extension (see `dcmmeta.DcmMeta`).
 
     Parameters
     ----------
-    time_order : str or DicomOrdering
-        The DICOM keyword or DicomOrdering object specifying how to order 
-        the DICOM data sets along the time dimension.
+    time_order : str
+        The DICOM keyword orspecifying how to order the DICOM data sets along 
+        the time dimension.
 
-    vector_order : str or DicomOrdering
-        The DICOM keyword or DicomOrdering object specifying how to order 
-        the DICOM data sets along the vector dimension.
-    
-    allow_dummies : bool
-        If True then data sets without pixel data can be added to the stack.
-        The "dummy" voxels will have the maximum representable value for 
-        the datatype.
+    vector_order : str
+        The DICOM keyword specifying how to order the DICOM data sets along 
+        the vector dimension.
     
     meta_filter : callable
         A callable that takes a meta data key and value, and returns True if 
@@ -352,7 +263,7 @@ class DicomStack(object):
                         'ImageOrientationPatient',
                         'InPlanePhaseEncodingDirection',
                         'RepetitionTime',
-                        'AcquisitionTime'
+                        'AcquisitionTime',
                        ] +
                        list(default_group_keys)
                       )
@@ -360,22 +271,14 @@ class DicomStack(object):
     the source DICOM files.'''
     
     def __init__(self, time_order=None, vector_order=None, 
-                 allow_dummies=False, meta_filter=None):
-        if isinstance(time_order, str):
-            self._time_order = DicomOrdering(time_order)
-        else:
-            self._time_order = time_order
-        if isinstance(vector_order, str):
-            self._vector_order = DicomOrdering(vector_order)
-        else:
-            self._vector_order = vector_order
+                 meta_filter=None):
+        self._time_order = time_order
+        self._vector_order = vector_order
         
         if meta_filter is None:
             self._meta_filter = default_meta_filter
         else:
             self._meta_filter = meta_filter
-        
-        self._allow_dummies = allow_dummies
         
         #Sets all the state variables to their defaults
         self.clear()
@@ -386,26 +289,14 @@ class DicomStack(object):
                 raise IncongruentImageError("%s does not match" % key)
 
     def _chk_congruent(self, meta):
-        is_dummy = not 'Rows' in meta or not 'Columns' in meta
-        if is_dummy and not self._allow_dummies:
-            raise IncongruentImageError('Missing Rows/Columns')
-            
         if not self._ref_input is None:
-            self._chk_equal(('PixelSpacing', 
+            self._chk_equal(('Rows',
+                             'Columns',
+                             'PixelSpacing', 
                              'ImageOrientationPatient'), 
                              meta, 
                              self._ref_input
                             )
-            if not is_dummy:
-                self._chk_equal(('Rows', 'Columns'), meta, self._ref_input)
-        elif len(self._dummies) != 0:
-            self._chk_equal(('PixelSpacing', 
-                             'ImageOrientationPatient'), 
-                            meta, 
-                            self._dummies[0][0]
-                           )
-        return is_dummy
-            
     
     def add_dcm(self, dcm, meta=None):
         '''Add a pydicom dataset to the stack. 
@@ -434,23 +325,27 @@ class DicomStack(object):
             from .extract import default_extractor
             meta = default_extractor(dcm)
 
-        dw = wrapper_from_data(dcm)
+        #If this is the first dcm added, use it as the reference. Otherwise 
+        #make sure it is congruent to existing reference
+        if self._ref_input is None:
+            self._ref_input = meta
+        else:
+            self._chk_congruent(meta)
 
-        is_dummy = self._chk_congruent(meta)
+        #Create a DicomWrapper for the input
+        dw = wrapper_from_data(dcm)
         
+        #Keep track of option meta data that could be used to construct the 
+        #Nifti header
         self._phase_enc_dirs.add(meta.get('InPlanePhaseEncodingDirection'))
         self._repetition_times.add(meta.get('RepetitionTime'))
         
         #Pull the info used for sorting
         slice_pos = dw.slice_indicator
         self._slice_pos_vals.add(slice_pos)
-        time_val = None
-        if self._time_order:
-            time_val = self._time_order.get_ordinate(meta)
+        time_val = meta.get(self._time_order)
         self._time_vals.add(time_val)
-        vector_val = None
-        if self._vector_order:
-            vector_val = self._vector_order.get_ordinate(meta)
+        vector_val = meta.get(self._vector_order)
         self._vector_vals.add(vector_val)
         
         #Create a tuple with the sorting values
@@ -465,28 +360,9 @@ class DicomStack(object):
             raise ImageCollisionError()
         self._sorting_tuples.add(sorting_tuple)
         
-        #Create a NiftiWrapper for this input if possible
-        nii_wrp = None
-        if not is_dummy:
-            nii_wrp = NiftiWrapper.from_dicom_wrapper(dw, meta)
-            if self._ref_input is None:
-                #We don't have a reference input yet, use this one
-                self._ref_input = nii_wrp
-                #Convert any dummies that we have stashed previously
-                for dummy_meta, dummy_tuple, iop in self._dummies:
-                    dummy_wrp = _make_dummy(self._ref_input, dummy_meta, iop)
-                    self._files_info.append((dummy_wrp, dummy_tuple))
-        else:
-            if self._ref_input is None:
-                #We don't have a reference input, so stash the dummy for now
-                self._dummies.append((meta, sorting_tuple, dcm.ImagePositionPatient))
-            else:
-                #Convert dummy using the reference input
-                nii_wrp = _make_dummy(self._ref_input, meta, dcm.ImagePositionPatient)
-        
-        #If we made a NiftiWrapper add it to the stack
-        if not nii_wrp is None:
-            self._files_info.append((nii_wrp, sorting_tuple))
+        #Create a NiftiWrapper for this input and add it to our list
+        nii_wrp = NiftiWrapper.from_dicom_wrapper(dw, meta)
+        self._files_info.append((nii_wrp, sorting_tuple))
         
         #Set the dirty flags
         self._shape_dirty = True 
@@ -502,14 +378,13 @@ class DicomStack(object):
         self._phase_enc_dirs = set()
         self._repetition_times = set()
         
-        self._dummies = []
-        self._ref_input = None
-        
         self._shape_dirty = True
         self._shape = None
     
         self._meta_dirty = True
         self._meta = None
+        
+        self._ref_input = None
         
         self._files_info = []
     
@@ -568,9 +443,9 @@ class DicomStack(object):
         if not self._shape_dirty:
             return self._shape
 
-        #We need at least one non-dummy file in the stack
+        #We need at least one file in the stack
         if len(self._files_info) == 0:
-            raise InvalidStackError("No (non-dummy) files in the stack")
+            raise InvalidStackError("No files in the stack")
         
         #Figure out number of files and slices per volume
         files_per_vol = len(self._slice_pos_vals)

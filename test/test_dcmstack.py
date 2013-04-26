@@ -140,40 +140,6 @@ def test_dcm_time_to_sec():
     eq_(dcmstack.dcm_time_to_sec('10:02:35'), 36155)
     eq_(dcmstack.dcm_time_to_sec('10:02'), 36120)
     eq_(dcmstack.dcm_time_to_sec('10'), 36000)
-    
-class TestDicomOrdering(object):
-    def setUp(self):
-        self.ds = {'EchoTime' : 2}
-        
-    def test_missing_key(self):
-        ordering = dcmstack.DicomOrdering('blah')
-        eq_(ordering.get_ordinate(self.ds), None)
-        
-    def test_non_abs(self):
-        ordering = dcmstack.DicomOrdering('EchoTime')
-        eq_(ordering.get_ordinate(self.ds), self.ds['EchoTime'])
-        
-    def test_abs(self):
-        abs_order = [1,2,3]
-        ordering = dcmstack.DicomOrdering('EchoTime', abs_ordering=abs_order)
-        eq_(ordering.get_ordinate(self.ds), 
-            abs_order.index(self.ds['EchoTime']))
-            
-    def test_abs_as_str(self):
-        abs_order = ['1','2','3']
-        ordering = dcmstack.DicomOrdering('EchoTime', 
-                                          abs_ordering=abs_order, 
-                                          abs_as_str=True)
-        eq_(ordering.get_ordinate(self.ds), 
-            abs_order.index(str(self.ds['EchoTime'])))
-            
-    def test_abs_missing(self):
-        abs_order = [1,3]
-        ordering = dcmstack.DicomOrdering('EchoTime', abs_ordering=abs_order)
-        assert_raises(ValueError,
-                      ordering.get_ordinate,
-                      self.ds
-                     )
 
 def test_image_collision():
     dcm_path = path.join(test_dir, 
@@ -253,16 +219,6 @@ class TestInvalidStack(object):
         self.stack = dcmstack.DicomStack()
         self._chk()
         
-    def test_only_dummy(self):
-        self.stack = dcmstack.DicomStack(allow_dummies=True)
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        del self.inputs[1].Rows
-        del self.inputs[1].Columns
-        self.stack.add_dcm(self.inputs[0])
-        self.stack.add_dcm(self.inputs[1])
-        self._chk()
-        
     def test_missing_slice(self):
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.inputs[0])
@@ -329,15 +285,6 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[3])
         shape = stack.get_shape()
         eq_(shape, (192, 192, 2, 1, 2))
-        
-    def test_allow_dummy(self):
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        stack = dcmstack.DicomStack(allow_dummies=True)
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        shape = stack.get_shape()
-        eq_(shape, (192, 192, 2))
         
 class TestGuessDim(object):
     def setUp(self):
@@ -441,18 +388,6 @@ class TestGetData(object):
         eq_(data.shape, stack.get_shape())
         eq_(sha256(data).hexdigest(),
             'c14d3a8324bdf4b85be05d765c0864b4e2661d7aa716adaf85a28b4102e1992b')
-            
-    def test_allow_dummy(self):
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        stack = dcmstack.DicomStack(allow_dummies=True)
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        data = stack.get_data()
-        eq_(data.shape, stack.get_shape())
-        ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
-        eq_(sha256(data).hexdigest(),
-            'ed14cb8694f1c0d542562fecc6fd71bced3810df4fcb857a091c8e8525fbdda6')
             
 class TestGetAffine(object):
     def setUp(self):
@@ -585,14 +520,4 @@ class TestToNifti(object):
         stack.add_dcm(self.inputs[3])
         nii = stack.to_nifti(embed_meta=True)
         self._chk(nii, 'two_vector_vol')
-        
-    def test_allow_dummies(self):
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        stack = dcmstack.DicomStack(allow_dummies=True)
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti(embed_meta=True)
-        data = nii.get_data()
-        ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
         
