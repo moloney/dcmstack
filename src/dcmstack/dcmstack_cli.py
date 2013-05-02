@@ -252,7 +252,7 @@ def main(argv=sys.argv):
                 elif 'SeriesDescription' in meta:
                     out_fmt.append('%(SeriesDescription)s')
                 else:
-                    out_fmt = 'series'
+                    out_fmt.append('series')
                 out_fmt = '-'.join(out_fmt)
             else:
                 out_fmt = args.output_name
