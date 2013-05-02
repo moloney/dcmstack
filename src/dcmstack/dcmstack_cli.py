@@ -7,7 +7,7 @@ import os, sys, argparse, string
 from glob import glob
 import dicom
 from . import dcmstack
-from .dcmstack import parse_and_group, stack_group, DicomOrdering, default_group_keys
+from .dcmstack import parse_and_group, stack_group, default_group_keys
 from .dcmmeta import NiftiWrapper
 from . import extract
 
@@ -57,10 +57,6 @@ def main(argv=sys.argv):
     input_opt.add_argument('--file-ext', default='.dcm', help=('Only try reading '
                            'files with the given extension. Default: '
                            '%(default)s'))
-    input_opt.add_argument('--allow-dummies', action='store_true', default=False,
-                           help=('Allow DICOM files that are missing pixel '
-                           'data, filling that slice of the output nifti with '
-                           'the maximum representable value.'))
                             
     output_opt = arg_parser.add_argument_group('Output options')
     output_opt.add_argument('--dest-dir', default=None, 
@@ -91,22 +87,11 @@ def main(argv=sys.argv):
                            'as a three character code: (l)eft, (r)ight, '
                            '(a)nterior, (p)osterior, (s)uperior, (i)nferior. '
                            'Default: %(default)s'))
-    stack_opt.add_argument('-t', '--time-var', default=None,
-                           help=('The DICOM tag to use for ordering the stack '
-                           'along the time dimension.'))
-    stack_opt.add_argument('--vector-var', default=None,
-                           help=('The DICOM tag to use for ordering the stack '
-                           'along the vector dimension.'))
-    stack_opt.add_argument('--time-order', default=None, 
-                           help=('Provide a text file with the desired order '
-                           'for the values (one per line) of the attribute '
-                           'used as the time variable. This option is rarely '
-                           'needed.'))
-    stack_opt.add_argument('--vector-order', default=None, 
-                           help=('Provide a text file with the desired order '
-                           'for the values (one per line) of the attribute '
-                           'used as the vector variable. This option is rarely '
-                           'needed.'))
+    stack_opt.add_argument('-s', '--sort-order', default=None, 
+                           help="Comma seperated list of meta data keys to "
+                           "use for sorting files along extra-spatial "
+                           "dimensions. In unspecified the key to use will "
+                           "be guessed.")
     
     meta_opt = arg_parser.add_argument_group('Meta Extraction and Filtering '
                                              'Options')
@@ -205,27 +190,8 @@ def main(argv=sys.argv):
     meta_filter = dcmstack.make_key_regex_filter(exclude_regexes, 
                                                  include_regexes)
     
-    #Figure out time and vector ordering
-    if args.time_var:
-        if args.time_order:
-            order_file = open(args.time_order)
-            abs_order = [line.strip() for line in order_file.readlines()]
-            order_file.close()
-            time_order = DicomOrdering(args.time_var, abs_order, True)
-        else:
-            time_order = DicomOrdering(args.time_var)
-    else:
-        time_order = None
-    if args.vector_var:
-        if args.vector_order:
-            order_file = open(args.vector_order)
-            abs_order = [line.strip() for line in order_file.readlines()]
-            order_file.close()
-            vector_order = DicomOrdering(args.vector_var, abs_order, True)
-        else:
-            vector_order = DicomOrdering(args.vector_var)         
-    else:
-        vector_order = None
+    if not args.sort_order is None:
+        args.sort_order = args.sort_order.split(',')
     
     if len(args.src_dirs) == 0:
         arg_parser.error('No source directories were provided.')
@@ -272,9 +238,7 @@ def main(argv=sys.argv):
         for key, group in groups.iteritems():
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
-                                time_order=time_order, 
-                                vector_order=vector_order, 
-                                allow_dummies=args.allow_dummies, 
+                                dim_orderings=args.sort_order,
                                 meta_filter=meta_filter)
             meta = group[0][1]
             

@@ -4,6 +4,7 @@ into the package namespace.
 """
 import warnings, re, dicom
 from copy import deepcopy
+import itertools as it
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
@@ -72,7 +73,7 @@ default_key_excl_res = ['Patient',
                         'Ethnic',
                         'Occupation',
                         'Unknown',
-                        'PrivateTagData',
+                        'Private',
                         'UID',
                         'StudyDescription',
                         'DeviceSerialNumber',
@@ -184,11 +185,19 @@ def dcm_time_to_sec(time_str):
         result += float(time_str[4:])
     
     return float(result)
+    
+def get_n_vols(shape):
+    '''Get the total number of two or three dimensional volumes for the given 
+    shape.'''
+    n_vols = 1
+    for dim_size in shape[3:]:
+        n_vols *= dim_size
+    return n_vols
 
 class IncongruentImageError(Exception):
     def __init__(self, msg):
-        '''An exception denoting that a DICOM with incorrect size or orientation 
-        was passed to `DicomStack.add_dcm`.'''
+        '''An exception denoting that a DICOM with incorrect size, pixel 
+        spacing, or orientation was passed to `DicomStack.add_dcm`.'''
         self.msg = msg
         
     def __str__(self):
@@ -225,22 +234,17 @@ class DicomStack(object):
 
     Parameters
     ----------
-    time_order : str
-        The DICOM keyword orspecifying how to order the DICOM data sets along 
-        the time dimension.
-
-    vector_order : str
-        The DICOM keyword specifying how to order the DICOM data sets along 
-        the vector dimension.
+    dim_orderings : list of str
+        List of the DICOM keywords specifying how to order the DICOM data sets 
+        along any extra-spatial dimensions. If not specified the ordering is 
+        guessed based off the input data. If the input DICOM data has N 
+        dimensions (N > 2), the first element in this list is used to order 
+        dimension N + 1, the second N + 2, and so on.
     
     meta_filter : callable
         A callable that takes a meta data key and value, and returns True if 
-        that meta data element should be excluded from the DcmMeta extension.
-        
-    Notes
-    -----
-    If both time_order and vector_order are None, the time_order will be 
-    guessed based off the data sets.
+        that meta data element should be excluded from the DcmMeta extension. 
+        If not specified, defaults to `default_meta_filter`.
     '''
         
     sort_guesses = ['EchoTime',
@@ -254,7 +258,9 @@ class DicomStack(object):
                     'InstanceNumber',
                    ]
     '''The meta data keywords used when trying to guess the sorting order. 
-    Keys that come earlier in the list are given higher priority.'''
+    Keys that come earlier in the list are given higher priority. Acquisition 
+    parameters come first in the list, followed by time stamps, followed by 
+    assigned numbers.'''
     
     minimal_keys = set(sort_guesses + 
                        ['Rows', 
@@ -270,10 +276,8 @@ class DicomStack(object):
     '''Set of minimal meta data keys that should be provided if they exist in 
     the source DICOM files.'''
     
-    def __init__(self, time_order=None, vector_order=None, 
-                 meta_filter=None):
-        self._time_order = time_order
-        self._vector_order = vector_order
+    def __init__(self, dim_orderings=None, meta_filter=None):
+        self._dim_orderings = dim_orderings
         
         if meta_filter is None:
             self._meta_filter = default_meta_filter
@@ -317,7 +321,7 @@ class DicomStack(object):
             those already in the stack.
             
         ImageCollisionError
-            The provided `dcm` has the same slice location and time/vector 
+            The provided `dcm` has the same slice location and dim_orderings 
             values.
 
         '''                
@@ -335,26 +339,32 @@ class DicomStack(object):
         #Create a DicomWrapper for the input
         dw = wrapper_from_data(dcm)
         
-        #Keep track of option meta data that could be used to construct the 
-        #Nifti header
+        #Keep track of optional meta data that could be used when constructing 
+        #the Nifti header
         self._phase_enc_dirs.add(meta.get('InPlanePhaseEncodingDirection'))
         self._repetition_times.add(meta.get('RepetitionTime'))
         
-        #Pull the info used for sorting
+        #If dim_orderings was specified, pull out relevant values
+        sorting_vals = []
+        if not self._dim_orderings is None:
+            n_ord = len(self._dim_orderings)
+            for dim_idx in xrange(n_ord-1, -1, -1):
+                dim_ord_key = self._dim_orderings[dim_idx]
+                dim_ord_val = meta.get(dim_ord_key)
+                sorting_vals.append(dim_ord_val)
+                self._dim_order_vals[dim_idx].add(dim_ord_val)
+            
+        #Add the slice position at the end of sorting_vals
         slice_pos = dw.slice_indicator
         self._slice_pos_vals.add(slice_pos)
-        time_val = meta.get(self._time_order)
-        self._time_vals.add(time_val)
-        vector_val = meta.get(self._vector_order)
-        self._vector_vals.add(vector_val)
+        sorting_vals.append(slice_pos)
         
         #Create a tuple with the sorting values
-        sorting_tuple = (vector_val, time_val, slice_pos)
+        sorting_tuple = tuple(sorting_vals)
         
         #If a explicit order was specified, raise an exception if image 
         #collides with another already in the stack
-        if ((not self._time_order is None or 
-             not self._vector_order is None) and 
+        if (not self._dim_orderings is None and 
             sorting_tuple in self._sorting_tuples
            ):
             raise ImageCollisionError()
@@ -370,9 +380,11 @@ class DicomStack(object):
         
     def clear(self):
         '''Remove any DICOM datasets from the stack.'''
+        if not self._dim_orderings is None:
+            self._dim_order_vals = [set() 
+                                    for dim in xrange(len(self._dim_orderings))
+                                   ]
         self._slice_pos_vals = set()
-        self._time_vals = set()
-        self._vector_vals = set()
         self._sorting_tuples = set()
         
         self._phase_enc_dirs = set()
@@ -388,8 +400,8 @@ class DicomStack(object):
         
         self._files_info = []
     
-    def _chk_order(self, slice_positions, files_per_vol, num_volumes, 
-                   num_time_points, num_vec_comps):
+    def _sort_and_chk_order(self, slice_positions, files_per_vol, num_volumes, 
+                   extra_dim_sizes, inferred_dim=None):
         #Sort the files
         self._files_info.sort(key=lambda x: x[1])
         if files_per_vol > 1:
@@ -399,33 +411,34 @@ class DicomStack(object):
                 self._files_info[start_slice:end_slice] = \
                     sorted(self._files_info[start_slice:end_slice], 
                            key=lambda x: x[1][-1])
-       
-        #Do a thorough check for correctness
-        for vec_idx in xrange(num_vec_comps):
-            file_idx = vec_idx*num_time_points*files_per_vol
-            curr_vec_val = self._files_info[file_idx][1][0]
-            for time_idx in xrange(num_time_points):
-                for slice_idx in xrange(files_per_vol):
-                    file_idx = (vec_idx*num_time_points*files_per_vol + 
-                                time_idx*files_per_vol + slice_idx)
-                    file_info = self._files_info[file_idx]
-                    if file_info[1][0] != curr_vec_val:
-                        raise InvalidStackError("Not enough images with the " + 
-                                                "vector value of " + 
-                                                str(curr_vec_val))
-                    if (file_info[1][2] != slice_positions[slice_idx]):
-                        if (file_info[1][2] == slice_positions[slice_idx-1]):
-                            error_msg = ["Duplicate slice position"]
-                        else:
-                            error_msg = ["Missing slice position"]
-                        error_msg.append(" at slice index %d" % slice_idx)
-                        if num_time_points > 1:
-                            error_msg.append(' in time point %d' % time_idx)
-                        if num_vec_comps > 1:
-                            error_msg.append(' for vector component %s' % 
-                                             str(curr_vec_val))
-                        raise InvalidStackError(''.join(error_msg))
         
+        #Figure out the number of files for each index in the extra dims
+        files_per_idx = [files_per_vol]
+        for dim_size in extra_dim_sizes[:-1]:
+            files_per_idx.append(files_per_idx[-1] * dim_size)
+        
+        #For any extra dims whose size is not inferred, sorting value should 
+        #be constant for each index
+        for dim, dim_size in enumerate(extra_dim_sizes):
+            if inferred_dim is None or dim == inferred_dim:
+                continue
+            for dim_idx in xrange(dim_size):
+                start_idx = dim_idx * files_per_idx[dim]
+                end_idx = start_idx + files_per_idx[dim]
+                sort_val = self._files_info[start_idx][1][-1 - dim]
+                for file_info in self._files_info[start_idx:end_idx]:
+                    if file_info[1][-1 - dim] != sort_val:
+                        raise InvalidStackError("Sorting values not constant "
+                                                "over each index")
+                
+        #Check that slice positions are consistent across all volumes
+        if files_per_vol > 1:
+            for vol_idx in xrange(num_volumes):
+                start_idx = vol_idx * files_per_vol
+                for slice_idx, slice_pos in enumerate(slice_positions):
+                    file_info = self._files_info[start_idx+slice_idx]
+                    if file_info[1][-1] != slice_pos:
+                        raise InvalidStackError("Missing or duplicate slice.")
         
     def get_shape(self):
         '''Get the shape of the stack.
@@ -447,8 +460,10 @@ class DicomStack(object):
         if len(self._files_info) == 0:
             raise InvalidStackError("No files in the stack")
         
-        #Figure out number of files and slices per volume
+        #Figure out number of files per volume
         files_per_vol = len(self._slice_pos_vals)
+        
+        #Get the slice positions is sorted order
         slice_positions = sorted(list(self._slice_pos_vals))
         
         #If more than one file per volume, check that slice spacing is equal
@@ -465,77 +480,107 @@ class DicomStack(object):
         if len(self._files_info) % files_per_vol != 0:
             raise InvalidStackError("Number of files is not an even multiple "
                                     "of the number of unique slice positions.")
+        
+        #The number of individual (hyper) volumes (3 or more dimensions)
         num_volumes = len(self._files_info) / files_per_vol
         
-        #Figure out the number of vector components and time points
-        num_vec_comps = len(self._vector_vals)
-        if num_vec_comps > num_volumes:
-            raise InvalidStackError("Vector variable varies within volumes")
-        if num_volumes % num_vec_comps != 0:
-            raise InvalidStackError("Number of volumes not an even multiple "
-                                    "of the number of vector components.")
-        num_time_points = num_volumes / num_vec_comps
-        
-        #If both sort keys are None try to guess
-        if (num_volumes > 1 and self._time_order == None and 
-                self._vector_order == None):
+        #If we are joining files along an extra-spatial dim and no ordering is 
+        #specified, we try to guess 
+        if num_volumes > 1 and self._dim_orderings is None:
+            extra_dim_sizes = [num_volumes]
+            
             #Get a list of possible sort orders
             possible_orders = []
             for key in self.sort_guesses:
                 vals = set([file_info[0].get_meta(key)
                             for file_info in self._files_info]
                           )
-                if len(vals) == num_volumes or len(vals) == len(self._files_info):
+                if (len(vals) == num_volumes  or 
+                    len(vals) == len(self._files_info)):
                     possible_orders.append(key)
-            if len(possible_orders) == 0:
-                raise InvalidStackError("Unable to guess key for sorting the "
-                                        "fourth dimension")
-            
+                    
             #Try out each possible sort order
-            for time_order in possible_orders:
+            for ordering in possible_orders:
                 #Update sorting tuples
                 for idx in xrange(len(self._files_info)):
                     nii_wrp, curr_tuple = self._files_info[idx] 
                     self._files_info[idx] = (nii_wrp, 
-                                             (curr_tuple[0], 
-                                              nii_wrp[time_order],
-                                              curr_tuple[2]
+                                             (nii_wrp[ordering],
+                                              curr_tuple[0]
                                              )
                                             )
                                                
-                #Check the order
+                #Sort and check the order
                 try:
-                    self._chk_order(slice_positions,
-                                    files_per_vol, 
-                                    num_volumes, 
-                                    num_time_points, 
-                                    num_vec_comps)
+                    self._sort_and_chk_order(slice_positions,
+                                             files_per_vol, 
+                                             num_volumes, 
+                                             [num_volumes],
+                                             None
+                                            )
                 except InvalidStackError:
                     pass
                 else:
                     break
             else:
-                raise InvalidStackError("Unable to guess key for sorting the "
-                                        "fourth dimension")
-        else: #If at least on sort key was specified, just check the order
-            self._chk_order(slice_positions,
-                            files_per_vol, 
-                            num_volumes, 
-                            num_time_points, 
-                            num_vec_comps)
+                raise InvalidStackError("Unable to guess key for sorting "
+                                        "last dimension")
+        else:
+            #If there are extra-spatital dimensions we must determine their
+            #size
+            if not self._dim_orderings is None:
+                #We can infer the size of one dimension from the number of 
+                #(hyper) volumes plus the size of any other extra dimensions.
+                #If there are other extra dimensions, their size must be equal 
+                #to the number of unique values for their sorting key
+                extra_dim_sizes = [len(vals) for vals in self._dim_order_vals]
+                if len(extra_dim_sizes) == 1:
+                    inferred_dim = 0
+                    extra_dim_sizes = [num_volumes]
+                else:
+                    #If there is one value per volume or per file it must be 
+                    #the inferred one
+                    inferred_dim = None
+                    inferred_size = num_volumes
+                    for dim_idx, dim_size in enumerate(extra_dim_sizes):
+                        if (dim_size == per_volume or 
+                            dim_size == len(self._files_info)):
+                            if not inferred_dim is None:
+                                raise InvalidStackError("Cannot infer the "
+                                    "size of more than one extra spatial "
+                                    "dimension")
+                            inferred_dim = dim_idx
+                        else:
+                            inferred_size /= dim_size
+                        extra_dim_sizes[inferred_dim] = inferred_size
+            else:
+                extra_dim_sizes = []
+                inferred_dim = None
+                
+            #Sort the files and check if the ordering is valid
+            self._sort_and_chk_order(slice_positions,
+                                     files_per_vol, 
+                                     num_volumes, 
+                                     extra_dim_sizes,
+                                     inferred_dim
+                                    )
         
         #Stack appears to be valid, build the shape tuple
         file_shape = self._files_info[0][0].nii_img.get_shape()
         vol_shape = list(file_shape)
         if files_per_vol > 1:
             vol_shape[2] = files_per_vol 
-        shape = vol_shape+ [num_time_points, num_vec_comps]
-        if shape[4] == 1:
-            shape = shape[:-1]
-            if shape[3] == 1:
+        shape = vol_shape + extra_dim_sizes
+        
+        #Strip trailing singular dimensions
+        for dim_idx in xrange(len(shape)-1, 2, -1):
+            if shape[dim_idx] == 1:
                 shape = shape[:-1]
-        self._shape = tuple(shape)
-            
+            else:
+                break
+        
+        #Cache the result
+        self._shape = tuple(shape)          
         self._shape_dirty = False
         return self._shape
 
@@ -551,37 +596,42 @@ class DicomStack(object):
         InvalidStackError
             The stack is incomplete or invalid.
         '''
-        #Create a numpy array for storing the voxel data
+        #Create an array for storing the voxel data
         stack_shape = self.get_shape()
-        stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
-        vox_array = np.empty(stack_shape, np.int16)        
+        vox_array = np.empty(stack_shape, 
+                             self._files_info[0][0].nii_img.get_data_dtype())        
         
-        #Fill the array with data
-        n_vols = 1
-        if len(stack_shape) > 3:
-            n_vols *= stack_shape[3]
-        if len(stack_shape) > 4:
-            n_vols *= stack_shape[4]
+        #Figure out files per volume, file shape/n_dims, etc
+        n_vols = get_n_vols(stack_shape)
         files_per_vol = len(self._files_info) / n_vols
         file_shape = self._files_info[0][0].nii_img.get_shape()
-        for vec_idx in range(stack_shape[4]):
-            for time_idx in range(stack_shape[3]):
-                if files_per_vol == 1 and file_shape[2] != 1:
-                    file_idx = vec_idx*(stack_shape[3]) + time_idx
-                    vox_array[:, :, :, time_idx, vec_idx] = \
-                        self._files_info[file_idx][0].nii_img.get_data()
-                else:
-                    for slice_idx in range(files_per_vol):
-                        file_idx = (vec_idx*(stack_shape[3]*stack_shape[2]) + 
-                                    time_idx*(stack_shape[2]) + slice_idx)
-                        vox_array[:, :, slice_idx, time_idx, vec_idx] = \
-                            self._files_info[file_idx][0].nii_img.get_data()[:, :, 0]
+        file_n_dims = len(file_shape)
         
-        #Trim unused time/vector dimensions
-        if stack_shape[4] == 1:
-            vox_array = vox_array[...,0]
-            if stack_shape[3] == 1:
-                vox_array = vox_array[...,0]
+        #If the file data is 2D we need to account for singular last dimension
+        src_idx = [slice(None) for _ in xrange(file_n_dims)]
+        if file_n_dims == 3 and file_shape[2] == 1:
+            file_n_dims = 2
+            src_idx[2] = 0
+            
+        #Number of files for each of the indices we are iterating over
+        files_per_idx = [1]
+        for dim_size in stack_shape[file_n_dims:]:
+            files_per_idx.append(files_per_idx[-1] * dim_size)
+            
+        #We iterate over any dimensions higher than the file's dimensions, 
+        #copying a file's data on each iteration
+        idx_iters = ([[slice(None)]
+                      for _ in xrange(file_n_dims)
+                     ] + 
+                     [xrange(dim_size) 
+                      for dim_size in stack_shape[file_n_dims:]
+                     ]
+                    )
+        for dest_idx in it.product(*idx_iters):
+            file_idx = sum(dest_idx[file_n_dims + dim] * files_per_idx[dim] 
+                           for dim in xrange(len(stack_shape) - file_n_dims))
+            nii_img = self._files_info[file_idx][0].nii_img
+            vox_array[dest_idx] = nii_img.get_data()[src_idx]
         
         return vox_array
         
@@ -600,11 +650,7 @@ class DicomStack(object):
         '''
         #Figure out the number of three (or two) dimensional volumes
         shape = self.get_shape()
-        n_vols = 1
-        if len(shape) > 3:
-            n_vols *= shape[3]
-        if len(shape) > 4:
-            n_vols *= shape[4]
+        n_vols = get_n_vols(shape)
         
         #Figure out the number of files in each volume
         files_per_vol = len(self._files_info) / n_vols
@@ -642,13 +688,8 @@ class DicomStack(object):
         data = self.get_data()
         affine = self.get_affine()
         
-        #Figure out the number of three (or two) dimensional volumes
-        n_vols = 1
-        if len(data.shape) > 3:
-            n_vols *= data.shape[3]
-        if len(data.shape) > 4:
-            n_vols *= data.shape[4]
-        
+        #Figure out the number of 2D/3D volumes and files per volume
+        n_vols = get_n_vols(data.shape)
         files_per_vol = len(self._files_info) / n_vols 
         
         #Reorder the voxel data if requested
