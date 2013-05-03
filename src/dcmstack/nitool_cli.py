@@ -3,7 +3,7 @@ Command line interface for nitool.
 
 @author: moloney
 """
-import os, sys, argparse
+import os, sys, argparse, json
 import nibabel as nb
 from .dcmmeta import NiftiWrapper, DcmMetaExtension, MissingExtensionError
 
@@ -154,7 +154,7 @@ def merge(args):
 def dump(args):
     src_nii = nb.load(args.src_nii[0])
     src_wrp = NiftiWrapper(src_nii, args.make_empty)
-    meta_str = src_wrp.meta_ext.to_json()
+    meta_str = json.dumps(src_wrp.meta_ext, indent=4)
     args.dest_json.write(meta_str)
     args.dest_json.write('\n')
     

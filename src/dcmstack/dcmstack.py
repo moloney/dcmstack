@@ -775,41 +775,27 @@ class DicomStack(object):
                 
         #Embed the meta data extension if requested
         if embed_meta:
-            #Build meta data for each volume if needed
-            vol_meta = []
+            #Iteratively merge meta along each dimension from smallest to 
+            #largest
             if files_per_vol > 1:
-                for vol_idx in xrange(n_vols):
-                    start_slice = vol_idx * n_slices
-                    end_slice = start_slice + n_slices
-                    exts = [file_info[0].meta_ext
-                            for file_info in self._files_info[start_slice:end_slice]]
-                    meta = DcmMeta.from_sequence(exts, 2)
-                    vol_meta.append(meta)
+                start_dim = 2
             else:
-                vol_meta = [file_info[0].meta_ext 
-                            for file_info in self._files_info]
-                            
-            #Build meta data for each time point / vector component
-            if len(data.shape) == 5:
-                if data.shape[3] != 1:
-                    vec_meta = []
-                    for vec_idx in xrange(data.shape[4]):
-                        start_idx = vec_idx * data.shape[3]
-                        end_idx = start_idx + data.shape[3]
-                        meta = DcmMeta.from_sequence(\
-                            vol_meta[start_idx:end_idx], 3)
-                        vec_meta.append(meta)
-                else:
-                    vec_meta = vol_meta
-                        
-                meta_ext = DcmMeta.from_sequence(vec_meta, 4)
-            elif len(data.shape) == 4:
-                meta_ext = DcmMeta.from_sequence(vol_meta, 3)
-            else:
-                meta_ext = vol_meta[0]
-                if meta_ext is file_info[0].meta_ext:
-                    meta_ext = deepcopy(meta_ext)
-                    
+                start_dim = len(self._files_info[0][0].nii_img.get_shape())
+            end_dim = len(data.shape)
+            exts = [file_info[0].meta_ext for file_info in self._files_info]
+            for merge_dim in xrange(start_dim, end_dim):
+                seq_size = data.shape[merge_dim]
+                n_seqs = len(exts) / seq_size
+                merged = []
+                for seq_idx in xrange(n_seqs):
+                    start = seq_idx * seq_size
+                    end = start + seq_size
+                    merged.append(DcmMeta.from_sequence(exts[start:end], 
+                                                        merge_dim)
+                                 )
+                exts = merged
+            meta_ext = exts[0] 
+            
             meta_ext.shape = data.shape
             meta_ext.slice_dim = slice_dim
             meta_ext.affine = nifti_header.get_best_affine()
