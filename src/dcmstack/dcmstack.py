@@ -417,10 +417,10 @@ class DicomStack(object):
         for dim_size in extra_dim_sizes[:-1]:
             files_per_idx.append(files_per_idx[-1] * dim_size)
         
-        #For any extra dims whose size is not inferred, sorting value should 
-        #be constant for each index
+        #For any extra dims whose size is not inferred or singular, sorting 
+        #value should be constant for each index
         for dim, dim_size in enumerate(extra_dim_sizes):
-            if inferred_dim is None or dim == inferred_dim:
+            if inferred_dim is None or dim == inferred_dim or dim_size == 1:
                 continue
             for dim_idx in xrange(dim_size):
                 start_idx = dim_idx * files_per_idx[dim]
@@ -485,7 +485,7 @@ class DicomStack(object):
         num_volumes = len(self._files_info) / files_per_vol
         
         #If we are joining files along an extra-spatial dim and no ordering is 
-        #specified, we try to guess 
+        #specified, we try to guess how to order along that dim
         if num_volumes > 1 and self._dim_orderings is None:
             extra_dim_sizes = [num_volumes]
             
@@ -495,20 +495,21 @@ class DicomStack(object):
                 vals = set([file_info[0].get_meta(key)
                             for file_info in self._files_info]
                           )
-                if (len(vals) == num_volumes  or 
-                    len(vals) == len(self._files_info)):
+                #Need at least as many values as volumes for a unique ordering
+                if len(vals) >= num_volumes:
                     possible_orders.append(key)
                     
             #Try out each possible sort order
             for ordering in possible_orders:
-                #Update sorting tuples
+                #Update sorting tuples, make sure they are unique
+                self._sorting_tuples = set()
                 for idx in xrange(len(self._files_info)):
                     nii_wrp, curr_tuple = self._files_info[idx] 
-                    self._files_info[idx] = (nii_wrp, 
-                                             (nii_wrp[ordering],
-                                              curr_tuple[0]
-                                             )
-                                            )
+                    new_tuple = (nii_wrp[ordering], curr_tuple[0])
+                    if new_tuple in self._sorting_tuples:
+                        continue
+                    self._sorting_tuples.add(new_tuple)
+                    self._files_info[idx] = (nii_wrp, new_tuple)
                                                
                 #Sort and check the order
                 try:
@@ -516,7 +517,7 @@ class DicomStack(object):
                                              files_per_vol, 
                                              num_volumes, 
                                              [num_volumes],
-                                             None
+                                             0
                                             )
                 except InvalidStackError:
                     pass
@@ -526,33 +527,34 @@ class DicomStack(object):
                 raise InvalidStackError("Unable to guess key for sorting "
                                         "last dimension")
         else:
-            #If there are extra-spatital dimensions we must determine their
-            #size
-            if not self._dim_orderings is None:
-                #We can infer the size of one dimension from the number of 
-                #(hyper) volumes plus the size of any other extra dimensions.
-                #If there are other extra dimensions, their size must be equal 
-                #to the number of unique values for their sorting key
+            #If there are extra-spatital dimensions and the order is defined 
+            #we must determine their size
+            if not self._dim_orderings is None and num_volumes > 1:
+                #We can infer the size of the first additional extra-spatial
+                #dimension from the number of (hyper) volumes plus the size of 
+                #any other extra dimensions. If there are other extra 
+                #dimensions, their size must be equal to the number of unique 
+                #values for their sorting key
                 extra_dim_sizes = [len(vals) for vals in self._dim_order_vals]
-                if len(extra_dim_sizes) == 1:
-                    inferred_dim = 0
-                    extra_dim_sizes = [num_volumes]
+                n_non_single = 0
+                first_non_single = None
+                for dim_idx, dim_size in enumerate(extra_dim_sizes):
+                    if dim_size != 1:
+                        if first_non_single is None:
+                            first_non_single = dim_idx
+                        n_non_single += 1
+                if n_non_single == 1:
+                    extra_dim_sizes[first_non_single] = num_volumes
+                    inferred_dim = first_non_single
                 else:
-                    #If there is one value per volume or per file it must be 
-                    #the inferred one
-                    inferred_dim = None
-                    inferred_size = num_volumes
-                    for dim_idx, dim_size in enumerate(extra_dim_sizes):
-                        if (dim_size == per_volume or 
-                            dim_size == len(self._files_info)):
-                            if not inferred_dim is None:
-                                raise InvalidStackError("Cannot infer the "
-                                    "size of more than one extra spatial "
-                                    "dimension")
-                            inferred_dim = dim_idx
-                        else:
-                            inferred_size /= dim_size
-                        extra_dim_sizes[inferred_dim] = inferred_size
+                    #If the first dim has as many or more values than volumes 
+                    #it must be inferred
+                    if extra_dim_sizes[first_non_single] >= num_volumes:
+                        extra_dim_sizes[first_non_single] = num_volumes
+                        inferred_dim = first_non_single
+                        for dim_size in extra_dim_sizes[first_non_single + 1:]:
+                            extra_dim_sizes[first_non_single] /= dim_size
+                
             else:
                 extra_dim_sizes = []
                 inferred_dim = None
@@ -598,8 +600,14 @@ class DicomStack(object):
         '''
         #Create an array for storing the voxel data
         stack_shape = self.get_shape()
-        vox_array = np.empty(stack_shape, 
-                             self._files_info[0][0].nii_img.get_data_dtype())        
+        stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
+        #This is a hack to keep fslview happy, It seems unlikely it will cause 
+        #problems, but in theory some scaling could have been applied that 
+        #will cause this to overflow.
+        #TODO: Consider an alternative approach
+        if stack_dtype == np.uint16:
+            stack_dtype = np.int16
+        vox_array = np.empty(stack_shape, dtype=stack_dtype)        
         
         #Figure out files per volume, file shape/n_dims, etc
         n_vols = get_n_vols(stack_shape)
@@ -784,7 +792,10 @@ class DicomStack(object):
             end_dim = len(data.shape)
             exts = [file_info[0].meta_ext for file_info in self._files_info]
             for merge_dim in xrange(start_dim, end_dim):
-                seq_size = data.shape[merge_dim]
+                if merge_dim < 3 :
+                    seq_size = data.shape[slice_dim]
+                else:
+                    seq_size = data.shape[merge_dim]
                 n_seqs = len(exts) / seq_size
                 merged = []
                 for seq_idx in xrange(n_seqs):

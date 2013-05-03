@@ -148,7 +148,7 @@ def test_image_collision():
                          '2D_16Echo_qT2', 
                          'TE_20_SlcPos_-33.707626341697.dcm')
     dcm = dicom.read_file(dcm_path)
-    stack = dcmstack.DicomStack('EchoTime')
+    stack = dcmstack.DicomStack(['EchoTime'])
     stack.add_dcm(dcm)
     assert_raises(dcmstack.ImageCollisionError,
                   stack.add_dcm,
@@ -227,18 +227,10 @@ class TestInvalidStack(object):
         self._chk()
         
     def test_wrong_number_of_files(self):
-        self.stack = dcmstack.DicomStack(time_order='EchoTime')
+        self.stack = dcmstack.DicomStack(['EchoTime'])
         self.stack.add_dcm(self.inputs[0])
         self.stack.add_dcm(self.inputs[1])
         self.stack.add_dcm(self.inputs[2])
-        self._chk()
-        
-    def test_vector_var_over_vol(self):
-        self.stack = dcmstack.DicomStack(vector_order='EchoTime')
-        self.stack.add_dcm(self.inputs[0])
-        self.stack.add_dcm(self.inputs[1])
-        self.stack.add_dcm(self.inputs[2])
-        self.stack.add_dcm(self.inputs[3])
         self._chk()
                                 
 class TestGetShape(object):
@@ -269,7 +261,7 @@ class TestGetShape(object):
         eq_(shape, (192, 192, 2))
         
     def test_four_dim(self):
-        stack = dcmstack.DicomStack(time_order='EchoTime')
+        stack = dcmstack.DicomStack(['EchoTime'])
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
@@ -278,7 +270,7 @@ class TestGetShape(object):
         eq_(shape, (192, 192, 2, 2))
         
     def test_five_dim(self):
-        stack = dcmstack.DicomStack(vector_order='EchoTime')
+        stack = dcmstack.DicomStack([None, 'EchoTime'])
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
@@ -368,7 +360,7 @@ class TestGetData(object):
             'ec60d148734916bb05aa7d73cc76bd0777560518da86d1ac5aa93c8f151cf73f')
             
     def test_four_dim(self):
-        stack = dcmstack.DicomStack(time_order='EchoTime')
+        stack = dcmstack.DicomStack(['EchoTime'])
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
@@ -379,7 +371,7 @@ class TestGetData(object):
             'c14d3a8324bdf4b85be05d765c0864b4e2661d7aa716adaf85a28b4102e1992b')
             
     def test_five_dim(self):
-        stack = dcmstack.DicomStack(vector_order='EchoTime')
+        stack = dcmstack.DicomStack([None, 'EchoTime'])
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
@@ -504,7 +496,7 @@ class TestToNifti(object):
         self._chk(nii, 'single_vol_SAR')   
         
     def test_two_time_vol(self):
-        stack = dcmstack.DicomStack(time_order='EchoTime')
+        stack = dcmstack.DicomStack(['EchoTime'])
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
@@ -513,7 +505,7 @@ class TestToNifti(object):
         self._chk(nii, 'two_time_vol')
         
     def test_two_vector_vol(self):
-        stack = dcmstack.DicomStack(vector_order='EchoTime')
+        stack = dcmstack.DicomStack([None, 'EchoTime'])
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
