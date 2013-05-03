@@ -12,8 +12,8 @@ from .dcmmeta import NiftiWrapper
 from . import extract
 
 
-prog_descrip = """Stack DICOM files from each source directory into 2D to 5D 
-volumes, optionally extracting meta data.
+prog_descrip = """Stack DICOM files from each source directory into 
+multi-dimensional volumes, optionally extracting meta data.
 
 Arguments accepting DICOM tags should be in the format '0x0_0x0'. More than 
 one tag can be given in a comma seperated list.

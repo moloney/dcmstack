@@ -54,21 +54,17 @@ an appropriate format string for the available meta data. Generally this
 will be the 'SeriesNumber' followed by the 'ProtocolName' or 
 'SeriesDescription' (or just the word "series").
 
-Ordering Time and Vector Dimensions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Ordering Extra-Spatial Dimensions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In addition to the three spatial dimensions, Nifti images can have time and 
-(less commonly) vector dimensions. By default, the software will try to 
-guess the appropriate meta data key for sorting the time dimension. If you 
-would like to specify the meta data key, or stack along the vector 
-dimension, you can do so with the *--time-var* (*-t*) and 
-*--vector-var* (*-v*) options. Both options take a meta data key as an 
-argument.
-
-If there isn't an attribute that can be used with a simple ascending order to 
-sort along these dimensions, the *--time-order* or *--vector-order* options 
-can be used. The argument to the option should be a text file with one value 
-per line corresponding to the sorted order to use. 
+In addition to the three spatial dimensions, Nifti images can have as 
+many as four extra-spatial dimensions (a maximum of seven dimensions 
+total). By default, the software will try to guess the appropriate meta 
+data key for sorting one extra-spatial dimension if needed. If you 
+would like to specify the meta data key, or stack along more than one 
+extra-spatial dimension, you can do so with the *--sort-order* (*-s*) 
+option. This option takes one or more meta data keys (comma seperated) 
+as an rgument.
 
 Creating Uncompressed Niftis
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -86,11 +82,6 @@ identify them as a DICOM file. It is not uncommon to come across files that are
 missing this preamble but are otherwise valid (generally due to bad software). 
 You can force dcmstack to try to read these files using the *--force-read* 
 option.
-
-With some data sets (generally EPI) slices can be missing their pixel data due 
-to an error in the reconstruction. Using the *--allow-dummies* option will 
-allow these files and fill the corresponding slice with the maximum possible 
-value (i.e. 65535 for uint16).
 
 Voxel Order
 ^^^^^^^^^^^
@@ -175,7 +166,7 @@ and values. For example, to set a globally constant element with the key
 
 .. code-block:: console
     
-    $ nitool inject 032-MPRAGE_AX_TI900_Pre.nii.gz global const PatientID Subject_001
+    $ nitool inject 032-MPRAGE_AX_TI900_Pre.nii.gz const PatientID Subject_001
 
 
 

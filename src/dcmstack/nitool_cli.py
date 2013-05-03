@@ -84,7 +84,7 @@ def main(argv=sys.argv):
     inject_help = "Inject meta data into the JSON extension."
     inject_parser = sub_parsers.add_parser('inject', help=inject_help)
     inject_parser.add_argument('dest_nii', nargs=1)
-    inject_parser.add_argument('classification', nargs=2)
+    inject_parser.add_argument('classification', nargs=1)
     inject_parser.add_argument('key', nargs=1)
     inject_parser.add_argument('values', nargs='+')
     inject_parser.add_argument('-f', '--force-overwrite', 
@@ -110,9 +110,7 @@ def split(args):
         src_wrp = NiftiWrapper(src_nii, make_empty=True)
     for split_idx, split in enumerate(src_wrp.split(args.dimension)):
         if args.output_format:
-            out_name = (args.output_format % 
-                        split.meta_ext.get_class_dict(('global', 'const'))
-                       )
+            out_name = (args.output_format % split.meta_ext['const'])
         else:
             out_name = os.path.join(src_dir, '%03d-%s' % (split_idx, src_fn))
         nb.save(split, out_name)
@@ -146,8 +144,7 @@ def merge(args):
     if args.clear_slices:
         result_wrp.meta_ext.clear_slice_meta()
         
-    out_name = (args.output[0] % 
-                result_wrp.meta_ext.get_class_dict(('global', 'const')))
+    out_name = (args.output[0] % result_wrp.meta_ext['const'])
     result_wrp.to_filename(out_name)  
     return 0 
     
@@ -212,27 +209,25 @@ def convert_values(values):
 def inject(args):
     dest_nii = nb.load(args.dest_nii[0])
     dest_wrp = NiftiWrapper(dest_nii, make_empty=True)
-    classification = tuple(args.classification)
+    classification = args.classification[0]
     if not classification in dest_wrp.meta_ext.get_valid_classes():
-        print "Invalid classification: %s" % (classification,)
+        print "Invalid classification: %s" % classification
         return 1
     n_vals = len(args.values)
-    mult = dest_wrp.meta_ext.get_multiplicity(classification)
+    mult = dest_wrp.meta_ext.get_n_vals(classification)
     if n_vals != mult:
         print ("Invalid number of values for classification. Expected "
                "%d but got %d") % (mult, n_vals)
         return 1
     key = args.key[0]
-    if key in dest_wrp.meta_ext.get_keys():
+    if key in dest_wrp.meta_ext.get_all_keys():
         if not args.force_overwrite:
             print "Key already exists, must pass --force-overwrite"
             return 1
         else:
             curr_class = dest_wrp.meta_ext.get_classification(key)
-            curr_dict = dest_wrp.meta_ext.get_class_dict(curr_class)
-            del curr_dict[key]
-    class_dict = dest_wrp.meta_ext.get_class_dict(classification)
-    class_dict[key] = convert_values(args.values)
+            del dest_wrp.meta_ext[curr_class][key]
+    dest_wrp.meta_ext[classification][key] = convert_values(args.values)
     nb.save(dest_nii, args.dest_nii[0])
     return 0
     

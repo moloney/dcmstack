@@ -33,7 +33,8 @@ The software consists of the python package (*dcmstack*) with two command
 line interfaces (*dcmstack* and *nitool*).
 
 It is recommended that you sort your DICOM data into directories (at least 
-per study, but perferably by series) before conversion.
+per study, but perferably by series) before conversion. This will reduce 
+the amount of memory required for conversion.
 
 To convert directories of DICOM data from the command line you generally 
 just need to pass the directories to *dcmstack*:
