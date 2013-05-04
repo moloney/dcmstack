@@ -35,23 +35,24 @@ Any keyword arguments for the *DicomStack* constructor can also be passed
 to *parse_and_stack*.
 
 
-Specifying Time and Vector Order
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Ordering Extra-Spatial Dimensions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-By default, if there is more than one 3D volume in the stack the software 
-will try to guess the meta key to sort the fourth (time) dimension. To 
-specify the meta data key for the fourth dimension or stack along the fifth 
-(vector) dimension, use the *time_order* and *vector_order* arguments to the 
-*DicomStack* constructor. 
+By default, if the files are being stacked along a single extra-spatial 
+dimension the software will try to guess the correct ordering. If you 
+want to explicitly specify the meta data key to use for ordering along 
+this dimension, or stack along more than one extra-spatial dimension, 
+you can specify a list of meta data keys as the *dim_orderings* 
+argument to the *DicomStack* constructor. 
 
 Grouping Datasets
 ^^^^^^^^^^^^^^^^^
 
 The *parse_and_stack* function groups data sets using a tuple of meta data 
 keys provided as the argument *group_by*. The default values should group 
-datasets from the same series into the same stack. The result is a 
-dictionary where the keys are the matching tuples of meta data values, and 
-the values are the are the corresponding stacks.
+datasets from the same series and slice direction into the same stack. 
+The result is a dictionary where the keys are the matching tuples of 
+meta data values, and the values are the are the corresponding stacks.
 
 Using DicomStack Objects
 ------------------------
@@ -69,9 +70,10 @@ Embedding Meta Data
 ^^^^^^^^^^^^^^^^^^^
 
 The meta data from the source DICOM data sets can be summarized into a 
-*DcmMetaExtension* which is embeded into the Nifti header. To do this you can 
-either pass True for the *embed_meta* parameter to *DicomStack.to_nifti* or 
-you can immediately get a *NiftiWrapper* with *DicomStack.to_nifti_wrapper*.
+*DcmMeta* object which can be embeded into the Nifti header using a 
+*DcmMetaExtension* object. To do this you can either pass True for the 
+*embed_meta* parameter to *DicomStack.to_nifti* or you can immediately 
+get a *NiftiWrapper* with *DicomStack.to_nifti_wrapper*.
 
 By default the meta data is filtered to reduce the chance of including 
 private health information.  This filtering can be controlled with the 
@@ -110,7 +112,7 @@ Using NiftiWrapper Objects
 
 The *NiftiWrapper* objects have attribute *nii_img* pointing to the 
 *Nifti1Image* being wrapped and the attribute *meta_ext* pointing to the 
-*DcmMetaExtension*. There are also a number of methods for working with 
+*DcmMeta* object. There are also a number of methods for working with 
 the image data and meta data together. For example merging or splitting 
 the data set along the time axis.
 
@@ -195,7 +197,4 @@ extension directly.
     >>> print nw.meta_ext.get_values('EchoTime')
     [11.0, 87.0]
     >>> print nw.meta_ext.get_classification('EchoTime')
-    ('time', 'samples')
-    
-    
-    
+    'per_volume'

@@ -261,6 +261,9 @@ class DcmMeta(OrderedDict):
                     result.append('per_sample_%d' % dim_idx)
         if n_extra_spatial >= 1:
             result.append('per_volume')
+        #TODO: This probably shouldn't be included if there is only one 
+        #slice and no extra spatial dimensions. It wouldn't be valid to have 
+        #any meta data with the 'per_slice' classification in this case
         result.append('per_slice')
         return tuple(result)
 
