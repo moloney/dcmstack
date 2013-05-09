@@ -146,17 +146,17 @@ class TestCheckValid(object):
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_invalid_affine(self):
-        self.ext['dcmmeta_affine'] = np.eye(3).tolist()
+        self.ext['meta']['affine'] = np.eye(3).tolist()
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_invalid_slice_dim(self):
-        self.ext['dcmmeta_slice_dim'] = 3
+        self.ext['meta']['slice_dim'] = 3
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
-        self.ext['dcmmeta_slice_dim'] = -1
+        self.ext['meta']['slice_dim'] = -1
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_invalid_shape(self):
-        self.ext['dcmmeta_shape'] = [2, 2]
+        self.ext['meta']['shape'] = [2, 2]
         assert_raises(dcmmeta.InvalidExtensionError, self.ext.check_valid)
         
     def test_multiple_classes(self):

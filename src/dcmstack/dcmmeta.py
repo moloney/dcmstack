@@ -36,11 +36,7 @@ _req_base_keys_map= {0.5 : set(('dcmmeta_affine',
                                 'global',
                                 )
                                ),
-                     0.7 : set(('dcmmeta_affine',
-                                'dcmmeta_reorient_transform',
-                                'dcmmeta_slice_dim',
-                                'dcmmeta_shape',
-                                'dcmmeta_version',
+                     0.7 : set(('meta',
                                 'const',
                                 'per_slice',
                                )
@@ -141,6 +137,11 @@ class DcmMeta(OrderedDict):
             extension
         '''
         super(DcmMeta, self).__init__()
+
+        #Create nested dict for storing "meta meta" data
+        self['meta'] = OrderedDict()
+        
+        #Set all of the "meta meta" data
         self.shape = shape
         self.affine = affine
         self.reorient_transform = reorient_transform
@@ -155,31 +156,31 @@ class DcmMeta(OrderedDict):
     def affine(self):
         '''The affine associated with the meta data. If this differs from the 
         image affine, the per-slice meta data will not be used. '''
-        return np.array(self['dcmmeta_affine'])
+        return np.array(self['meta']['affine'])
         
     @affine.setter
     def affine(self, value):
         if value.shape != (4, 4):
             raise ValueError("Invalid shape for affine")
-        self['dcmmeta_affine'] = value.tolist()
+        self['meta']['affine'] = value.tolist()
         
     @property
     def slice_dim(self):
         '''The index of the slice dimension associated with the per-slice 
         meta data.'''
-        return self['dcmmeta_slice_dim']
+        return self['meta']['slice_dim']
     
     @slice_dim.setter
     def slice_dim(self, value):
         if not value is None and not (0 <= value < 3):
             raise ValueError("The slice dimension must be in the range [0,3)")
-        self['dcmmeta_slice_dim'] = value
+        self['meta']['slice_dim'] = value
     
     @property
     def shape(self):
         '''The shape of the data associated with the meta data. Defines the 
         number of values for the meta data classifications.'''
-        return tuple(self['dcmmeta_shape'])
+        return tuple(self['meta']['shape'])
     
     @shape.setter
     def shape(self, value):
@@ -187,7 +188,7 @@ class DcmMeta(OrderedDict):
             raise ValueError("There must be at least two dimensions")
         if len(value) == 2:
             value = value + (1,)
-        self['dcmmeta_shape'] = value
+        self['meta']['shape'] = value
     
     @property
     def reorient_transform(self):
@@ -196,9 +197,9 @@ class DcmMeta(OrderedDict):
         needed) into the same space as the affine.'''
         if self.version < 0.6:
             return None
-        if self['dcmmeta_reorient_transform'] is None:
+        if self['meta']['reorient_transform'] is None:
             return None
-        return np.array(self['dcmmeta_reorient_transform'])
+        return np.array(self['meta']['reorient_transform'])
         
     @reorient_transform.setter
     def reorient_transform(self, value):
@@ -206,19 +207,19 @@ class DcmMeta(OrderedDict):
             raise ValueError("The reorient_transform must be none or (4,4) "
             "array")
         if value is None:
-            self['dcmmeta_reorient_transform'] = None
+            self['meta']['reorient_transform'] = None
         else:
-            self['dcmmeta_reorient_transform'] = value.tolist()
+            self['meta']['reorient_transform'] = value.tolist()
             
     @property
     def version(self):
         '''The version of the meta data extension.'''
-        return self['dcmmeta_version']
+        return self['meta']['version']
         
     @version.setter
     def version(self, value):
         '''Set the version of the meta data extension.'''
-        self['dcmmeta_version'] = value
+        self['meta']['version'] = value
         
     @property
     def slice_normal(self):
