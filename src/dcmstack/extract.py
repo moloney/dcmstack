@@ -4,7 +4,6 @@ Extract meta data from a DICOM data set.
 import struct, warnings
 from collections import namedtuple, defaultdict
 import dicom
-from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
 from .dcmstack import DicomStack
 try:
@@ -12,9 +11,21 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
+# Use keyword_for_tag if available, otherwise use compatibility function
+try: # importable from pydicom >= 0.9.7
+    from dicom.datadict import keyword_for_tag
+except ImportError:
+    def keyword_for_tag(tag):
+        names = dicom.datadict.AllNamesForTag(tag)
+        return names[0]
+
 #This is needed to allow extraction on files with invalid values (e.g. too 
 #long of a decimal string)
-dicom.config.enforce_valid_values = False
+try: # Available from pydicom >= 0.9.7
+    dicom.config.enforce_valid_values = False
+except AttributeError:
+    pass
+
 
 def ignore_private(elem):
     '''Ignore rule for `MetaExtractor` to skip private DICOM elements (odd 
