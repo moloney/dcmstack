@@ -346,7 +346,7 @@ class MetaExtractor(object):
         if elem.VR in unpack_vr_map and isinstance(elem.value, str):
             if elem.VM == 1:
                 num_elem = len(elem.value)/struct.calcsize(unpack_vr_map[elem.VR])
-                return struct.unpack(unpack_vr_map[elem.VR]*num_elem, elem.value)[0]
+                return struct.unpack(unpack_vr_map[elem.VR]*num_elem, elem.value)[:num_elem]
             else:
                 return list(struct.unpack(unpack_vr_map[elem.VR], elem.value))
         
