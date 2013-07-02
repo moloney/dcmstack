@@ -756,7 +756,13 @@ class DicomStack(object):
         #Create a numpy array for storing the voxel data
         stack_shape = self.get_shape()
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
-        vox_array = np.empty(stack_shape, np.int16)        
+        stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
+        #This is a hack to keep fslview happy, Shouldn't cause issues as the 
+        #original data should be 12-bit and any scaling will result in float 
+        #data
+        if stack_dtype == np.uint16:
+            stack_dtype = np.int16
+        vox_array = np.empty(stack_shape, dtype=stack_dtype)        
         
         #Fill the array with data
         n_vols = 1
