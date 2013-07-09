@@ -90,6 +90,8 @@ def main(argv=sys.argv):
                            'The directions in patient space should be given '
                            'as a three character code: (l)eft, (r)ight, '
                            '(a)nterior, (p)osterior, (s)uperior, (i)nferior. '
+                           'Passing an empty string will disable '
+                           'reorientation. '
                            'Default: %(default)s'))
     stack_opt.add_argument('-t', '--time-var', default=None,
                            help=('The DICOM tag to use for ordering the stack '

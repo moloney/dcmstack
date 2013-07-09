@@ -836,7 +836,8 @@ class DicomStack(object):
         ----------
         voxel_order : str
             A three character string repsenting the voxel order in patient 
-            space (see the function `reorder_voxels`).
+            space (see the function `reorder_voxels`). Can be None or an empty 
+            string to disable reorientation.
             
         embed_meta : bool
             If true a dcmmeta.DcmMetaExtension will be embedded in the Nifti 
