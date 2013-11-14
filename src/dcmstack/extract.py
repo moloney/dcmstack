@@ -343,22 +343,36 @@ class MetaExtractor(object):
         
     def _get_elem_value(self, elem):
         '''Get the value for any non-translated elements'''
+        #If the VR is implicit, we may need to unpack the values from a byte 
+        #string. This may require us to make an assumption about whether the 
+        #value is signed or not, but this is unavoidable.
         if elem.VR in unpack_vr_map and isinstance(elem.value, str):
-            if elem.VM == 1:
-                return struct.unpack(unpack_vr_map[elem.VR], elem.value)[0]
+            n_vals = len(elem.value)/struct.calcsize(unpack_vr_map[elem.VR])
+            if n_vals != elem.VM:
+                warnings.warn("The element's VM and the number of values do "
+                              "not match.")
+            if n_vals == 1:
+                value = struct.unpack(unpack_vr_map[elem.VR], elem.value)[0]
             else:
-                return list(struct.unpack(unpack_vr_map[elem.VR], elem.value))
-        
-        if elem.VR in self.conversions:
-            if elem.VM == 1:
-                return self.conversions[elem.VR](elem.value)
-            else:
-                return [self.conversions[elem.VR](val) for val in elem.value]
-           
-        if elem.VM == 1:
-            return elem.value
+                value = list(struct.unpack(unpack_vr_map[elem.VR]*n_vals, 
+                                           elem.value)
+                            )
         else:
-            return elem.value[:]
+            #Otherwise, just take a copy if the value is a list
+            n_vals = elem.VM
+            if n_vals > 1:
+                value = elem.value[:]
+            else:
+                value = elem.value
+        
+        #Handle any conversions
+        if elem.VR in self.conversions:
+            if n_vals == 1:
+                value = self.conversions[elem.VR](value)
+            else:
+                value = [self.conversions[elem.VR](val) for val in value]
+           
+        return value
         
     def __call__(self, dcm):
         '''Extract the meta data from a DICOM dataset.
