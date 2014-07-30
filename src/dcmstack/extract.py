@@ -76,8 +76,11 @@ def simplify_csa_dict(csa_dict):
 
 def csa_image_trans_func(elem):
     '''Function for translating the CSA image sub header.'''
-    return simplify_csa_dict(csareader.read(elem.value))
-
+    if elem.name != '[CSA Image Header Info]':
+        csa_dict = {}
+    else:
+        csa_dict = simplify_csa_dict(csareader.read(elem.value))
+    return csa_dict
     
 csa_image_trans = Translator('CsaImage', 
                              dicom.tag.Tag(0x29, 0x1010), 
@@ -192,21 +195,24 @@ def parse_phoenix_prot(prot_key, prot_val):
 
 def csa_series_trans_func(elem):
     '''Function for parsing the CSA series sub header.'''
-    csa_dict = simplify_csa_dict(csareader.read(elem.value))
+    if elem.name != '[CSA Series Header Info]':
+        csa_dict = {}
+    else:
+        csa_dict = simplify_csa_dict(csareader.read(elem.value))
     
-    #If there is a phoenix protocol, parse it and dump it into the csa_dict
-    phx_src = None
-    if 'MrPhoenixProtocol' in csa_dict:
-        phx_src = 'MrPhoenixProtocol'
-    elif 'MrProtocol' in csa_dict:
-        phx_src = 'MrProtocol'
+        #If there is a phoenix protocol, parse it and dump it into the csa_dict
+        phx_src = None
+        if 'MrPhoenixProtocol' in csa_dict:
+            phx_src = 'MrPhoenixProtocol'
+        elif 'MrProtocol' in csa_dict:
+            phx_src = 'MrProtocol'
         
-    if not phx_src is None:
-        phoenix_dict = parse_phoenix_prot(phx_src, csa_dict[phx_src])
-        del csa_dict[phx_src]
-        for key, val in phoenix_dict.iteritems():
-            new_key = '%s.%s' % ('MrPhoenixProtocol', key)
-            csa_dict[new_key] = val
+        if not phx_src is None:
+            phoenix_dict = parse_phoenix_prot(phx_src, csa_dict[phx_src])
+            del csa_dict[phx_src]
+            for key, val in phoenix_dict.iteritems():
+                new_key = '%s.%s' % ('MrPhoenixProtocol', key)
+                csa_dict[new_key] = val
         
     return csa_dict
 
