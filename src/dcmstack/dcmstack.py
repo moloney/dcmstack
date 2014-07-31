@@ -1003,7 +1003,8 @@ class DicomStack(object):
         return NiftiWrapper(self.to_nifti(voxel_order, True))
 
 def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
-                    force=False, warn_on_except=False):
+                    force=False, warn_on_except=False,
+                    close_tests=('ImageOrientationPatient',)):
     '''Parse the given dicom files and group them together. Each group is
     stored as a (list) value in a dict where the key is a tuple of values
     corresponding to the keys in 'group_by'
@@ -1029,6 +1030,10 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         Convert exceptions into warnings, possibly allowing some results to be
         returned.
 
+    close_tests : sequence
+        Any `group_by` key listed here is tested with `numpy.allclose` instead
+        of straight equality when determining group membership.
+
     Returns
     -------
     groups : dict
@@ -1041,6 +1046,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         extractor = default_extractor
 
     results = {}
+    close_elems = {}
     for dcm_path in src_paths:
         #Read the DICOM file
         try:
@@ -1054,19 +1060,53 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
 
         #Extract the meta data and group
         meta = extractor(dcm)
-        key_list = []
+        key_list = [] # Values from group_by elems with equality testing
+        close_list = [] # Values from group_by elems with np.allclose testing
         for grp_key in group_by:
             key_elem = meta.get(grp_key)
             if isinstance(key_elem, list):
                 key_elem = tuple(key_elem)
-            key_list.append(key_elem)
+            if grp_key in close_tests:
+                close_list.append(key_elem)
+            else:
+                key_list.append(key_elem)
+
+        # Initially each key has multiple sub_results (corresponding to
+        # different values of the "close" keys)
         key = tuple(key_list)
         if not key in results:
-            results[key] = []
+            results[key] = [(close_list, [(dcm, meta, dcm_path)])]
+        else:
+            # Look for a matching sub_result
+            for c_list, sub_res in results[key]:
+                for c_idx, c_val in enumerate(c_list):
+                    if not np.allclose(c_val, close_list[c_idx], atol=5e-5):
+                        break
+                else:
+                    sub_res.append((dcm, meta, dcm_path))
+                    break
+            else:
+                # No match found, append another sub result
+                results[key].append((close_list, [(dcm, meta, dcm_path)]))
 
-        results[key].append((dcm, meta, dcm_path))
+    # Unpack sub results, using the canonical value for the close keys
+    full_results = {}
+    for eq_key, sub_res_list in results.iteritems():
+        for close_key, sub_res in sub_res_list:
+            full_key = []
+            eq_idx = 0
+            close_idx = 0
+            for grp_key in group_by:
+                if grp_key in close_tests:
+                    full_key.append(close_key[close_idx])
+                    close_idx += 1
+                else:
+                    full_key.append(eq_key[eq_idx])
+                    eq_idx += 1
+            full_key = tuple(full_key)
+            full_results[full_key] = sub_res
 
-    return results
+    return full_results
 
 def stack_group(group, warn_on_except=False, **stack_args):
     result = DicomStack(**stack_args)
