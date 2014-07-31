@@ -464,7 +464,7 @@ class DicomStack(object):
 
     def _chk_close(self, keys, meta1, meta2):
         for key in keys:
-            if not np.allclose(meta1[key], meta2[key], atol=1e-6):
+            if not np.allclose(meta1[key], meta2[key], atol=5e-5):
                 raise IncongruentImageError("%s is not close to matching" %
                                             key)
 
