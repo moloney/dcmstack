@@ -16,7 +16,9 @@ dicom, csareader = extract.dicom, extract.csareader
 class TestCsa(object):
     def setUp(self):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
+        csa_data_info_fn = path.join(test_dir, 'data', 'extract', 'csa_data_info.dcm')
         self.data = dicom.read_file(data_fn)
+        self.csa_data_info = dicom.read_file(csa_data_info_fn)
         
     def tearDown(self):
         del self.data
@@ -37,6 +39,10 @@ class TestCsa(object):
     def test_csa_image_trans(self):
         csa_dict = extract.csa_series_trans_func(self.data[(0x29, 0x1010)])
         eq_(csa_dict["EchoLinePosition"], 64)
+        # csareader cannot read the value from csa data info
+        assert_raises(extract.csareader.CSAReadError, csareader.read, self.csa_data_info[(0x29,0x1010)].value)
+        # csa_image_trans_func returns empty dict
+        eq_(extract.csa_image_trans_func(self.csa_data_info[(0x029,0x1010)]), {})
                 
     def test_parse_phx_line(self):
         ok_(extract._parse_phoenix_line("") is None)
