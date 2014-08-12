@@ -398,13 +398,8 @@ class MetaExtractor(object):
         standard_meta = []
         trans_meta_dicts = OrderedDict()
 
-        #Make dict mapping tags to tranlators
+        #Make dict to track which tags map to which translators
         trans_map = {}
-        for translator in self.translators:
-            if translator.tag in trans_map:
-                raise ValueError('More than one translator given for tag: '
-                                 '%s' % translator.tag)
-            trans_map[translator.tag] = translator
 
         for elem in dcm:
             if isinstance(elem.value, str) and elem.value.strip() == '':
@@ -413,25 +408,18 @@ class MetaExtractor(object):
             #Get the name for non-translated elements
             name = self._get_elem_key(elem)
 
-            #If it is a private creator element, handle any corresponding
+            #If it is a private creator element, setup any corresponding
             #translators
             if elem.name == "Private Creator":
-                moves = []
-                for curr_tag, translator in trans_map.iteritems():
+                for translator in self.translators:
                     if translator.priv_creator == elem.value:
                         new_elem = ((translator.tag.elem & 0xff) |
                                     (elem.tag.elem * 16**2))
                         new_tag = dicom.tag.Tag(elem.tag.group, new_elem)
-                        if new_tag != curr_tag:
-                            if (new_tag in trans_map or
-                                any(new_tag == move[0] for move in moves)
-                               ):
-                                raise ValueError('More than one translator '
-                                                 'for tag: %s' % new_tag)
-                            moves.append((curr_tag, new_tag))
-                for curr_tag, new_tag in moves:
-                    trans_map[new_tag] = trans_map[curr_tag]
-                    del trans_map[curr_tag]
+                        if new_tag in trans_map:
+                            raise ValueError('More than one translator '
+                                             'for tag: %s' % new_tag)
+                        trans_map[new_tag] = translator
 
             #If there is a translator for this element, use it
             if elem.tag in trans_map:
