@@ -16,9 +16,6 @@ from .info import __version__
 
 prog_descrip = """Stack DICOM files from each source directory into 2D to 5D
 volumes, optionally extracting meta data.
-
-Arguments accepting DICOM tags should be in the format '0x0_0x0'. More than
-one tag can be given in a comma seperated list.
 """
 
 prog_epilog = """IT IS YOUR RESPONSIBILITY TO KNOW IF THERE IS PRIVATE HEALTH
@@ -96,11 +93,11 @@ def main(argv=sys.argv):
                            'reorientation. '
                            'Default: %(default)s'))
     stack_opt.add_argument('-t', '--time-var', default=None,
-                           help=('The DICOM tag to use for ordering the stack '
-                           'along the time dimension.'))
+                           help=('The DICOM element keyword to use for '
+                           'ordering the stack along the time dimension.'))
     stack_opt.add_argument('--vector-var', default=None,
-                           help=('The DICOM tag to use for ordering the stack '
-                           'along the vector dimension.'))
+                           help=('The DICOM element keyword to use for '
+                           'ordering the stack along the vector dimension.'))
     stack_opt.add_argument('--time-order', default=None,
                            help=('Provide a text file with the desired order '
                            'for the values (one per line) of the attribute '
@@ -119,7 +116,9 @@ def main(argv=sys.argv):
                           'and exit'))
     meta_opt.add_argument('--disable-translator', default=None,
                           help=('Disable the translators for the provided '
-                          'tags. If the word "all" is provided, all '
+                          'tags. Tags should be given in the format '
+                          '"0x0_0x0". More than one can be given in a comma '
+                          'separated list. If the word "all" is provided, all '
                           'translators will be disabled.'))
     meta_opt.add_argument('--extract-private', default=False,
                           action='store_true',
