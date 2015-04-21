@@ -434,7 +434,7 @@ class TestGetData(object):
         data = stack.get_data()
         eq_(data.shape, stack.get_shape())
         eq_(sha256(data).hexdigest(),
-            'ec60d148734916bb05aa7d73cc76bd0777560518da86d1ac5aa93c8f151cf73f')
+            'ab5225fdbedceeea3442b2c9387e1abcbf398c71f525e0017251849c3cfbf49c')
 
     def test_four_dim(self):
         stack = dcmstack.DicomStack(time_order='EchoTime')
@@ -445,7 +445,7 @@ class TestGetData(object):
         data = stack.get_data()
         eq_(data.shape, stack.get_shape())
         eq_(sha256(data).hexdigest(),
-            'c14d3a8324bdf4b85be05d765c0864b4e2661d7aa716adaf85a28b4102e1992b')
+            'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a')
 
     def test_five_dim(self):
         stack = dcmstack.DicomStack(vector_order='EchoTime')
@@ -456,7 +456,7 @@ class TestGetData(object):
         data = stack.get_data()
         eq_(data.shape, stack.get_shape())
         eq_(sha256(data).hexdigest(),
-            'c14d3a8324bdf4b85be05d765c0864b4e2661d7aa716adaf85a28b4102e1992b')
+            'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a')
 
     def test_allow_dummy(self):
         del self.inputs[0].Rows
@@ -466,9 +466,9 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[1])
         data = stack.get_data()
         eq_(data.shape, stack.get_shape())
-        ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
+        ok_(np.all(data[:, :, -1] == np.iinfo(np.int16).max))
         eq_(sha256(data).hexdigest(),
-            'ed14cb8694f1c0d542562fecc6fd71bced3810df4fcb857a091c8e8525fbdda6')
+            '7d85fbcb60a5021a45df3975613dcb7ac731830e0a268590cc798dc39897c04b')
 
 class TestGetAffine(object):
     def setUp(self):
@@ -487,8 +487,6 @@ class TestGetAffine(object):
         stack.add_dcm(self.inputs[0])
         affine = stack.get_affine()
         ref = np.load(path.join(self.data_dir, 'single_slice_aff.npy'))
-        print affine
-        print ref
         ok_(np.allclose(affine, ref))
 
     def test_three_dim(self):
@@ -559,7 +557,7 @@ class TestToNifti(object):
         ref_hdr = ref_nii.get_header()
 
         for key in self.eq_keys:
-            ok_(np.all(hdr[key] == ref_hdr[key]))
+            np.testing.assert_equal(hdr[key], ref_hdr[key])
 
         for key in self.close_keys:
             ok_(np.allclose(hdr[key], ref_hdr[key]))
