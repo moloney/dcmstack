@@ -290,7 +290,7 @@ class DcmMetaExtension(Nifti1Extension):
         if self.affine.shape != (4, 4):
             raise InvalidExtensionError('Affine has incorrect shape')
         slice_dim = self.slice_dim
-        if slice_dim != None:
+        if slice_dim is not None:
             if not (0 <= slice_dim < 3):
                 raise InvalidExtensionError('Slice dimension is not valid')
         if not (3 <= len(self.shape) < 6):
@@ -1765,30 +1765,30 @@ class NiftiWrapper(object):
         result_hdr = result_nii.get_header()
 
         #Update the header with any info that is consistent across inputs
-        if hdr_info['qform'] != None and hdr_info['qform_code'] != None:
+        if hdr_info['qform'] is not None and hdr_info['qform_code'] is not None:
             if not scaled_dim_dir is None:
                 hdr_info['qform'][:3, dim] = scaled_dim_dir
             result_nii.set_qform(hdr_info['qform'],
                                  int(hdr_info['qform_code']),
                                  update_affine=True)
-        if hdr_info['sform'] != None and hdr_info['sform_code'] != None:
+        if hdr_info['sform'] is not None and hdr_info['sform_code'] is not None:
             if not scaled_dim_dir is None:
                 hdr_info['sform'][:3, dim] = scaled_dim_dir
             result_nii.set_sform(hdr_info['sform'],
                                  int(hdr_info['sform_code']),
                                  update_affine=True)
-        if hdr_info['dim_info'] != None:
+        if hdr_info['dim_info'] is not None:
             result_hdr.set_dim_info(*hdr_info['dim_info'])
             slice_dim = hdr_info['dim_info'][2]
         else:
             slice_dim = None
-        if hdr_info['intent'] != None:
+        if hdr_info['intent'] is not None:
             result_hdr.set_intent(*hdr_info['intent'])
-        if hdr_info['xyzt_units'] != None:
+        if hdr_info['xyzt_units'] is not None:
             result_hdr.set_xyzt_units(*hdr_info['xyzt_units'])
-        if hdr_info['slice_duration'] != None:
+        if hdr_info['slice_duration'] is not None:
             result_hdr.set_slice_duration(hdr_info['slice_duration'])
-        if hdr_info['slice_times'] != None:
+        if hdr_info['slice_times'] is not None:
             result_hdr.set_slice_times(hdr_info['slice_times'])
 
         #Create the meta data extension and insert it

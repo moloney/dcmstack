@@ -685,8 +685,8 @@ class DicomStack(object):
         num_time_points = num_volumes / num_vec_comps
 
         #If both sort keys are None try to guess
-        if (num_volumes > 1 and self._time_order == None and
-                self._vector_order == None):
+        if (num_volumes > 1 and self._time_order is None and
+                self._vector_order is None):
             #Get a list of possible sort orders
             possible_orders = []
             for key in self.sort_guesses:
