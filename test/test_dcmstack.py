@@ -200,7 +200,7 @@ class TestIncongruentImage(object):
 
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.dcm)
-        self.dcm = deepcopy(self.dcm)
+        self.dcm = dicom.read_file(dcm_path)
 
     def _chk_raises(self):
         assert_raises(dcmstack.IncongruentImageError,
