@@ -200,7 +200,7 @@ def parse_phoenix_prot(prot_key, prot_val):
         str_delim = '"'
     else:
         raise ValueError('Unknown protocol key: %s' % prot_key)
-    ascconv_start = prot_val.find('### ASCCONV BEGIN ###')
+    ascconv_start = prot_val.find('### ASCCONV BEGIN ')
     ascconv_end = prot_val.find('### ASCCONV END ###')
     ascconv = prot_val[ascconv_start:ascconv_end].split('\n')[1:-1]
 
