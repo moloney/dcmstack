@@ -38,24 +38,17 @@ def ignore_private(elem):
 def ignore_pixel_data(elem):
     return elem.tag == dicom.tag.Tag(0x7fe0, 0x10)
 
-def ignore_non_text_bytes(elem):
-    '''Ignore rule for `MetaExtractor` to skip elements with VR of 'OW', 'OB',
-    or 'UN' if the element value is not text. If the 'chardet' package is
-    installed that will be used to try to detect text encodings, otherwise
-    we just test if the element value is ASCII'''
-    if elem.VR in ('OW', 'OB', 'OW or OB', 'UN'):
-        if have_chardet:
-            match = chardet.detect(elem.value)
-            if match['encoding'] is None:
-                return True
-        else:
-            if not is_ascii(elem.value):
-                return True
-    return False
+def ignore_overlay_data(elem):
+    return elem.tag.group & 0xff00 == 0x6000 and elem.tag.elem == 0x3000
+
+def ignore_color_lut_data(elem):
+    return (elem.tag.group == 0x28 and
+            elem.tag.elem in (0x1201, 0x1202, 0x1203, 0x1221, 0x1222, 0x1223))
 
 default_ignore_rules = (ignore_private,
                         ignore_pixel_data,
-                        ignore_non_text_bytes)
+                        ignore_overlay_data,
+                        ignore_color_lut_data)
 '''The default tuple of ignore rules for `MetaExtractor`.'''
 
 
@@ -312,6 +305,7 @@ default_conversions = {'DS' : float,
                        'OW' : get_text,
                        'OB' : get_text,
                        'OW or OB' : get_text,
+                       'OB or OW' : get_text,
                        'UN' : get_text,
                        'PN' : unicode,
                        'UI' : unicode,
