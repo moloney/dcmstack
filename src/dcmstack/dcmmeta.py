@@ -1704,7 +1704,7 @@ class NiftiWrapper(object):
                     last_trans = in_trans
 
                 #Check that axis vectors match
-                if not np.allclose(in_vec, axis_vec):
+                if not np.allclose(in_vec, axis_vec, atol=5e-4):
                     raise ValueError("Cannot join images with different "
                                      "orientations.")
 
