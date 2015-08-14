@@ -1391,8 +1391,8 @@ class NiftiWrapper(object):
         else:
             raise IndexError('Extension not found in header')
         del hdr.extensions[target_idx]
-        #Nifti1Image.update_header will increase this if necessary
-        hdr['vox_offset'] = 352
+        # Nifti1Image.update_header will increase this if necessary
+        hdr['vox_offset'] = 0
 
     def replace_extension(self, dcmmeta_ext):
         '''Replace the DcmMetaExtension.
