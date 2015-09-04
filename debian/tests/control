@@ -1,0 +1,2 @@
+Test-Command: nosetests .
+Depends: @, @builddeps@

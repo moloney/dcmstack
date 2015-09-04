@@ -1,0 +1,35 @@
+Source: dcmstack
+Maintainer: NeuroDebian Team <team@neuro.debian.net>
+Uploaders: Michael Hanke <mih@debian.org>
+Section: science
+Testsuite: autopkgtest
+Priority: optional
+Build-Depends: debhelper (>= 9),
+               dh-python,
+               python-all,
+               python-setuptools,
+               python-docutils,
+               python-sphinx (>= 1.0.7+dfsg-1~),
+               help2man
+Standards-Version: 3.9.6
+Homepage: https://github.com/moloney/dcmstack
+X-Python-Version: >= 2.6
+
+Package: python-dcmstack
+Architecture: all
+Section: python
+Depends: ${python:Depends},
+         ${misc:Depends},
+         ${sphinxdoc:Depends},
+         python-nibabel (>= 2.0~),
+         python-dicom (>= 0.9.7~),
+         python-numpy
+Provides: ${python:Provides}
+Description: DICOM to Nifti conversion
+ DICOM to Nifti conversion with the added ability to extract and summarize
+ meta data from the source DICOMs. The meta data can be injected into a
+ Nifti header extension or written out as a JSON formatted text file.
+ .
+ This package provides the Python package, command line tools (dcmstack,
+ and nitool), as well as the documentation in HTML format.
+
