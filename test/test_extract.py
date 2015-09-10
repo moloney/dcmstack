@@ -76,7 +76,7 @@ class TestMetaExtractor(object):
         del self.data
 
     def test_get_elem_key(self):
-        ignore_rules = (extract.ignore_non_text_bytes,)
+        ignore_rules = (extract.ignore_pixel_data,)
         extractor = extract.MetaExtractor(ignore_rules=ignore_rules)
         for elem in self.data:
             key = extractor._get_elem_key(elem)
@@ -85,7 +85,7 @@ class TestMetaExtractor(object):
             ok_(key[-1].isalnum())
 
     def test_get_elem_value(self):
-        ignore_rules = (extract.ignore_non_text_bytes,)
+        ignore_rules = (extract.ignore_pixel_data,)
         extractor = extract.MetaExtractor(ignore_rules=ignore_rules)
         for elem in self.data:
             value = extractor._get_elem_value(elem)
