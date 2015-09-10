@@ -158,7 +158,7 @@ def main(argv=sys.argv):
 
     #Check if we are just listing the translators
     if args.list_translators:
-        for translator in translators:
+        for translator in extract.default_translators:
             print '%s -> %s' % (translator.tag, translator.name)
         return 0
 
