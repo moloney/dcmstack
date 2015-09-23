@@ -6,11 +6,11 @@ Testsuite: autopkgtest
 Priority: optional
 Build-Depends: debhelper (>= 9),
                dh-python,
+               help2man,
                python-all,
-               python-setuptools,
                python-docutils,
-               python-sphinx (>= 1.0.7+dfsg-1~),
-               help2man
+               python-setuptools,
+               python-sphinx (>= 1.0.7+dfsg-1~)
 Standards-Version: 3.9.6
 Homepage: https://github.com/moloney/dcmstack
 X-Python-Version: >= 2.6
@@ -18,12 +18,12 @@ X-Python-Version: >= 2.6
 Package: python-dcmstack
 Architecture: all
 Section: python
-Depends: ${python:Depends},
-         ${misc:Depends},
-         ${sphinxdoc:Depends},
+Depends: python-dicom (>= 0.9.7~),
          python-nibabel (>= 2.0~),
-         python-dicom (>= 0.9.7~),
-         python-numpy
+         python-numpy,
+         ${misc:Depends},
+         ${python:Depends},
+         ${sphinxdoc:Depends}
 Provides: ${python:Provides}
 Description: DICOM to Nifti conversion
  DICOM to Nifti conversion with the added ability to extract and summarize
@@ -32,4 +32,3 @@ Description: DICOM to Nifti conversion
  .
  This package provides the Python package, command line tools (dcmstack,
  and nitool), as well as the documentation in HTML format.
-
