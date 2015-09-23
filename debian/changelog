@@ -1,5 +1,5 @@
-dcmstack (0.6.2+git28-g4143244.1-1) UNRELEASED; urgency=low
+dcmstack (0.6.2+git33-gb43919a.1-1) unstable; urgency=low
 
   * Initial release (Closes: #798040).
 
- -- Michael Hanke <mih@debian.org>  Fri, 04 Sep 2015 18:08:10 +0200
+ -- Michael Hanke <mih@debian.org>  Wed, 23 Sep 2015 18:56:29 +0200
