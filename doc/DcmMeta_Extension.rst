@@ -70,7 +70,7 @@ directly match the per-slice meta data values to slices of the data array.
 
 The reorientation transform can be used to update directional meta data to 
 match the image orientation. This transform encodes any reordering of the 
-voxel data that occured during conversion. If the image affine does not match 
+voxel data that occurred during conversion. If the image affine does not match 
 the meta data affine, then an additional transformation needs to be done after 
 applying the reorientation transform (from the meta data space to the image 
 space).

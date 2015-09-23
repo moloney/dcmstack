@@ -7,7 +7,7 @@ details refer to :doc:`modules`.
 Creating DicomStack Objects
 ---------------------------
 
-If you have an aquisition that you would like to turn into a single 
+If you have an acquisition that you would like to turn into a single 
 *DicomStack* object then you may want to do this directly.
 
 .. code-block:: python
@@ -69,7 +69,7 @@ Embedding Meta Data
 ^^^^^^^^^^^^^^^^^^^
 
 The meta data from the source DICOM data sets can be summarized into a 
-*DcmMetaExtension* which is embeded into the Nifti header. To do this you can 
+*DcmMetaExtension* which is embedded into the Nifti header. To do this you can 
 either pass True for the *embed_meta* parameter to *DicomStack.to_nifti* or 
 you can immediately get a *NiftiWrapper* with *DicomStack.to_nifti_wrapper*.
 
@@ -77,7 +77,7 @@ By default the meta data is filtered to reduce the chance of including
 private health information.  This filtering can be controlled with the 
 *meta_filter* parameter to the *DicomStack* constructor.
 
-**IT IS YOUR RESPONSABILITY TO KNOW IF THERE IS PRIVATE HEALTH INFORMATION 
+**IT IS YOUR RESPONSIBILITY TO KNOW IF THERE IS PRIVATE HEALTH INFORMATION 
 IN THE RESULTING FILE AND TREAT SUCH FILES APPROPRIATELY.**
 
 Creating NiftiWrapper Objects
