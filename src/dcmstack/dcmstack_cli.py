@@ -81,7 +81,7 @@ def main(argv=sys.argv):
 
     stack_opt = arg_parser.add_argument_group('Stacking Options')
     stack_opt.add_argument('-g', '--group-by', default=None,
-                           help=("Comma seperated list of meta data keys to "
+                           help=("Comma separated list of meta data keys to "
                            "group input files into stacks with."))
     stack_opt.add_argument('--voxel-order', default='LAS',
                            help=('Order the voxels so the spatial indices '

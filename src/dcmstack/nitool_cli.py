@@ -76,7 +76,7 @@ def main(argv=sys.argv):
     lookup_parser.add_argument('src_nii', nargs=1)
     lookup_parser.add_argument('-i', '--index',
                                help=("Use the given voxel index. The index "
-                               "must be provided as a comma seperated list of "
+                               "must be provided as a comma separated list of "
                                "integers (one for each dimension)."))
     lookup_parser.set_defaults(func=lookup)
 
@@ -93,7 +93,7 @@ def main(argv=sys.argv):
                                "for the key"))
     inject_parser.set_defaults(func=inject)
 
-    #Parse the arguments and call the appropriate funciton
+    #Parse the arguments and call the appropriate function
     args = arg_parser.parse_args(argv[1:])
     return args.func(args)
 
