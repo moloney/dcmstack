@@ -8,8 +8,8 @@ from hashlib import sha256
 from nose.tools import ok_, eq_, assert_raises
 from copy import deepcopy
 import numpy as np
-import dicom
-from dicom import datadict
+import pydicom
+from pydicom import datadict
 import nibabel as nb
 from nibabel.orientations import aff2axcodes
 
@@ -182,7 +182,7 @@ def test_image_collision():
                          'dcmstack',
                          '2D_16Echo_qT2',
                          'TE_20_SlcPos_-33.707626341697.dcm')
-    dcm = dicom.read_file(dcm_path)
+    dcm = pydicom.read_file(dcm_path)
     stack = dcmstack.DicomStack('EchoTime')
     stack.add_dcm(dcm)
     assert_raises(dcmstack.ImageCollisionError,
@@ -196,11 +196,11 @@ class TestIncongruentImage(object):
                              'dcmstack',
                              '2D_16Echo_qT2',
                              'TE_20_SlcPos_-33.707626341697.dcm')
-        self.dcm = dicom.read_file(dcm_path)
+        self.dcm = pydicom.read_file(dcm_path)
 
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.dcm)
-        self.dcm = dicom.read_file(dcm_path)
+        self.dcm = pydicom.read_file(dcm_path)
 
     def _chk_raises(self):
         assert_raises(dcmstack.IncongruentImageError,
@@ -246,7 +246,7 @@ class TestInvalidStack(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -307,7 +307,7 @@ class TestGetShape(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -361,7 +361,7 @@ class TestGuessDim(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -411,7 +411,7 @@ class TestGetData(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -476,7 +476,7 @@ class TestGetAffine(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm'
                                  )
@@ -543,7 +543,7 @@ class TestToNifti(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',

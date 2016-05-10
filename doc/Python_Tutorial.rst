@@ -17,7 +17,7 @@ If you have an acquisition that you would like to turn into a single
     >>> src_paths = glob('032-MPRAGEAXTI900Pre/*.dcm')
     >>> my_stack = dcmstack.DicomStack()
     >>> for src_path in src_paths:
-    ...     src_dcm = dicom.read_file(src_path)
+    ...     src_dcm = pydicom.read_file(src_path)
     ...     my_stack.add_dcm(src_dcm)
 
 If you are unsure how many stacks you want from a collection of DICOM data 
@@ -94,7 +94,7 @@ these can be created directly from a *DicomStack*.
     >>> src_paths = glob('032-MPRAGEAXTI900Pre/*.dcm')
     >>> my_stack = dcmstack.DicomStack()
     >>> for src_path in src_paths:
-    ...     src_dcm = dicom.read_file(src_path)
+    ...     src_dcm = pydicom.read_file(src_path)
     ...     my_stack.add_dcm(src_dcm)
     ...
     >>> nii_wrp = my_stack.to_nifti_wrapper()

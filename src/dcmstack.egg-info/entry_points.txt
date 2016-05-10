@@ -1,0 +1,4 @@
+[console_scripts]
+dcmstack = dcmstack.dcmstack_cli:main
+nitool = dcmstack.nitool_cli:main
+

@@ -16,14 +16,14 @@ dicom, csareader = extract.dicom, extract.csareader
 class TestCsa(object):
     def setUp(self):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = dicom.read_file(data_fn)
+        self.data = pydicom.read_file(data_fn)
 
     def tearDown(self):
         del self.data
 
     def test_simplify(self):
         eq_(extract.simplify_csa_dict(None), None)
-        csa_dict = csareader.read(self.data[dicom.tag.Tag(0x29, 0x1010)].value)
+        csa_dict = csareader.read(self.data[pydicom.tag.Tag(0x29, 0x1010)].value)
         simp_dict = extract.simplify_csa_dict(csa_dict)
         for tag in csa_dict['tags']:
             items = csa_dict['tags'][tag]['items']
@@ -70,7 +70,7 @@ class TestCsa(object):
 class TestMetaExtractor(object):
     def setUp(self):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = dicom.read_file(data_fn)
+        self.data = pydicom.read_file(data_fn)
 
     def tearDown(self):
         del self.data
@@ -104,9 +104,9 @@ class TestMetaExtractor(object):
 
     def test_reloc_private(self):
         extractor = extract.MetaExtractor()
-        self.data[(0x29, 0x10)].tag = dicom.tag.Tag((0x29, 0x20))
-        self.data[(0x29, 0x1010)].tag = dicom.tag.Tag((0x29, 0x2010))
-        self.data[(0x29, 0x1020)].tag = dicom.tag.Tag((0x29, 0x2020))
+        self.data[(0x29, 0x10)].tag = pydicom.tag.Tag((0x29, 0x20))
+        self.data[(0x29, 0x1010)].tag = pydicom.tag.Tag((0x29, 0x2010))
+        self.data[(0x29, 0x1020)].tag = pydicom.tag.Tag((0x29, 0x2020))
         meta_dict = extractor(self.data)
         eq_(meta_dict["CsaImage.EchoLinePosition"], 64)
         ok_(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)
