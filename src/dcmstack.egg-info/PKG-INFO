@@ -1,0 +1,18 @@
+Metadata-Version: 1.1
+Name: dcmstack
+Version: 0.7.0.dev0
+Summary: Stack DICOM images into volumes and convert to Nifti
+Home-page: UNKNOWN
+Author: Brendan Moloney
+Author-email: moloney@ohsu.edu
+License: UNKNOWN
+Description: UNKNOWN
+Platform: OS Independent
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Scientific/Engineering
+Provides: dcmstack
