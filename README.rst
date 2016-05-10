@@ -1,6 +1,9 @@
 .. -*- rest -*-
 .. vim:syntax=rest
 
+check out importing_pydicom branch after clone the folder with command:
+git checkout importing_pydicom
+
 ========
 dcmstack
 ========
