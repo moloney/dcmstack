@@ -4,6 +4,7 @@ Command line interface to dcmstack.
 @author: moloney
 """
 import os, sys, argparse, string
+from future.utils import iteritems
 from glob import glob
 import dicom
 from . import dcmstack
@@ -280,7 +281,7 @@ def main(argv=sys.argv):
 
         out_idx = 0
         generated_outs = set()
-        for key, group in groups.iteritems():
+        for key, group in iteritems(groups):
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
                                 time_order=time_order,

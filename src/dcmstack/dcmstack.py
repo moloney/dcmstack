@@ -3,6 +3,7 @@ Stack DICOM datasets into volumes. The contents of this module are imported
 into the package namespace.
 """
 import warnings, re, dicom
+from future.utils import iteritems
 from copy import deepcopy
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
@@ -1092,7 +1093,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
 
     # Unpack sub results, using the canonical value for the close keys
     full_results = {}
-    for eq_key, sub_res_list in results.iteritems():
+    for eq_key, sub_res_list in iteritems(results):
         for close_key, sub_res in sub_res_list:
             full_key = []
             eq_idx = 0
@@ -1157,7 +1158,7 @@ def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None,
                               force,
                               warn_on_except)
 
-    for key, group in results.iteritems():
+    for key, group in iteritems(results):
         results[key] = stack_group(group, warn_on_except, **stack_args)
 
     return results
