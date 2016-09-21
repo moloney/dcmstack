@@ -5,6 +5,7 @@ import sys
 from os import path
 from glob import glob
 from nose.tools import ok_, eq_, assert_raises
+from past.builtins import xrange
 import numpy as np
 import dicom
 import nibabel as nb

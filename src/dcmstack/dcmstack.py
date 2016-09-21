@@ -10,6 +10,7 @@ from nibabel.spatialimages import HeaderDataError
 from nibabel.orientations import (io_orientation,
                                   apply_orientation,
                                   inv_ornt_aff)
+from past.builtins import xrange
 import numpy as np
 from .dcmmeta import DcmMetaExtension, NiftiWrapper
 
