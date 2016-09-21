@@ -5,6 +5,7 @@ import sys
 from os import path
 from glob import glob
 from nose.tools import ok_, eq_, assert_raises
+from past.builtins import xrange
 import numpy as np
 import dicom
 import nibabel as nb
@@ -461,11 +462,11 @@ class TestGetSubset(object):
                        )
                 elif classes == ('vector', 'slices'):
                     eq_(sub.get_values_and_class(key),
-                        ((range(slc_idx, (3 * 5), 3) * 7), ('time', 'samples'))
+                        (list(range(slc_idx, (3 * 5), 3) * 7), ('time', 'samples'))
                        )
                 elif classes == ('global', 'slices'):
                     eq_(sub.get_values_and_class(key),
-                        (range(slc_idx, (3 * 5 * 7), 3), ('time', 'samples')))
+                        (list(range(slc_idx, (3 * 5 * 7), 3)), ('time', 'samples')))
                 else:
                     eq_(sub.get_values_and_class(key),
                         self.ext.get_values_and_class(key)

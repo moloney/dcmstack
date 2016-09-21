@@ -4,6 +4,7 @@ Command line interface to dcmstack.
 @author: moloney
 """
 import os, sys, argparse, string
+from future.utils import iteritems
 from glob import glob
 import dicom
 from . import dcmstack
@@ -153,7 +154,7 @@ def main(argv=sys.argv):
     args = arg_parser.parse_args(argv[1:])
 
     if args.version:
-        print __version__
+        print(__version__)
         return 0
 
     #Check if we are just listing the translators
@@ -280,7 +281,7 @@ def main(argv=sys.argv):
 
         out_idx = 0
         generated_outs = set()
-        for key, group in groups.iteritems():
+        for key, group in iteritems(groups):
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
                                 time_order=time_order,

@@ -3,6 +3,7 @@ Stack DICOM datasets into volumes. The contents of this module are imported
 into the package namespace.
 """
 import warnings, re, dicom
+from future.utils import iteritems
 from copy import deepcopy
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
@@ -10,6 +11,7 @@ from nibabel.spatialimages import HeaderDataError
 from nibabel.orientations import (io_orientation,
                                   apply_orientation,
                                   inv_ornt_aff)
+from past.builtins import xrange
 import numpy as np
 from .dcmmeta import DcmMetaExtension, NiftiWrapper
 
@@ -673,7 +675,7 @@ class DicomStack(object):
         if len(self._files_info) % files_per_vol != 0:
             raise InvalidStackError("Number of files is not an even multiple "
                                     "of the number of unique slice positions.")
-        num_volumes = len(self._files_info) / files_per_vol
+        num_volumes = len(self._files_info) // files_per_vol
 
         #Figure out the number of vector components and time points
         num_vec_comps = len(self._vector_vals)
@@ -682,7 +684,7 @@ class DicomStack(object):
         if num_volumes % num_vec_comps != 0:
             raise InvalidStackError("Number of volumes not an even multiple "
                                     "of the number of vector components.")
-        num_time_points = num_volumes / num_vec_comps
+        num_time_points = num_volumes // num_vec_comps
 
         #If both sort keys are None try to guess
         if (num_volumes > 1 and self._time_order is None and
@@ -776,7 +778,7 @@ class DicomStack(object):
             n_vols *= stack_shape[3]
         if len(stack_shape) > 4:
             n_vols *= stack_shape[4]
-        files_per_vol = len(self._files_info) / n_vols
+        files_per_vol = len(self._files_info) // n_vols
         file_shape = self._files_info[0][0].nii_img.get_shape()
         for vec_idx in range(stack_shape[4]):
             for time_idx in range(stack_shape[3]):
@@ -821,7 +823,7 @@ class DicomStack(object):
             n_vols *= shape[4]
 
         #Figure out the number of files in each volume
-        files_per_vol = len(self._files_info) / n_vols
+        files_per_vol = len(self._files_info) // n_vols
 
         #Pull the DICOM Patient Space affine from the first input
         aff = self._files_info[0][0].nii_img.get_affine()
@@ -864,7 +866,7 @@ class DicomStack(object):
         if len(data.shape) > 4:
             n_vols *= data.shape[4]
 
-        files_per_vol = len(self._files_info) / n_vols
+        files_per_vol = len(self._files_info) // n_vols
 
         #Reorder the voxel data if requested
         permutation = [0, 1, 2]
@@ -963,7 +965,7 @@ class DicomStack(object):
                 vol_meta = [file_info[0].meta_ext
                             for file_info in self._files_info]
 
-            #Build meta data for each time point / vector component
+            #Build meta data for each time point // vector component
             if len(data.shape) == 5:
                 if data.shape[3] != 1:
                     vec_meta = []
@@ -1051,7 +1053,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         #Read the DICOM file
         try:
             dcm = dicom.read_file(dcm_path, force=force)
-        except Exception, e:
+        except Exception as e:
             if warn_on_except:
                 warnings.warn('Error reading file %s: %s' % (dcm_path, str(e)))
                 continue
@@ -1091,7 +1093,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
 
     # Unpack sub results, using the canonical value for the close keys
     full_results = {}
-    for eq_key, sub_res_list in results.iteritems():
+    for eq_key, sub_res_list in iteritems(results):
         for close_key, sub_res in sub_res_list:
             full_key = []
             eq_idx = 0
@@ -1113,7 +1115,7 @@ def stack_group(group, warn_on_except=False, **stack_args):
     for dcm, meta, fn in group:
         try:
             result.add_dcm(dcm, meta)
-        except Exception, e:
+        except Exception as e:
             if warn_on_except:
                 warnings.warn('Error adding file %s to stack: %s' %
                               (fn, str(e)))
@@ -1156,7 +1158,7 @@ def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None,
                               force,
                               warn_on_except)
 
-    for key, group in results.iteritems():
+    for key, group in iteritems(results):
         results[key] = stack_group(group, warn_on_except, **stack_args)
 
     return results

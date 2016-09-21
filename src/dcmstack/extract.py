@@ -1,8 +1,10 @@
 """
 Extract meta data from a DICOM data set.
 """
-import struct, warnings
+from builtins import str
+from future.utils import iteritems
 from collections import namedtuple, defaultdict
+import struct, warnings
 import dicom
 from dicom.datadict import keyword_for_tag
 from nibabel.nicom import csareader
@@ -219,7 +221,7 @@ def csa_series_trans_func(elem):
     if not phx_src is None:
         phoenix_dict = parse_phoenix_prot(phx_src, csa_dict[phx_src])
         del csa_dict[phx_src]
-        for key, val in phoenix_dict.iteritems():
+        for key, val in iteritems(phoenix_dict):
             new_key = '%s.%s' % ('MrPhoenixProtocol', key)
             csa_dict[new_key] = val
 
@@ -307,8 +309,8 @@ default_conversions = {'DS' : float,
                        'OW or OB' : get_text,
                        'OB or OW' : get_text,
                        'UN' : get_text,
-                       'PN' : unicode,
-                       'UI' : unicode,
+                       'PN' : str,
+                       'UI' : str,
                       }
 
 class MetaExtractor(object):
@@ -494,8 +496,8 @@ class MetaExtractor(object):
             result[name] = value
 
         #Inject translator results
-        for trans_name, meta in trans_meta_dicts.iteritems():
-            for name, value in meta.iteritems():
+        for trans_name, meta in iteritems(trans_meta_dicts):
+            for name, value in iteritems(meta):
                 name = '%s.%s' % (trans_name, name)
                 result[name] = value
 

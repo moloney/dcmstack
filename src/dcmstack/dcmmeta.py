@@ -4,6 +4,8 @@ DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 import sys
 import json, warnings
 from copy import deepcopy
+from future.utils import iteritems
+from past.builtins import xrange
 import numpy as np
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extension
@@ -61,7 +63,7 @@ def is_constant(sequence, period=None):
             raise ValueError('The sequence length is not evenly divisible by '
                              'the period length.')
 
-        for period_idx in range(seq_len / period):
+        for period_idx in range(seq_len // period):
             start_idx = period_idx * period
             end_idx = start_idx + period
             if not all(val == sequence[start_idx]
@@ -90,7 +92,7 @@ def is_repeating(sequence, period):
         raise ValueError('The sequence length is not evenly divisible by the '
                          'period length.')
 
-    for period_idx in range(1, seq_len / period):
+    for period_idx in range(1, seq_len // period):
         start_idx = period_idx * period
         end_idx = start_idx + period
         if sequence[start_idx:end_idx] != sequence[:period]:
@@ -313,7 +315,7 @@ class DcmMetaExtension(Nifti1Extension):
                 raise InvalidExtensionError('Slice dim is None but per-slice '
                                             'meta data is present')
             elif cls_mult > 1:
-                for key, vals in cls_meta.iteritems():
+                for key, vals in iteritems(cls_meta):
                     n_vals = len(vals)
                     if n_vals != cls_mult:
                         msg = (('Incorrect number of values for key %s with '
@@ -429,7 +431,7 @@ class DcmMetaExtension(Nifti1Extension):
         for classes in self.get_valid_classes():
             filtered = []
             curr_dict = self.get_class_dict(classes)
-            for key, values in curr_dict.iteritems():
+            for key, values in iteritems(curr_dict):
                 if filter_func(key, values):
                     filtered.append(key)
             for key in filtered:
@@ -478,18 +480,18 @@ class DcmMetaExtension(Nifti1Extension):
         for src_class in valid_classes:
             #Constants remain constant
             if src_class == ('global', 'const'):
-                for key, val in self.get_class_dict(src_class).iteritems():
+                for key, val in iteritems(self.get_class_dict(src_class)):
                     result.get_class_dict(src_class)[key] = deepcopy(val)
                 continue
 
             if dim == self.slice_dim:
                 if src_class[1] != 'slices':
-                    for key, vals in self.get_class_dict(src_class).iteritems():
+                    for key, vals in iteritems(self.get_class_dict(src_class)):
                         result.get_class_dict(src_class)[key] = deepcopy(vals)
                 else:
                     result._copy_slice(self, src_class, idx)
             elif dim < 3:
-                for key, vals in self.get_class_dict(src_class).iteritems():
+                for key, vals in iteritems(self.get_class_dict(src_class)):
                     result.get_class_dict(src_class)[key] = deepcopy(vals)
             elif dim == 3:
                 result._copy_sample(self, src_class, 'time', idx)
@@ -724,7 +726,7 @@ class DcmMetaExtension(Nifti1Extension):
         if dest_cls == ('global', 'const'):
             return None
         elif src_cls == ('global', 'slices'):
-            return self.get_multiplicity(src_cls) / self.get_multiplicity(dest_cls)
+            return self.get_multiplicity(src_cls) // self.get_multiplicity(dest_cls)
         elif src_cls == ('vector', 'slices'): #implies dest_cls == ('time', 'samples'):
             return  self.n_slices
         elif src_cls == ('time', 'samples'): #implies dest_cls == ('vector', 'samples')
@@ -843,13 +845,13 @@ class DcmMetaExtension(Nifti1Extension):
                 new_mult = self.shape[slice_dim]
         else:
             new_mult = 1
-        mult_fact = new_mult / curr_mult
+        mult_fact = new_mult // curr_mult
         if curr_mult == 1:
             values = [values]
 
 
         if per_slice:
-            result = values * mult_fact
+            result = list(values) * mult_fact
         else:
             result = []
             for value in values:
@@ -900,12 +902,12 @@ class DcmMetaExtension(Nifti1Extension):
         dest_dict = self.get_class_dict(dest_class)
         dest_mult = self.get_multiplicity(dest_class)
         stride = other.n_slices
-        for key, vals in src_dict.iteritems():
+        for key, vals in iteritems(src_dict):
             subset_vals = vals[idx::stride]
 
             if len(subset_vals) < dest_mult:
                 full_vals = []
-                for val_idx in xrange(dest_mult / len(subset_vals)):
+                for val_idx in xrange(dest_mult // len(subset_vals)):
                     full_vals += deepcopy(subset_vals)
                 subset_vals = full_vals
             if len(subset_vals) == 1:
@@ -962,12 +964,12 @@ class DcmMetaExtension(Nifti1Extension):
 
                 dest_mult = self.get_multiplicity(dest_cls)
                 if dest_mult == 1:
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(dest_cls)[key] = \
                             deepcopy(vals[idx])
                 else: #We must be doing time samples -> vector samples
                     stride = other.shape[3]
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(dest_cls)[key] = \
                             deepcopy(vals[idx::stride])
                     for key in src_dict.keys():
@@ -980,12 +982,12 @@ class DcmMetaExtension(Nifti1Extension):
                     dest_mult = self.get_multiplicity(src_class)
                     start_idx = idx * dest_mult
                     end_idx = start_idx + dest_mult
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = \
                             deepcopy(vals[start_idx:end_idx])
                         self._simplify(key)
                 else: #Otherwise multiplicity is unchanged
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = deepcopy(vals)
         else: #The src_class is per slice
             if src_class[0] == sample_base:
@@ -994,7 +996,7 @@ class DcmMetaExtension(Nifti1Extension):
                     if dest_class in self.get_valid_classes():
                         best_dest = dest_class
                         break
-                for key, vals in src_dict.iteritems():
+                for key, vals in iteritems(src_dict):
                     self.get_class_dict(best_dest)[key] = deepcopy(vals)
             elif src_class[0] != 'global':
                 if sample_base == 'time':
@@ -1002,17 +1004,17 @@ class DcmMetaExtension(Nifti1Extension):
                     n_slices = self.n_slices
                     start_idx = idx * n_slices
                     end_idx = start_idx + n_slices
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = \
                             deepcopy(vals[start_idx:end_idx])
                         self._simplify(key)
                 else:
                     #Time slices are unchanged
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = deepcopy(vals)
             else:
                 #Take a subset of global slices
-                for key, vals in src_dict.iteritems():
+                for key, vals in iteritems(src_dict):
                     subset_vals = \
                         other._global_slice_subset(key, sample_base, idx)
                     self.get_class_dict(src_class)[key] = deepcopy(subset_vals)
@@ -1084,7 +1086,7 @@ class DcmMetaExtension(Nifti1Extension):
         other_vals = other._get_changed_class(key, classes, self.slice_dim)
 
 
-        #Handle some common / simple insertions with special cases
+        #Handle some common // simple insertions with special cases
         if classes == ('global', 'const'):
             if local_vals != other_vals:
                 for dest_base in ('time', 'vector', 'global'):
@@ -1249,8 +1251,8 @@ class NiftiWrapper(object):
             if extension.get_code() == dcm_meta_ecode:
                 try:
                     extension.check_valid()
-                except InvalidExtensionError, e:
-                    print "Found candidate extension, but invalid: %s" % e
+                except InvalidExtensionError as e:
+                    print("Found candidate extension, but invalid: %s" % e)
                 else:
                     if not self.meta_ext is None:
                         raise ValueError('More than one valid DcmMeta '

@@ -109,7 +109,7 @@ def split(args):
     try:
         src_wrp = NiftiWrapper(src_nii)
     except MissingExtensionError:
-        print "No dcmmeta extension found, making empty one..."
+        print("No dcmmeta extension found, making empty one...")
         src_wrp = NiftiWrapper(src_nii, make_empty=True)
     for split_idx, split in enumerate(src_wrp.split(args.dimension)):
         if args.output_format:
