@@ -1,6 +1,7 @@
 """
 Extract meta data from a DICOM data set.
 """
+from builtins import str
 import struct, warnings
 from collections import namedtuple, defaultdict
 import dicom
@@ -307,8 +308,8 @@ default_conversions = {'DS' : float,
                        'OW or OB' : get_text,
                        'OB or OW' : get_text,
                        'UN' : get_text,
-                       'PN' : unicode,
-                       'UI' : unicode,
+                       'PN' : str,
+                       'UI' : str,
                       }
 
 class MetaExtractor(object):
