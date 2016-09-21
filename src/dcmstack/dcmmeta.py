@@ -851,7 +851,7 @@ class DcmMetaExtension(Nifti1Extension):
 
 
         if per_slice:
-            result = values * mult_fact
+            result = list(values) * mult_fact
         else:
             result = []
             for value in values:

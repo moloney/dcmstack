@@ -462,11 +462,11 @@ class TestGetSubset(object):
                        )
                 elif classes == ('vector', 'slices'):
                     eq_(sub.get_values_and_class(key),
-                        ((range(slc_idx, (3 * 5), 3) * 7), ('time', 'samples'))
+                        (list(range(slc_idx, (3 * 5), 3) * 7), ('time', 'samples'))
                        )
                 elif classes == ('global', 'slices'):
                     eq_(sub.get_values_and_class(key),
-                        (range(slc_idx, (3 * 5 * 7), 3), ('time', 'samples')))
+                        (list(range(slc_idx, (3 * 5 * 7), 3)), ('time', 'samples')))
                 else:
                     eq_(sub.get_values_and_class(key),
                         self.ext.get_values_and_class(key)
