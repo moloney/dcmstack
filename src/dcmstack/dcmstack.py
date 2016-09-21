@@ -1113,7 +1113,7 @@ def stack_group(group, warn_on_except=False, **stack_args):
     for dcm, meta, fn in group:
         try:
             result.add_dcm(dcm, meta)
-        except Exception, e:
+        except Exception as e:
             if warn_on_except:
                 warnings.warn('Error adding file %s to stack: %s' %
                               (fn, str(e)))
