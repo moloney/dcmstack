@@ -1249,8 +1249,8 @@ class NiftiWrapper(object):
             if extension.get_code() == dcm_meta_ecode:
                 try:
                     extension.check_valid()
-                except InvalidExtensionError, e:
-                    print "Found candidate extension, but invalid: %s" % e
+                except InvalidExtensionError as e:
+                    print("Found candidate extension, but invalid: %s" % e)
                 else:
                     if not self.meta_ext is None:
                         raise ValueError('More than one valid DcmMeta '

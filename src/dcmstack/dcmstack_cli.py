@@ -153,7 +153,7 @@ def main(argv=sys.argv):
     args = arg_parser.parse_args(argv[1:])
 
     if args.version:
-        print __version__
+        print(__version__)
         return 0
 
     #Check if we are just listing the translators
