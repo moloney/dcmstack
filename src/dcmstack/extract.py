@@ -219,7 +219,7 @@ def csa_series_trans_func(elem):
     if not phx_src is None:
         phoenix_dict = parse_phoenix_prot(phx_src, csa_dict[phx_src])
         del csa_dict[phx_src]
-        for key, val in phoenix_dict.iteritems():
+        for key, val in phoenix_dict.items():
             new_key = '%s.%s' % ('MrPhoenixProtocol', key)
             csa_dict[new_key] = val
 
@@ -307,8 +307,8 @@ default_conversions = {'DS' : float,
                        'OW or OB' : get_text,
                        'OB or OW' : get_text,
                        'UN' : get_text,
-                       'PN' : unicode,
-                       'UI' : unicode,
+                       'PN' : str,
+                       'UI' : str,
                       }
 
 class MetaExtractor(object):
@@ -459,7 +459,7 @@ class MetaExtractor(object):
                     if self.warn_on_trans_except:
                         warnings.warn("Exception from translator %s: %s" %
                                       (trans_map[elem.tag].name,
-                                       repr(unicode(e))))
+                                       repr(str(e))))
                     else:
                         raise
                 else:
@@ -494,8 +494,8 @@ class MetaExtractor(object):
             result[name] = value
 
         #Inject translator results
-        for trans_name, meta in trans_meta_dicts.iteritems():
-            for name, value in meta.iteritems():
+        for trans_name, meta in trans_meta_dicts.items():
+            for name, value in meta.items():
                 name = '%s.%s' % (trans_name, name)
                 result[name] = value
 

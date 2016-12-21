@@ -153,23 +153,23 @@ def main(argv=sys.argv):
     args = arg_parser.parse_args(argv[1:])
 
     if args.version:
-        print __version__
+        print(__version__)
         return 0
 
     #Check if we are just listing the translators
     if args.list_translators:
         for translator in extract.default_translators:
-            print '%s -> %s' % (translator.tag, translator.name)
+            print('%s -> %s' % (translator.tag, translator.name))
         return 0
 
     #Check if we are just listing the default exclude regular expressions
     if args.default_regexes:
-        print 'Default exclude regular expressions:'
+        print('Default exclude regular expressions:')
         for regex in dcmstack.default_key_excl_res:
-            print '\t' + regex
-        print 'Default include regular expressions:'
+            print('\t' + regex)
+        print('Default include regular expressions:')
         for regex in dcmstack.default_key_incl_res:
-            print '\t' + regex
+            print('\t' + regex)
         return 0
 
     #Check if we are generating meta data
@@ -250,10 +250,10 @@ def main(argv=sys.argv):
     #Handle each source directory individually
     for src_dir in args.src_dirs:
         if not os.path.isdir(src_dir):
-            print >> sys.stderr, '%s is not a directory, skipping' % src_dir
+            print('%s is not a directory, skipping' % src_dir, file=sys.stderr)
 
         if args.verbose:
-            print "Processing source directory %s" % src_dir
+            print("Processing source directory %s" % src_dir)
 
         #Build a list of paths to source files
         glob_str = os.path.join(src_dir, '*')
@@ -262,7 +262,7 @@ def main(argv=sys.argv):
         src_paths = glob(glob_str)
 
         if args.verbose:
-            print "Found %d source files in the directory" % len(src_paths)
+            print("Found %d source files in the directory" % len(src_paths))
 
         #Group the files in this directory
         groups = parse_and_group(src_paths,
@@ -273,10 +273,10 @@ def main(argv=sys.argv):
                                 )
 
         if args.verbose:
-            print "Found %d groups of DICOM images" % len(groups)
+            print("Found %d groups of DICOM images" % len(groups))
 
         if len(groups) == 0:
-            print "No DICOM files found in %s" % src_dir
+            print("No DICOM files found in %s" % src_dir)
 
         out_idx = 0
         generated_outs = set()
@@ -319,7 +319,7 @@ def main(argv=sys.argv):
                 out_path = os.path.join(src_dir, out_fn)
 
             if args.verbose:
-                print "Writing out stack to path %s" % out_path
+                print("Writing out stack to path %s" % out_path)
 
             nii = stack.to_nifti(args.voxel_order, gen_meta)
 

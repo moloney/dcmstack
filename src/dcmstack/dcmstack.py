@@ -1051,7 +1051,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         #Read the DICOM file
         try:
             dcm = dicom.read_file(dcm_path, force=force)
-        except Exception, e:
+        except Exception as e:
             if warn_on_except:
                 warnings.warn('Error reading file %s: %s' % (dcm_path, str(e)))
                 continue
@@ -1113,7 +1113,7 @@ def stack_group(group, warn_on_except=False, **stack_args):
     for dcm, meta, fn in group:
         try:
             result.add_dcm(dcm, meta)
-        except Exception, e:
+        except Exception as e:
             if warn_on_except:
                 warnings.warn('Error adding file %s to stack: %s' %
                               (fn, str(e)))
