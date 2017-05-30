@@ -22,6 +22,9 @@ except ImportError:
 #long of a decimal string)
 dicom.config.enforce_valid_values = False
 
+# Python 2 / 3 compatibility
+unicode_str = unicode if sys.version_info[0] < 3 else str
+
 def is_ascii(in_str):
     '''Return true if the given string is valid ASCII.'''
     if all(' ' <= c <= '~' for c in in_str):
@@ -307,8 +310,8 @@ default_conversions = {'DS' : float,
                        'OW or OB' : get_text,
                        'OB or OW' : get_text,
                        'UN' : get_text,
-                       'PN' : str,
-                       'UI' : str,
+                       'PN' : unicode_str,
+                       'UI' : unicode_str,
                       }
 
 class MetaExtractor(object):
