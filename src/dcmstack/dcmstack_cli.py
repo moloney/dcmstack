@@ -3,6 +3,8 @@ Command line interface to dcmstack.
 
 @author: moloney
 """
+from __future__ import print_function
+
 import os, sys, argparse, string
 from glob import glob
 import dicom

@@ -1,6 +1,8 @@
 """
 DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
+from __future__ import print_function
+
 import sys
 import json, warnings
 from copy import deepcopy
