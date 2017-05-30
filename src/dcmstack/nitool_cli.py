@@ -3,6 +3,8 @@ Command line interface for nitool.
 
 @author: moloney
 """
+from __future__ import print_function
+
 import os, sys, argparse
 import nibabel as nb
 from .dcmmeta import NiftiWrapper, DcmMetaExtension, MissingExtensionError
@@ -109,7 +111,7 @@ def split(args):
     try:
         src_wrp = NiftiWrapper(src_nii)
     except MissingExtensionError:
-        print "No dcmmeta extension found, making empty one..."
+        print("No dcmmeta extension found, making empty one...")
         src_wrp = NiftiWrapper(src_nii, make_empty=True)
     for split_idx, split in enumerate(src_wrp.split(args.dimension)):
         if args.output_format:
@@ -137,7 +139,7 @@ def merge(args):
         try:
             src_wrp = NiftiWrapper(src_nii)
         except MissingExtensionError:
-            print "No dcmmeta extension found, making empty one..."
+            print("No dcmmeta extension found, making empty one...")
             src_wrp = NiftiWrapper(src_nii, make_empty=True)
         src_wrps.append(src_wrp)
 
@@ -169,7 +171,7 @@ def dump(args):
 def check_overwrite():
     usr_input = ''
     while not usr_input in ('y', 'n'):
-        usr_input = raw_input('Existing DcmMeta extension found, overwrite? '
+        usr_input = input('Existing DcmMeta extension found, overwrite? '
                               '[y/n]').lower()
     return usr_input == 'y'
 
@@ -197,7 +199,7 @@ def lookup(args):
         index = tuple(int(idx.strip()) for idx in args.index.split(','))
     meta = src_wrp.get_meta(args.key[0], index)
     if not meta is None:
-        print meta
+        print(meta)
     return 0
 
 def convert_values(values, type_str=None):
@@ -223,18 +225,18 @@ def inject(args):
     dest_wrp = NiftiWrapper(dest_nii, make_empty=True)
     classification = tuple(args.classification)
     if not classification in dest_wrp.meta_ext.get_valid_classes():
-        print "Invalid classification: %s" % (classification,)
+        print("Invalid classification: %s" % (classification,))
         return 1
     n_vals = len(args.values)
     mult = dest_wrp.meta_ext.get_multiplicity(classification)
     if n_vals != mult:
-        print ("Invalid number of values for classification. Expected "
-               "%d but got %d") % (mult, n_vals)
+        print(("Invalid number of values for classification. Expected "
+               "%d but got %d") % (mult, n_vals))
         return 1
     key = args.key[0]
     if key in dest_wrp.meta_ext.get_keys():
         if not args.force_overwrite:
-            print "Key already exists, must pass --force-overwrite"
+            print("Key already exists, must pass --force-overwrite")
             return 1
         else:
             curr_class = dest_wrp.meta_ext.get_classification(key)
