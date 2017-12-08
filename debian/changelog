@@ -1,3 +1,13 @@
+dcmstack (0.6.2+git36-gc12d27d-1) unstable; urgency=medium
+
+  * New upstream snapshot from v0.6.2-36-gc12d27d
+  * debian/control
+    - Added Vcs fields
+    - Properly capitalized NIfTI
+    - Boosted policy to 4.1.1
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 07 Dec 2017 19:39:52 -0500
+
 dcmstack (0.6.2+git33-gb43919a.1-1) unstable; urgency=low
 
   * Initial release (Closes: #798040).

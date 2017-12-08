@@ -3,11 +3,12 @@ Upstream-Name: dcmstack
 Source: https://github.com/moloney/dcmstack
 
 Files: *
-Copyright: 2011-2012 Brendan Moloney <moloney@ohsu.edu>
+Copyright: 2011-2016 Brendan Moloney <moloney@ohsu.edu>
 License: MIT
 
 Files: debian/*
 Copyright: 2015 Michael Hanke <mih@debian.org>
+           2017 Yaroslav Halchenko <debian@onerussia.com>
 License: MIT
 
 License: MIT
