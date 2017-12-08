@@ -81,7 +81,7 @@ def main(argv=sys.argv):
 
     stack_opt = arg_parser.add_argument_group('Stacking Options')
     stack_opt.add_argument('-g', '--group-by', default=None,
-                           help=("Comma seperated list of meta data keys to "
+                           help=("Comma separated list of meta data keys to "
                            "group input files into stacks with."))
     stack_opt.add_argument('--voxel-order', default='LAS',
                            help=('Order the voxels so the spatial indices '
@@ -197,7 +197,9 @@ def main(argv=sys.argv):
 
         #Include non-translated private elements if requested
         if args.extract_private:
-            ignore_rules = [extract.ignore_non_ascii_bytes]
+            ignore_rules = (extract.ignore_pixel_data,
+                            extract.ignore_overlay_data,
+                            extract.ignore_color_lut_data)
 
         extractor = extract.MetaExtractor(ignore_rules, translators)
 

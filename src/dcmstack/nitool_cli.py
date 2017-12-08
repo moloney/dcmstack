@@ -76,7 +76,7 @@ def main(argv=sys.argv):
     lookup_parser.add_argument('src_nii', nargs=1)
     lookup_parser.add_argument('-i', '--index',
                                help=("Use the given voxel index. The index "
-                               "must be provided as a comma seperated list of "
+                               "must be provided as a comma separated list of "
                                "integers (one for each dimension)."))
     lookup_parser.set_defaults(func=lookup)
 
@@ -91,9 +91,12 @@ def main(argv=sys.argv):
                                action='store_true',
                                help=("Overwrite any existing values "
                                "for the key"))
+    inject_parser.add_argument('-t', '--type', default=None,
+                               help="Interpret the value as this type instead "
+                               "of trying to determine the type automatically")
     inject_parser.set_defaults(func=inject)
 
-    #Parse the arguments and call the appropriate funciton
+    #Parse the arguments and call the appropriate function
     args = arg_parser.parse_args(argv[1:])
     return args.func(args)
 
@@ -197,14 +200,20 @@ def lookup(args):
         print meta
     return 0
 
-def convert_values(values):
-    for conv_type in (int, float):
-        try:
-            values = [conv_type(val) for val in values]
-        except ValueError:
-            pass
-        else:
-            break
+def convert_values(values, type_str=None):
+    if type_str is None:
+        for conv_type in (int, float):
+            try:
+                values = [conv_type(val) for val in values]
+            except ValueError:
+                pass
+            else:
+                break
+    else:
+        if type_str not in ('str', 'int', 'float'):
+            raise ValueError("Unrecognized type: %s" % type_str)
+        conv_type = eval(type_str)
+        values = [conv_type(val) for val in values]
     if len(values) == 1:
         return values[0]
     return values
@@ -232,7 +241,7 @@ def inject(args):
             curr_dict = dest_wrp.meta_ext.get_class_dict(curr_class)
             del curr_dict[key]
     class_dict = dest_wrp.meta_ext.get_class_dict(classification)
-    class_dict[key] = convert_values(args.values)
+    class_dict[key] = convert_values(args.values, args.type)
     nb.save(dest_nii, args.dest_nii[0])
     return 0
 

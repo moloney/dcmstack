@@ -40,7 +40,7 @@ By default, any private DICOM elements are ignored unless there is a
 *--disable-translator* option. To include private elements that don't have 
 a translator use the *--extract-private* option.
 
-**IT IS YOUR RESPONSABILITY TO KNOW IF THERE IS PRIVATE HEALTH INFORMATION 
+**IT IS YOUR RESPONSIBILITY TO KNOW IF THERE IS PRIVATE HEALTH INFORMATION 
 IN THE RESULTING FILE AND TREAT SUCH FILES APPROPRIATELY.**
 
 Output Names and Grouping

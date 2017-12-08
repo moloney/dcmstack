@@ -455,11 +455,11 @@ class MetaExtractor(object):
             if elem.tag in trans_map:
                 try:
                     meta = trans_map[elem.tag].trans_func(elem)
-                except Exception, e:
+                except Exception as e:
                     if self.warn_on_trans_except:
                         warnings.warn("Exception from translator %s: %s" %
                                       (trans_map[elem.tag].name,
-                                       str(e)))
+                                       repr(unicode(e))))
                     else:
                         raise
                 else:
