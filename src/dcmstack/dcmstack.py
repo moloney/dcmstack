@@ -763,11 +763,6 @@ class DicomStack(object):
         stack_shape = self.get_shape()
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
-        #This is a hack to keep fslview happy, Shouldn't cause issues as the
-        #original data should be 12-bit and any scaling will result in float
-        #data
-        if stack_dtype == np.uint16:
-            stack_dtype = np.int16
         vox_array = np.empty(stack_shape, dtype=stack_dtype)
 
         #Fill the array with data
@@ -790,6 +785,12 @@ class DicomStack(object):
                                     time_idx*(stack_shape[2]) + slice_idx)
                         vox_array[:, :, slice_idx, time_idx, vec_idx] = \
                             self._files_info[file_idx][0].nii_img.get_data()[:, :, 0]
+
+        #This is a hack to keep fslview happy, Shouldn't cause issues as the
+        #original data should be 12-bit and any scaling will result in float
+        #data
+        if stack_dtype == np.uint16 and np.all(vox_array > 0):
+            vox_array = vox_array.astype(np.int16)
 
         #Trim unused time/vector dimensions
         if stack_shape[4] == 1:
