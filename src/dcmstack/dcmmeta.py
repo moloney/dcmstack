@@ -4,16 +4,15 @@ DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 import sys
 import json, warnings
 from copy import deepcopy
-import numpy as np
-import nibabel as nb
-from nibabel.nifti1 import Nifti1Extension
-from nibabel.spatialimages import HeaderDataError
-
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
 
+import numpy as np
+import nibabel as nb
+from nibabel.nifti1 import Nifti1Extension
+from nibabel.spatialimages import HeaderDataError
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from nibabel.nicom.dicomwrappers import wrapper_from_data
@@ -39,6 +38,13 @@ _req_base_keys_map= {0.5 : set(('dcmmeta_affine',
                                ),
                     }
 '''Minimum required keys in the base dictionaty to be considered valid'''
+
+def get_phase_dir(dw):
+    if hasattr(dw.dcm_data, 'InplanePhaseEncodingDirection'):
+        return dw['InplanePhaseEncodingDirection']
+    elif hasattr(dw.dcm_data, 'InPlanePhaseEncodingDirection'):
+        return dw['InPlanePhaseEncodingDirection']
+    return None
 
 def is_constant(sequence, period=None):
     '''Returns true if all elements in (each period of) the sequence are equal.
@@ -1537,8 +1543,9 @@ class NiftiWrapper(object):
                     'phase' : None,
                     'slice' : 2
                    }
-        if hasattr(dcm_wrp.dcm_data, 'InplanePhaseEncodingDirection'):
-            if dcm_wrp['InplanePhaseEncodingDirection'] == 'ROW':
+        phase_dir = get_phase_dir(dcm_wrp)
+        if phase_dir:
+            if phase_dir == 'ROW':
                 dim_info['phase'] = 1
                 dim_info['freq'] = 0
             else:

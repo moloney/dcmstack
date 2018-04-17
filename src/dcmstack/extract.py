@@ -3,14 +3,18 @@ Extract meta data from a DICOM data set.
 """
 import struct, warnings
 from collections import namedtuple, defaultdict
-import dicom
-from dicom.datadict import keyword_for_tag
-from nibabel.nicom import csareader
-from .dcmstack import DicomStack
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
+    
+try:
+    import pydicom
+    from pydicom.datadict import keyword_for_tag
+except ImportError:
+    import dicom as pydicom
+    from dicom.datadict import keyword_for_tag
+from nibabel.nicom import csareader
 try:
     import chardet
     have_chardet = True
@@ -18,9 +22,12 @@ except ImportError:
     have_chardet = False
     pass
 
+from .dcmstack import DicomStack
+
+
 #This is needed to allow extraction on files with invalid values (e.g. too
 #long of a decimal string)
-dicom.config.enforce_valid_values = False
+pydicom.config.enforce_valid_values = False
 
 def is_ascii(in_str):
     '''Return true if the given string is valid ASCII.'''
@@ -36,7 +43,7 @@ def ignore_private(elem):
     return False
 
 def ignore_pixel_data(elem):
-    return elem.tag == dicom.tag.Tag(0x7fe0, 0x10)
+    return elem.tag == pydicom.tag.Tag(0x7fe0, 0x10)
 
 def ignore_overlay_data(elem):
     return elem.tag.group & 0xff00 == 0x6000 and elem.tag.elem == 0x3000
@@ -58,7 +65,7 @@ Translator = namedtuple('Translator', ['name',
                                        'trans_func']
                        )
 '''A namedtuple for storing the four elements of a translator: a name, the
-dicom.tag.Tag that can be translated, the private creator string (optional), and
+pydicom.tag.Tag that can be translated, the private creator string (optional), and
 the function which takes the DICOM element and returns a dictionary.'''
 
 def simplify_csa_dict(csa_dict):
@@ -95,7 +102,7 @@ def csa_image_trans_func(elem):
     return simplify_csa_dict(csareader.read(elem.value))
 
 csa_image_trans = Translator('CsaImage',
-                             dicom.tag.Tag(0x29, 0x1010),
+                             pydicom.tag.Tag(0x29, 0x1010),
                              'SIEMENS CSA HEADER',
                              csa_image_trans_func)
 '''Translator for the CSA image sub header.'''
@@ -226,7 +233,7 @@ def csa_series_trans_func(elem):
     return csa_dict
 
 csa_series_trans = Translator('CsaSeries',
-                              dicom.tag.Tag(0x29, 0x1020),
+                              pydicom.tag.Tag(0x29, 0x1020),
                               'SIEMENS CSA HEADER',
                               csa_series_trans_func)
 '''Translator for parsing the CSA series sub header.'''
@@ -409,7 +416,7 @@ class MetaExtractor(object):
 
         Parameters
         ----------
-        dcm : dicom.dataset.Dataset
+        dcm : pydicom.dataset.Dataset
             The DICOM dataset to extract the meta data from.
 
         Returns
@@ -448,7 +455,7 @@ class MetaExtractor(object):
                     if translator.priv_creator == elem.value:
                         new_elem = ((translator.tag.elem & 0xff) |
                                     (elem.tag.elem * 16**2))
-                        new_tag = dicom.tag.Tag(elem.tag.group, new_elem)
+                        new_tag = pydicom.tag.Tag(elem.tag.group, new_elem)
                         if new_tag in trans_map:
                             raise ValueError('More than one translator '
                                              'for tag: %s' % new_tag)
@@ -472,7 +479,7 @@ class MetaExtractor(object):
             elif any(rule(elem) for rule in self.ignore_rules):
                 continue
             #Handle elements that are sequences with recursion
-            elif isinstance(elem.value, dicom.sequence.Sequence):
+            elif isinstance(elem.value, pydicom.sequence.Sequence):
                 value = []
                 for val in elem.value:
                     value.append(self(val))
