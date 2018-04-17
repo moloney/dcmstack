@@ -2,20 +2,26 @@
 Stack DICOM datasets into volumes. The contents of this module are imported
 into the package namespace.
 """
-import warnings, re, dicom
+import warnings, re
 from copy import deepcopy
+
+import numpy as np
+try:
+    import pydicom
+except ImportError:
+    import dicom as pydicom
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
 from nibabel.orientations import (io_orientation,
                                   apply_orientation,
                                   inv_ornt_aff)
-import numpy as np
-from .dcmmeta import DcmMetaExtension, NiftiWrapper
-
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from nibabel.nicom.dicomwrappers import wrapper_from_data
+
+from .dcmmeta import DcmMetaExtension, NiftiWrapper
+
 
 def make_key_regex_filter(exclude_res, force_include_res=None):
     '''Make a meta data filter using regular expressions.
@@ -495,7 +501,7 @@ class DicomStack(object):
 
         Parameters
         ----------
-        dcm : dicom.dataset.Dataset
+        dcm : pydicom.dataset.Dataset
             The data set being added to the stack
 
         meta : dict
@@ -1021,7 +1027,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         will also be the key in the result dictionary.
 
     extractor : callable
-        Should take a dicom.dataset.Dataset and return a dictionary of the
+        Should take a pydicom.dataset.Dataset and return a dictionary of the
         extracted meta data.
 
     force : bool
@@ -1051,7 +1057,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
     for dcm_path in src_paths:
         #Read the DICOM file
         try:
-            dcm = dicom.read_file(dcm_path, force=force)
+            dcm = pydicom.read_file(dcm_path, force=force)
         except Exception, e:
             if warn_on_except:
                 warnings.warn('Error reading file %s: %s' % (dcm_path, str(e)))
@@ -1138,7 +1144,7 @@ def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None,
         will also be the key in the result dictionary.
 
     extractor : callable
-        Should take a dicom.dataset.Dataset and return a dictionary of the
+        Should take a pydicom.dataset.Dataset and return a dictionary of the
         extracted meta data.
 
     force : bool
