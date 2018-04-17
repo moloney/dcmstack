@@ -292,12 +292,15 @@ def get_text(byte_str):
         if match['encoding'] is None:
             return None
         else:
-            return byte_str.decode(match['encoding'])
+            try:
+                return byte_str.decode(match['encoding'])
+            except UnicodeDecodeError:
+                pass
+
+    if not is_ascii(byte_str):
+        return None
     else:
-        if not is_ascii(byte_str):
-            return None
-        else:
-            return byte_str.decode('ascii')
+        return byte_str.decode('ascii')
 
 default_conversions = {'DS' : float,
                        'IS' : int,
