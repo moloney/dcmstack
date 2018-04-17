@@ -763,10 +763,11 @@ class DicomStack(object):
         stack_shape = self.get_shape()
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
-        #This is a hack to keep fslview happy, Shouldn't cause issues as the
-        #original data should be 12-bit and any scaling will result in float
-        #data
-        if stack_dtype == np.uint16:
+        bits_stored = self._files_info[0][0].get_meta('BitsStored', default=16)
+        # This is a hack to keep fslview happy, it does not like unsigned short
+        # data. If less than 16 bits are being used for each pixel we default 
+        # to signed short.        
+        if stack_dtype == np.uint16 and bits_stored < 16:
             stack_dtype = np.int16
         vox_array = np.empty(stack_shape, dtype=stack_dtype)
 

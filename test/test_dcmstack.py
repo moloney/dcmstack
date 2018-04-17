@@ -10,6 +10,7 @@ from copy import deepcopy
 import numpy as np
 import dicom
 from dicom import datadict
+from dicom.UID import ExplicitVRLittleEndian
 import nibabel as nb
 from nibabel.orientations import aff2axcodes
 
@@ -610,3 +611,48 @@ class TestToNifti(object):
         data = nii.get_data()
         ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
 
+
+def test_fsl_hack():
+    ds = dicom.dataset.Dataset()
+    ds.file_meta = dicom.dataset.Dataset()
+    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds.is_little_endian = True
+    ds.ImagePositionPatient = [0.0, 0.0, 0.0]
+    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    ds.PixelSpacing = [1.0, 1.0]
+    ds.SliceThickness = 1.0
+    ds.Rows = 16
+    ds.Columns = 16
+    ds.BitsAllocated = 16
+    ds.BitsStored = 14
+    ds.PixelRepresentation = 0
+    ds.SamplesPerPixel = 1
+    ds.PixelData = (np.ones((16, 16), np.uint16) * (2**14 - 1)).tostring()
+    stack = dcmstack.DicomStack()
+    stack.add_dcm(ds)
+    data = stack.get_data()    
+    eq_(np.max(data), (2**14 - 1))
+    eq_(data.dtype, np.int16)
+
+
+def test_pix_overflow():
+    ds = dicom.dataset.Dataset()
+    ds.file_meta = dicom.dataset.Dataset()
+    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds.is_little_endian = True
+    ds.ImagePositionPatient = [0.0, 0.0, 0.0]
+    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    ds.PixelSpacing = [1.0, 1.0]
+    ds.SliceThickness = 1.0
+    ds.Rows = 16
+    ds.Columns = 16
+    ds.BitsAllocated = 16
+    ds.BitsStored = 16
+    ds.PixelRepresentation = 0
+    ds.SamplesPerPixel = 1
+    ds.PixelData = (np.ones((16, 16), np.uint16) * (2**16 - 1)).tostring()
+    stack = dcmstack.DicomStack()
+    stack.add_dcm(ds)
+    data = stack.get_data()    
+    eq_(np.max(data), (2**16 - 1))
+    eq_(data.dtype, np.uint16)
