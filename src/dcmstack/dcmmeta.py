@@ -39,13 +39,6 @@ _req_base_keys_map= {0.5 : set(('dcmmeta_affine',
                     }
 '''Minimum required keys in the base dictionaty to be considered valid'''
 
-def get_phase_dir(dw):
-    if hasattr(dw.dcm_data, 'InplanePhaseEncodingDirection'):
-        return dw['InplanePhaseEncodingDirection']
-    elif hasattr(dw.dcm_data, 'InPlanePhaseEncodingDirection'):
-        return dw['InPlanePhaseEncodingDirection']
-    return None
-
 def is_constant(sequence, period=None):
     '''Returns true if all elements in (each period of) the sequence are equal.
 
@@ -1543,7 +1536,7 @@ class NiftiWrapper(object):
                     'phase' : None,
                     'slice' : 2
                    }
-        phase_dir = get_phase_dir(dcm_wrp)
+        phase_dir = dcm_wrp.get('InPlanePhaseEncodingDirection')
         if phase_dir:
             if phase_dir == 'ROW':
                 dim_info['phase'] = 1
