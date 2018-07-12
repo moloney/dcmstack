@@ -6,7 +6,9 @@ Command line interface for nitool.
 from __future__ import print_function
 
 import os, sys, argparse
+
 import nibabel as nb
+
 from .dcmmeta import NiftiWrapper, DcmMetaExtension, MissingExtensionError
 
 prog_descrip = """Work with extended Nifti files created by dcmstack"""

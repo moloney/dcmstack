@@ -7,7 +7,12 @@ from __future__ import print_function
 
 import os, sys, argparse, string
 from glob import glob
-import dicom
+
+try:
+    import pydicom
+except ImportError:
+    import dicom as pydicom
+
 from . import dcmstack
 from .dcmstack import (parse_and_group, stack_group, DicomOrdering,
                        default_group_keys)
@@ -30,7 +35,7 @@ def parse_tags(opt_str):
         tokens = tag_str.split('_')
         if len(tokens) != 2:
             raise ValueError('Invalid str format for tags')
-        tags.append(dicom.tag.Tag(int(tokens[0].strip(), 16),
+        tags.append(pydicom.tag.Tag(int(tokens[0].strip(), 16),
                                   int(tokens[1].strip(), 16))
                    )
     return tags

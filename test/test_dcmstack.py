@@ -5,11 +5,19 @@ import sys
 from os import path
 from glob import glob
 from hashlib import sha256
-from nose.tools import ok_, eq_, assert_raises
 from copy import deepcopy
+
+from nose.tools import ok_, eq_, assert_raises
 import numpy as np
-import dicom
-from dicom import datadict
+try:
+    import pydicom
+    from pydicom.datadict import keyword_dict, dictionary_VR
+    from pydicom.uid import ExplicitVRLittleEndian
+except ImportError:
+    import dicom as pydicom
+    from dicom.datadict import keyword_dict
+    from dicom.datadict import dictionaryVR as dictionary_VR
+    from dicom.UID import ExplicitVRLittleEndian
 import nibabel as nb
 from nibabel.orientations import aff2axcodes
 
@@ -182,7 +190,7 @@ def test_image_collision():
                          'dcmstack',
                          '2D_16Echo_qT2',
                          'TE_20_SlcPos_-33.707626341697.dcm')
-    dcm = dicom.read_file(dcm_path)
+    dcm = pydicom.read_file(dcm_path)
     stack = dcmstack.DicomStack('EchoTime')
     stack.add_dcm(dcm)
     assert_raises(dcmstack.ImageCollisionError,
@@ -196,11 +204,11 @@ class TestIncongruentImage(object):
                              'dcmstack',
                              '2D_16Echo_qT2',
                              'TE_20_SlcPos_-33.707626341697.dcm')
-        self.dcm = dicom.read_file(dcm_path)
+        self.dcm = pydicom.read_file(dcm_path)
 
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.dcm)
-        self.dcm = dicom.read_file(dcm_path)
+        self.dcm = pydicom.read_file(dcm_path)
 
     def _chk_raises(self):
         assert_raises(dcmstack.IncongruentImageError,
@@ -246,7 +254,7 @@ class TestInvalidStack(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -307,7 +315,7 @@ class TestGetShape(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -361,7 +369,7 @@ class TestGuessDim(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -374,8 +382,8 @@ class TestGuessDim(object):
                     delattr(in_dcm, key)
 
     def _get_vr_ord(self, key, ordinate):
-        tag = datadict.keyword_dict[key]
-        vr = datadict.dictionaryVR(tag)
+        tag = keyword_dict[key]
+        vr = dictionary_VR(tag)
         if vr == 'TM':
             return '%06d.000000' % ordinate
         else:
@@ -411,7 +419,7 @@ class TestGetData(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -476,7 +484,7 @@ class TestGetAffine(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm'
                                  )
@@ -543,7 +551,7 @@ class TestToNifti(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [dicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -610,3 +618,48 @@ class TestToNifti(object):
         data = nii.get_data()
         ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
 
+
+def test_fsl_hack():
+    ds = pydicom.dataset.Dataset()
+    ds.file_meta = pydicom.dataset.Dataset()
+    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds.is_little_endian = True
+    ds.ImagePositionPatient = [0.0, 0.0, 0.0]
+    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    ds.PixelSpacing = [1.0, 1.0]
+    ds.SliceThickness = 1.0
+    ds.Rows = 16
+    ds.Columns = 16
+    ds.BitsAllocated = 16
+    ds.BitsStored = 14
+    ds.PixelRepresentation = 0
+    ds.SamplesPerPixel = 1
+    ds.PixelData = (np.ones((16, 16), np.uint16) * (2**14 - 1)).tostring()
+    stack = dcmstack.DicomStack()
+    stack.add_dcm(ds)
+    data = stack.get_data()    
+    eq_(np.max(data), (2**14 - 1))
+    eq_(data.dtype, np.int16)
+
+
+def test_pix_overflow():
+    ds = pydicom.dataset.Dataset()
+    ds.file_meta = pydicom.dataset.Dataset()
+    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds.is_little_endian = True
+    ds.ImagePositionPatient = [0.0, 0.0, 0.0]
+    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    ds.PixelSpacing = [1.0, 1.0]
+    ds.SliceThickness = 1.0
+    ds.Rows = 16
+    ds.Columns = 16
+    ds.BitsAllocated = 16
+    ds.BitsStored = 16
+    ds.PixelRepresentation = 0
+    ds.SamplesPerPixel = 1
+    ds.PixelData = (np.ones((16, 16), np.uint16) * (2**16 - 1)).tostring()
+    stack = dcmstack.DicomStack()
+    stack.add_dcm(ds)
+    data = stack.get_data()    
+    eq_(np.max(data), (2**16 - 1))
+    eq_(data.dtype, np.uint16)

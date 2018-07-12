@@ -1,0 +1,26 @@
+language: python
+
+python:
+  - "2.7"
+
+env:
+    global:
+        - DEPENDS="nose"
+        - OPTIONAL_DEPENDS=""
+
+install:
+  - pip install $DEPENDS $OPTIONAL_DEPENDS
+  - pip install -e .
+
+matrix:
+  include:
+    - python: 2.7
+    - python: 2.7
+      env:
+        - DEPENDS="pydicom==0.9.9"
+    - python: 2.7
+      env:
+        - OPTIONAL_DEPENDS="chardet"
+
+script: 
+  - nosetests -v
