@@ -432,10 +432,10 @@ def test_simp_sngl_slc_5d():
                                               2
                                              )
     glob_slc = ext.get_class_dict(('global', 'slices'))
-    glob_slc['test1'] = range(15)
+    glob_slc['test1'] = list(range(15))
     ext._simplify('test1')
     eq_(ext.get_values_and_class('test1'),
-        (range(15), ('time','samples'))
+        (list(range(15)), ('time','samples'))
        )
 
 class TestGetSubset(object):
@@ -450,7 +450,7 @@ class TestGetSubset(object):
         for classes in self.ext.get_valid_classes():
             key = '%s_%s_test' % classes
             mult = self.ext.get_multiplicity(classes)
-            self.ext.get_class_dict(classes)[key] = range(mult)
+            self.ext.get_class_dict(classes)[key] = list(range(mult))
 
     def test_slice_subset(self):
         for slc_idx in range(self.ext.n_slices):
@@ -465,11 +465,11 @@ class TestGetSubset(object):
                        )
                 elif classes == ('vector', 'slices'):
                     eq_(sub.get_values_and_class(key),
-                        ((range(slc_idx, (3 * 5), 3) * 7), ('time', 'samples'))
+                        ((list(range(slc_idx, (3 * 5), 3)) * 7), ('time', 'samples'))
                        )
                 elif classes == ('global', 'slices'):
                     eq_(sub.get_values_and_class(key),
-                        (range(slc_idx, (3 * 5 * 7), 3), ('time', 'samples')))
+                        (list(range(slc_idx, (3 * 5 * 7), 3)), ('time', 'samples')))
                 else:
                     eq_(sub.get_values_and_class(key),
                         self.ext.get_values_and_class(key)
@@ -514,7 +514,7 @@ class TestGetSubset(object):
                     ok_(not classes in sub.get_valid_classes())
                     if classes[1] == 'samples':
                         eq_(sub.get_values_and_class(key),
-                            (range(time_idx, 5 * 7, 5), ('vector', 'samples'))
+                            (list(range(time_idx, 5 * 7, 5)), ('vector', 'samples'))
                            )
                     elif classes[1] == 'slices':
                         eq_(sub.get_values_and_class(key),
@@ -528,7 +528,7 @@ class TestGetSubset(object):
                         start = time_idx * 3
                         end = start + 3
                         eq_(sub.get_values_and_class(key),
-                            (range(start, end), ('vector', 'slices')))
+                            (list(range(start, end)), ('vector', 'slices')))
                 else:
                     if classes[1] == 'const':
                         eq_(sub.get_values_and_class(key),
@@ -539,7 +539,7 @@ class TestGetSubset(object):
                         for vec_idx in range(7):
                             start = (vec_idx * (3 * 5)) + (time_idx * 3)
                             end = start + 3
-                            vals += range(start, end)
+                            vals += list(range(start, end))
                         eq_(sub.get_values_and_class(key),
                             (vals, ('global', 'slices')))
 
@@ -606,10 +606,10 @@ class TestGetSubset(object):
             sub.check_valid()
             if time_idx == 1:
                 eq_(sub.get_values_and_class('glb_slc_to_vec'),
-                    (range(3), ('vector', 'slices')))
+                    (list(range(3)), ('vector', 'slices')))
             else:
                 eq_(sub.get_values_and_class('glb_slc_to_vec'),
-                    (range(7), ('vector', 'samples')))
+                    (list(range(7)), ('vector', 'samples')))
 
     def test_vector_sample_subset(self):
         for vector_idx in range(7):
@@ -625,14 +625,14 @@ class TestGetSubset(object):
                            )
                     elif classes[1] == 'slices':
                         eq_(sub.get_values_and_class(key),
-                            (range(3 * 5), ('global', 'slices'))
+                            (list(range(3 * 5)), ('global', 'slices'))
                            )
                 elif classes[0] == 'time':
                     if classes[1] == 'samples': #Could be const
                         start = vector_idx * 5
                         end = start + 5
                         eq_(sub.get_values_and_class(key),
-                            (range(start, end), classes)
+                            (list(range(start, end)), classes)
                            )
                     elif classes[1] == 'slices':
                         eq_(sub.get_values_and_class(key),
@@ -646,7 +646,7 @@ class TestGetSubset(object):
                         start = vector_idx * (3 * 5)
                         end = start + (3 * 5)
                         eq_(sub.get_values_and_class(key),
-                            (range(start, end), classes))
+                            (list(range(start, end)), classes))
 
     def test_vector_sample_subset_simplify(self):
 
@@ -687,10 +687,10 @@ class TestGetSubset(object):
                     (1, ('global', 'const')))
             elif vector_idx == 2:
                 eq_(sub.get_values_and_class('glb_slc'),
-                    (range(3), ('time', 'slices')))
+                    (list(range(3)), ('time', 'slices')))
             else:
                 eq_(sub.get_values_and_class('glb_slc'),
-                    (range(5), ('time', 'samples')))
+                    (list(range(5)), ('time', 'samples')))
 
 class TestChangeClass(object):
     def setUp(self):
@@ -706,7 +706,7 @@ class TestChangeClass(object):
             if mult == 1:
                 vals = 0
             else:
-                vals = range(mult)
+                vals = list(range(mult))
             self.ext.get_class_dict(classes)[key] = vals
 
     def test_change_none(self):
@@ -765,13 +765,13 @@ class TestChangeClass(object):
     def test_time_slices(self):
         vals = []
         for time_idx in range(5 * 7):
-            vals += range(3)
+            vals += list(range(3))
         eq_(self.ext._get_changed_class('time_slices_test',
                                         ('global', 'slices')),
             vals)
         vals = []
         for time_idx in range(5):
-            vals += range(3)
+            vals += list(range(3))
         eq_(self.ext._get_changed_class('time_slices_test',
                                         ('vector', 'slices')),
             vals)
@@ -779,7 +779,7 @@ class TestChangeClass(object):
     def test_vector_slices(self):
         vals = []
         for vector_idx in range(7):
-            vals += range(15)
+            vals += list(range(15))
         eq_(self.ext._get_changed_class('vector_slices_test',
                                         ('global', 'slices')),
             vals)
@@ -986,7 +986,7 @@ class TestGetMeta(object):
             if mult == 1:
                 vals = 0
             else:
-                vals = range(mult)
+                vals = list(range(mult))
             self.nw.meta_ext.get_class_dict(classes)[key] = vals
 
     def test_invalid_index(self):
@@ -1088,7 +1088,7 @@ class TestSplit(object):
             if mult == 1:
                 vals = 0
             else:
-                vals = range(mult)
+                vals = list(range(mult))
             self.nw.meta_ext.get_class_dict(classes)[key] = vals
 
     def test_split_slice(self):
@@ -1178,7 +1178,7 @@ def test_from_2d_slice_to_3d():
         (40, ('global', 'const'))
        )
     eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
-        (range(3), ('global', 'slices'))
+        (list(range(3)), ('global', 'slices'))
        )
     merged_hdr = merged.nii_img.get_header()
     eq_(merged_hdr.get_dim_info(), (0, 1, 2))
@@ -1204,8 +1204,8 @@ def test_from_3d_time_to_4d():
         const_meta['PatientID'] = 'Test'
         const_meta['EchoTime'] = idx
         glb_slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
-        glb_slice_meta['SliceLocation'] = range(4)
-        glb_slice_meta['AcquisitionTime'] = range(idx * 4, (idx + 1) * 4)
+        glb_slice_meta['SliceLocation'] = list(range(4))
+        glb_slice_meta['AcquisitionTime'] = list(range(idx * 4, (idx + 1) * 4))
         time_nws.append(nw)
 
     merged = dcmmeta.NiftiWrapper.from_sequence(time_nws, 3)
@@ -1220,10 +1220,10 @@ def test_from_3d_time_to_4d():
         ([0, 1, 2], ('time', 'samples'))
        )
     eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
-        (range(4), ('time', 'slices'))
+        (list(range(4)), ('time', 'slices'))
        )
     eq_(merged.meta_ext.get_values_and_class('AcquisitionTime'),
-        (range(4 * 3), ('global', 'slices'))
+        (list(range(4 * 3)), ('global', 'slices'))
        )
     merged_hdr = merged.nii_img.get_header()
     eq_(merged_hdr.get_dim_info(), (0, 1, 2))
@@ -1250,8 +1250,8 @@ def test_from_3d_vector_to_4d():
         const_meta['PatientID'] = 'Test'
         const_meta['EchoTime'] = idx
         glb_slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
-        glb_slice_meta['SliceLocation'] = range(4)
-        glb_slice_meta['AcquisitionTime'] = range(idx * 4, (idx + 1) * 4)
+        glb_slice_meta['SliceLocation'] = list(range(4))
+        glb_slice_meta['AcquisitionTime'] = list(range(idx * 4, (idx + 1) * 4))
         vector_nws.append(nw)
 
     merged = dcmmeta.NiftiWrapper.from_sequence(vector_nws, 4)
@@ -1266,10 +1266,10 @@ def test_from_3d_vector_to_4d():
         ([0, 1, 2], ('vector', 'samples'))
        )
     eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
-        (range(4), ('vector', 'slices'))
+        (list(range(4)), ('vector', 'slices'))
        )
     eq_(merged.meta_ext.get_values_and_class('AcquisitionTime'),
-        (range(4 * 3), ('global', 'slices'))
+        (list(range(4 * 3)), ('global', 'slices'))
        )
     merged_hdr = merged.nii_img.get_header()
     eq_(merged_hdr.get_dim_info(), (0, 1, 2))
@@ -1323,7 +1323,7 @@ def test_merge_with_slc_and_without():
         const_meta['EchoTime'] = idx
         if idx == 0:
             glb_slice_meta = nw.meta_ext.get_class_dict(('global', 'slices'))
-            glb_slice_meta['SliceLocation'] = range(4)
+            glb_slice_meta['SliceLocation'] = list(range(4))
         input_nws.append(nw)
 
     merged = dcmmeta.NiftiWrapper.from_sequence(input_nws)
@@ -1338,7 +1338,7 @@ def test_merge_with_slc_and_without():
         ([0, 1, 2], ('time', 'samples'))
        )
     eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
-        (range(4) + ([None] * 8), ('global', 'slices'))
+        (list(range(4)) + ([None] * 8), ('global', 'slices'))
        )
     merged_hdr = merged.nii_img.get_header()
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))

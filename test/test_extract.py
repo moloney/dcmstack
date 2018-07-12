@@ -96,7 +96,7 @@ class TestMetaExtractor(object):
             value = extractor._get_elem_value(elem)
             if elem.VM > 1:
                 ok_(isinstance(value, list))
-            if elem.VR in extract.unpack_vr_map.keys() + ['DS', 'IS']:
+            if elem.VR in list(extract.unpack_vr_map) + ['DS', 'IS']:
                 if elem.VM == 1:
                     ok_(not isinstance(value, str))
                 else:

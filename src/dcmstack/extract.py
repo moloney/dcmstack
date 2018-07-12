@@ -1,8 +1,10 @@
 """
 Extract meta data from a DICOM data set.
 """
-import struct, warnings
+import struct
+import warnings
 from collections import namedtuple, defaultdict
+
 try:
     from collections import OrderedDict
 except ImportError:
@@ -23,18 +25,22 @@ except ImportError:
     pass
 
 from .dcmstack import DicomStack
-
+from .utils import PY2
+from .utils import unicode_str
 
 #This is needed to allow extraction on files with invalid values (e.g. too
 #long of a decimal string)
 pydicom.config.enforce_valid_values = False
 
-# Python 2 / 3 compatibility
-unicode_str = unicode if sys.version_info[0] < 3 else str
-
 def is_ascii(in_str):
     '''Return true if the given string is valid ASCII.'''
-    if all(' ' <= c <= '~' for c in in_str):
+    # We do not want to deal with encode/decode ATM, so let's assume
+    # that no fancy unicode is in there and just do blunt comparison char
+    # by char
+    start, end = ' ', '~'
+    if not PY2 and isinstance(in_str, bytes):
+        start, end = 32, 126
+    if all(start <= c <= end for c in in_str):
         return True
     return False
 
