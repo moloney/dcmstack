@@ -21,6 +21,7 @@ with warnings.catch_warnings():
     from nibabel.nicom.dicomwrappers import wrapper_from_data
 
 from .dcmmeta import DcmMetaExtension, NiftiWrapper
+from .utils import iteritems
 
 
 def make_key_regex_filter(exclude_res, force_include_res=None):
@@ -381,6 +382,11 @@ default_group_keys =  ('SeriesInstanceUID',
                        'ImageOrientationPatient')
 '''Default keys for grouping DICOM files that belong in the same
 multi-dimensional array together.'''
+
+
+default_close_keys = ('ImageOrientationPatient')
+'''Default keys needing np.allclose instead of equaulity testing when grouping 
+'''
 
 class DicomStack(object):
     '''Defines a method for stacking together DICOM data sets into a multi
@@ -1012,7 +1018,7 @@ class DicomStack(object):
 
 def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
                     force=False, warn_on_except=False,
-                    close_tests=('ImageOrientationPatient',)):
+                    close_tests=default_close_keys):
     '''Parse the given dicom files and group them together. Each group is
     stored as a (list) value in a dict where the key is a tuple of values
     corresponding to the keys in 'group_by'
@@ -1099,7 +1105,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
 
     # Unpack sub results, using the canonical value for the close keys
     full_results = {}
-    for eq_key, sub_res_list in results.iteritems():
+    for eq_key, sub_res_list in iteritems(results):
         for close_key, sub_res in sub_res_list:
             full_key = []
             eq_idx = 0
@@ -1164,7 +1170,7 @@ def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None,
                               force,
                               warn_on_except)
 
-    for key, group in results.iteritems():
+    for key, group in iteritems(results):
         results[key] = stack_group(group, warn_on_except, **stack_args)
 
     return results

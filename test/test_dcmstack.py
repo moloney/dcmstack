@@ -632,6 +632,62 @@ class TestToNifti(object):
         ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
 
 
+class TestParseAndGroup(object):
+    def setUp(self):
+        self.data_dir = path.join(test_dir,
+                             'data',
+                             'dcmstack',
+                             '2D_16Echo_qT2')
+        self.in_paths = [path.join(self.data_dir, fn)
+                         for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
+                                    'TE_20_SlcPos_-23.207628249046.dcm',
+                                    'TE_40_SlcPos_-33.707626341697.dcm',
+                                    'TE_40_SlcPos_-23.207628249046.dcm',
+                                   )
+                        ]
+
+    def test_default(self):
+        res = dcmstack.parse_and_group(self.in_paths)
+        eq_(len(res), 1)
+        ds = pydicom.read_file(self.in_paths[0])
+        group_key = list(res.keys())[0]
+        for attr_idx, attr in enumerate(dcmstack.default_group_keys):
+            if attr in dcmstack.default_close_keys:
+                ok_(np.allclose(group_key[attr_idx], getattr(ds, attr)))
+            else:
+                eq_(group_key[attr_idx], getattr(ds, attr))
+
+
+class TestParseAndStack(object):
+    def setUp(self):
+        self.data_dir = path.join(test_dir,
+                             'data',
+                             'dcmstack',
+                             '2D_16Echo_qT2')
+        self.in_paths = [path.join(self.data_dir, fn)
+                         for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
+                                    'TE_20_SlcPos_-23.207628249046.dcm',
+                                    'TE_40_SlcPos_-33.707626341697.dcm',
+                                    'TE_40_SlcPos_-23.207628249046.dcm',
+                                   )
+                        ]
+
+    def test_default(self):
+        res = dcmstack.parse_and_stack(self.in_paths)
+        eq_(len(res), 1)
+        ds = pydicom.read_file(self.in_paths[0])
+        group_key = list(res.keys())[0]
+        for attr_idx, attr in enumerate(dcmstack.default_group_keys):
+            if attr in dcmstack.default_close_keys:
+                ok_(np.allclose(group_key[attr_idx], getattr(ds, attr)))
+            else:
+                eq_(group_key[attr_idx], getattr(ds, attr))
+        stack = list(res.values())[0]
+        ok_(isinstance(stack, dcmstack.DicomStack))
+        stack_data = stack.get_data()
+        eq_(stack_data.ndim, 4)
+
+
 def test_fsl_hack():
     ds = pydicom.dataset.Dataset()
     ds.file_meta = pydicom.dataset.Dataset()
