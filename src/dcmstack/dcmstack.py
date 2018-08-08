@@ -1078,7 +1078,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         close_list = [] # Values from group_by elems with np.allclose testing
         for grp_key in group_by:
             key_elem = meta.get(grp_key)
-            if isinstance(key_elem, list):
+            if isinstance(key_elem, list) or isinstance(key_elem, pydicom.multival.MultiValue):
                 key_elem = tuple(key_elem)
             if grp_key in close_tests:
                 close_list.append(key_elem)
