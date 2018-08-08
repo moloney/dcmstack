@@ -2,6 +2,8 @@ import sys, os, shutil
 from tempfile import mkdtemp
 from glob import glob
 
+from nose.tools import ok_, eq_
+
 test_dir = os.path.dirname(__file__)
 src_dir = os.path.normpath(os.path.join(test_dir, '../src'))
 sys.path.insert(0, src_dir)
