@@ -32,7 +32,6 @@ _def_file_meta = pydicom.dataset.Dataset()
 _def_file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
 
 def_dicom_attrs = {'file_meta' : _def_file_meta,
-                   'is_little_endian' : True,
                    'ImagePositionPatient' : [0.0, 0.0, 0.0],
                    'ImageOrientationPatient' : [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
                    'PixelSpacing' : [1.0, 1.0],
@@ -48,6 +47,7 @@ def_dicom_attrs = {'file_meta' : _def_file_meta,
 def make_dicom(attrs=None, pix_val=1):
     '''Build a mock DICOM dataset for testing purposes'''
     ds = pydicom.dataset.Dataset()
+    ds.is_little_endian = True
     if attrs is None:
         attrs = {}
     for attr_name, attr_val in attrs.items():
