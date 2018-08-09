@@ -384,7 +384,7 @@ default_group_keys =  ('SeriesInstanceUID',
 multi-dimensional array together.'''
 
 
-default_close_keys = ('ImageOrientationPatient')
+default_close_keys = ('ImageOrientationPatient',)
 '''Default keys needing np.allclose instead of equaulity testing when grouping 
 '''
 
