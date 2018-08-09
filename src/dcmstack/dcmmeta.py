@@ -19,7 +19,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from nibabel.nicom.dicomwrappers import wrapper_from_data
 
-from .utils import iteritems
+from .utils import iteritems, unicode_str
 
 dcm_meta_ecode = 0
 
@@ -503,7 +503,7 @@ class DcmMetaExtension(Nifti1Extension):
     def to_json(self):
         '''Return the extension encoded as a JSON string.'''
         self.check_valid()
-        return self._mangle(self._content)
+        return json.dumps(self._content, indent=4)
 
     @classmethod
     def from_json(klass, json_str):
@@ -693,6 +693,8 @@ class DcmMetaExtension(Nifti1Extension):
 
     def _unmangle(self, value):
         '''Go from extension data to runtime representation.'''
+        if not isinstance(value, unicode_str):
+            value = value.decode('utf-8')
         #Its not possible to preserve order while loading with python 2.6
         kwargs = {}
         if sys.version_info >= (2, 7):
@@ -701,7 +703,7 @@ class DcmMetaExtension(Nifti1Extension):
 
     def _mangle(self, value):
         '''Go from runtime representation to extension data.'''
-        return json.dumps(value, indent=4)
+        return json.dumps(value, indent=4).encode('utf-8')
 
     _const_tests = {('global', 'slices') : (('global', 'const'),
                                             ('vector', 'samples'),
