@@ -727,21 +727,6 @@ class TestParseAndStack(object):
 
 def test_fsl_hack():
     ds = make_dicom({'BitsStored': 14, }, 2**14 - 1)
-#    ds = pydicom.dataset.Dataset()
-#    ds.file_meta = pydicom.dataset.Dataset()
-#    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
-#    ds.is_little_endian = True
-#    ds.ImagePositionPatient = [0.0, 0.0, 0.0]
-#    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
-#    ds.PixelSpacing = [1.0, 1.0]
-#    ds.SliceThickness = 1.0
-#    ds.Rows = 16
-#    ds.Columns = 16
-#    ds.BitsAllocated = 16
-#    ds.BitsStored = 14
-#    ds.PixelRepresentation = 0
-#    ds.SamplesPerPixel = 1
-#    ds.PixelData = (np.ones((16, 16), np.uint16) * (2**14 - 1)).tostring()
     stack = dcmstack.DicomStack()
     stack.add_dcm(ds)
     data = stack.get_data()    
@@ -751,21 +736,6 @@ def test_fsl_hack():
 
 def test_pix_overflow():
     ds = make_dicom(pix_val=(2**16 - 1))
-#    ds = pydicom.dataset.Dataset()
-#    ds.file_meta = pydicom.dataset.Dataset()
-#    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
-#    ds.is_little_endian = True
-#    ds.ImagePositionPatient = [0.0, 0.0, 0.0]
-#    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
-#    ds.PixelSpacing = [1.0, 1.0]
-#    ds.SliceThickness = 1.0
-#    ds.Rows = 16
-#    ds.Columns = 16
-#    ds.BitsAllocated = 16
-#    ds.BitsStored = 16
-#    ds.PixelRepresentation = 0
-#    ds.SamplesPerPixel = 1
-#    ds.PixelData = (np.ones((16, 16), np.uint16) * (2**16 - 1)).tostring()
     stack = dcmstack.DicomStack()
     stack.add_dcm(ds)
     data = stack.get_data()    
