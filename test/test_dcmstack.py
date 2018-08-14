@@ -1,15 +1,20 @@
 """
 Tests for dcmstack.dcmstack
 """
+from __future__ import absolute_import
+
 import sys
 import warnings
-from os import path
+from copy import deepcopy
 from glob import glob
 from hashlib import sha256
-from copy import deepcopy
+from os import path
 
-from nose.tools import ok_, eq_, assert_raises
 import numpy as np
+from nose.tools import ok_, eq_, assert_raises
+
+from . import test_dir, src_dir
+
 try:
     import pydicom
     from pydicom.datadict import keyword_dict, dictionary_VR
@@ -21,10 +26,6 @@ except ImportError:
     from dicom.UID import ExplicitVRLittleEndian
 import nibabel as nb
 from nibabel.orientations import aff2axcodes
-
-test_dir = path.dirname(__file__)
-src_dir = path.normpath(path.join(test_dir, '../src'))
-sys.path.insert(0, src_dir)
 
 import dcmstack
 

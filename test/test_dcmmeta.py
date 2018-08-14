@@ -13,9 +13,7 @@ try:
 except ImportError:
     import dicom as pydicom
 
-test_dir = path.dirname(__file__)
-src_dir = path.normpath(path.join(test_dir, '../src'))
-sys.path.insert(0, src_dir)
+from . import test_dir, src_dir
 
 from dcmstack import dcmmeta
 

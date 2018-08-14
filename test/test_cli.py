@@ -7,9 +7,7 @@ import numpy as np
 
 from nose.tools import ok_, eq_
 
-test_dir = opath.dirname(__file__)
-src_dir = opath.normpath(opath.join(test_dir, '../src'))
-sys.path.insert(0, src_dir)
+from . import test_dir, src_dir
 
 from dcmstack import dcmstack_cli, nitool_cli
 
