@@ -1,7 +1,7 @@
 """
 Tests for dcmstack.dcmstack
 """
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 import sys
 import warnings
@@ -598,12 +598,39 @@ class TestToNifti(object):
                                  )
                       ]
 
+    def _build_nii(self, name):
+        kwargs = {}
+        if name.endswith('_meta'):
+            kwargs['embed_meta'] = True
+            name = name[:-5]
+        if name.endswith('_SAR'):
+            kwargs['voxel_order'] = 'SAR'
+            name = name[:-4]
+        if name == 'two_time_vol':
+            stack = dcmstack.DicomStack(time_order='EchoTime')
+        elif name == 'two_vector_vol':
+            stack = dcmstack.DicomStack(vector_order='EchoTime')
+        else:
+            stack = dcmstack.DicomStack()
+        stack.add_dcm(self.inputs[0])
+        if name == 'single_slice':
+            return stack.to_nifti(**kwargs)
+        stack.add_dcm(self.inputs[1])
+        if name == 'single_vol':
+            return stack.to_nifti(**kwargs)
+        stack.add_dcm(self.inputs[2])
+        stack.add_dcm(self.inputs[3])
+        if name in ('two_time_vol', 'two_vector_vol'):
+            return stack.to_nifti(**kwargs)
+        assert False # Unknown name
+
     def _chk(self, nii, ref_base_fn):
         hdr = nii.get_header()
         ref_nii = nb.load(path.join(self.data_dir, ref_base_fn) + '.nii.gz')
         ref_hdr = ref_nii.get_header()
 
         for key in self.eq_keys:
+            print("Testing key %s" % key)
             v1 = hdr[key]
             v2 = ref_hdr[key]
             try:
@@ -619,45 +646,33 @@ class TestToNifti(object):
                 raise
 
         for key in self.close_keys:
+            print("Testing key %s" % key)
             ok_(np.allclose(hdr[key], ref_hdr[key]))
 
     def test_single_slice(self):
-        stack = dcmstack.DicomStack()
-        stack.add_dcm(self.inputs[0])
-        nii = stack.to_nifti()
-        self._chk(nii, 'single_slice')
+        for tst in ('single_slice', 'single_slice_meta'):
+            nii = self._build_nii(tst)
+            self._chk(nii, tst)
 
     def test_single_vol(self):
-        stack = dcmstack.DicomStack()
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti()
-        self._chk(nii, 'single_vol')
+        for tst in ('single_vol', 'single_vol_meta'):
+            nii = self._build_nii(tst)
+            self._chk(nii, tst)
 
     def test_slice_dim_reorient(self):
-        stack = dcmstack.DicomStack()
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti(voxel_order='SAR')
-        self._chk(nii, 'single_vol_SAR')
+        for tst in ('single_vol_SAR', 'single_vol_SAR_meta'):
+            nii = self._build_nii(tst)
+            self._chk(nii, tst)
 
     def test_two_time_vol(self):
-        stack = dcmstack.DicomStack(time_order='EchoTime')
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        stack.add_dcm(self.inputs[2])
-        stack.add_dcm(self.inputs[3])
-        nii = stack.to_nifti()
-        self._chk(nii, 'two_time_vol')
+        for tst in ('two_time_vol', 'two_time_vol_meta'):
+            nii = self._build_nii(tst)
+            self._chk(nii, tst)
 
     def test_two_vector_vol(self):
-        stack = dcmstack.DicomStack(vector_order='EchoTime')
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        stack.add_dcm(self.inputs[2])
-        stack.add_dcm(self.inputs[3])
-        nii = stack.to_nifti()
-        self._chk(nii, 'two_vector_vol')
+        for tst in ('two_vector_vol', 'two_vector_vol_meta'):
+            nii = self._build_nii(tst)
+            self._chk(nii, tst)
 
     def test_allow_dummies(self):
         del self.inputs[0].Rows
