@@ -39,7 +39,7 @@ def is_ascii(in_str):
     # by char
     start, end = ' ', '~'
     if not PY2 and isinstance(in_str, bytes):
-        start, end = 32, 126
+        start, end = ord(start), ord(end)
     if all(start <= c <= end for c in in_str):
         return True
     return False
