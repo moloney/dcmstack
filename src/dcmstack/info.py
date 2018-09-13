@@ -43,6 +43,7 @@ AUTHOR              = "Brendan Moloney"
 AUTHOR_EMAIL        = "moloney@ohsu.edu"
 MAINTAINER          = "Brendan Moloney"
 MAINTAINER_EMAIL    = "moloney@ohsu.edu"
+URL                 = "https://github.com/moloney/dcmstack"
 DESCRIPTION         = description
 LICENSE             = "MIT license"
 CLASSIFIERS         = CLASSIFIERS
