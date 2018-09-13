@@ -1,8 +1,9 @@
 """
 DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
-import sys
-import json, warnings
+from __future__ import print_function
+
+import sys, re, json, warnings
 from copy import deepcopy
 try:
     from collections import OrderedDict
@@ -16,6 +17,8 @@ from nibabel.spatialimages import HeaderDataError
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from nibabel.nicom.dicomwrappers import wrapper_from_data
+
+from .utils import iteritems, unicode_str, PY2
 
 dcm_meta_ecode = 0
 
@@ -59,8 +62,7 @@ def is_constant(sequence, period=None):
         if seq_len % period != 0:
             raise ValueError('The sequence length is not evenly divisible by '
                              'the period length.')
-
-        for period_idx in range(seq_len / period):
+        for period_idx in range(seq_len // period):
             start_idx = period_idx * period
             end_idx = start_idx + period
             if not all(val == sequence[start_idx]
@@ -89,13 +91,14 @@ def is_repeating(sequence, period):
         raise ValueError('The sequence length is not evenly divisible by the '
                          'period length.')
 
-    for period_idx in range(1, seq_len / period):
+    for period_idx in range(1, seq_len // period):
         start_idx = period_idx * period
         end_idx = start_idx + period
         if sequence[start_idx:end_idx] != sequence[:period]:
             return False
 
     return True
+
 
 class InvalidExtensionError(Exception):
     def __init__(self, msg):
@@ -312,7 +315,7 @@ class DcmMetaExtension(Nifti1Extension):
                 raise InvalidExtensionError('Slice dim is None but per-slice '
                                             'meta data is present')
             elif cls_mult > 1:
-                for key, vals in cls_meta.iteritems():
+                for key, vals in iteritems(cls_meta):
                     n_vals = len(vals)
                     if n_vals != cls_mult:
                         msg = (('Incorrect number of values for key %s with '
@@ -428,7 +431,7 @@ class DcmMetaExtension(Nifti1Extension):
         for classes in self.get_valid_classes():
             filtered = []
             curr_dict = self.get_class_dict(classes)
-            for key, values in curr_dict.iteritems():
+            for key, values in iteritems(curr_dict):
                 if filter_func(key, values):
                     filtered.append(key)
             for key in filtered:
@@ -477,18 +480,18 @@ class DcmMetaExtension(Nifti1Extension):
         for src_class in valid_classes:
             #Constants remain constant
             if src_class == ('global', 'const'):
-                for key, val in self.get_class_dict(src_class).iteritems():
+                for key, val in iteritems(self.get_class_dict(src_class)):
                     result.get_class_dict(src_class)[key] = deepcopy(val)
                 continue
 
             if dim == self.slice_dim:
                 if src_class[1] != 'slices':
-                    for key, vals in self.get_class_dict(src_class).iteritems():
+                    for key, vals in iteritems(self.get_class_dict(src_class)):
                         result.get_class_dict(src_class)[key] = deepcopy(vals)
                 else:
                     result._copy_slice(self, src_class, idx)
             elif dim < 3:
-                for key, vals in self.get_class_dict(src_class).iteritems():
+                for key, vals in iteritems(self.get_class_dict(src_class)):
                     result.get_class_dict(src_class)[key] = deepcopy(vals)
             elif dim == 3:
                 result._copy_sample(self, src_class, 'time', idx)
@@ -500,7 +503,7 @@ class DcmMetaExtension(Nifti1Extension):
     def to_json(self):
         '''Return the extension encoded as a JSON string.'''
         self.check_valid()
-        return self._mangle(self._content)
+        return json.dumps(self._content, indent=4)
 
     @classmethod
     def from_json(klass, json_str):
@@ -664,7 +667,7 @@ class DcmMetaExtension(Nifti1Extension):
         result.reorient_transform = reorient_transform
 
         #Try simplifying any keys in global slices
-        for key in result.get_class_dict(('global', 'slices')).keys():
+        for key in list(result.get_class_dict(('global', 'slices'))):
             result._simplify(key)
 
         return result
@@ -690,6 +693,8 @@ class DcmMetaExtension(Nifti1Extension):
 
     def _unmangle(self, value):
         '''Go from extension data to runtime representation.'''
+        if not isinstance(value, unicode_str):
+            value = value.decode('utf-8')
         #Its not possible to preserve order while loading with python 2.6
         kwargs = {}
         if sys.version_info >= (2, 7):
@@ -698,7 +703,13 @@ class DcmMetaExtension(Nifti1Extension):
 
     def _mangle(self, value):
         '''Go from runtime representation to extension data.'''
-        return json.dumps(value, indent=4)
+        res = json.dumps(value, indent=4)
+        # Python 2 leaves some trailing white-space in the JSON output while
+        # python 3 does not. We strip it so output is binary identical across 
+        # versions
+        if PY2:
+            res = re.sub('[ \t]+$', '', res, 0, re.M)
+        return res.encode('utf-8')
 
     _const_tests = {('global', 'slices') : (('global', 'const'),
                                             ('vector', 'samples'),
@@ -723,7 +734,7 @@ class DcmMetaExtension(Nifti1Extension):
         if dest_cls == ('global', 'const'):
             return None
         elif src_cls == ('global', 'slices'):
-            return self.get_multiplicity(src_cls) / self.get_multiplicity(dest_cls)
+            return int(self.get_multiplicity(src_cls) // self.get_multiplicity(dest_cls))
         elif src_cls == ('vector', 'slices'): #implies dest_cls == ('time', 'samples'):
             return  self.n_slices
         elif src_cls == ('time', 'samples'): #implies dest_cls == ('vector', 'samples')
@@ -842,7 +853,7 @@ class DcmMetaExtension(Nifti1Extension):
                 new_mult = self.shape[slice_dim]
         else:
             new_mult = 1
-        mult_fact = new_mult / curr_mult
+        mult_fact = int(new_mult // curr_mult)
         if curr_mult == 1:
             values = [values]
 
@@ -899,12 +910,12 @@ class DcmMetaExtension(Nifti1Extension):
         dest_dict = self.get_class_dict(dest_class)
         dest_mult = self.get_multiplicity(dest_class)
         stride = other.n_slices
-        for key, vals in src_dict.iteritems():
+        for key, vals in iteritems(src_dict):
             subset_vals = vals[idx::stride]
 
             if len(subset_vals) < dest_mult:
                 full_vals = []
-                for val_idx in xrange(dest_mult / len(subset_vals)):
+                for val_idx in range(dest_mult // len(subset_vals)):
                     full_vals += deepcopy(subset_vals)
                 subset_vals = full_vals
             if len(subset_vals) == 1:
@@ -933,7 +944,7 @@ class DcmMetaExtension(Nifti1Extension):
             else:
                 result = []
                 slices_per_vec = n_slices * shape[3]
-                for vec_idx in xrange(shape[4]):
+                for vec_idx in range(shape[4]):
                     start_idx = (vec_idx * slices_per_vec) + (idx * n_slices)
                     end_idx = start_idx + n_slices
                     result.extend(src_dict[key][start_idx:end_idx])
@@ -961,12 +972,12 @@ class DcmMetaExtension(Nifti1Extension):
 
                 dest_mult = self.get_multiplicity(dest_cls)
                 if dest_mult == 1:
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(dest_cls)[key] = \
                             deepcopy(vals[idx])
                 else: #We must be doing time samples -> vector samples
                     stride = other.shape[3]
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(dest_cls)[key] = \
                             deepcopy(vals[idx::stride])
                     for key in src_dict.keys():
@@ -979,12 +990,12 @@ class DcmMetaExtension(Nifti1Extension):
                     dest_mult = self.get_multiplicity(src_class)
                     start_idx = idx * dest_mult
                     end_idx = start_idx + dest_mult
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = \
                             deepcopy(vals[start_idx:end_idx])
                         self._simplify(key)
                 else: #Otherwise multiplicity is unchanged
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = deepcopy(vals)
         else: #The src_class is per slice
             if src_class[0] == sample_base:
@@ -993,7 +1004,7 @@ class DcmMetaExtension(Nifti1Extension):
                     if dest_class in self.get_valid_classes():
                         best_dest = dest_class
                         break
-                for key, vals in src_dict.iteritems():
+                for key, vals in iteritems(src_dict):
                     self.get_class_dict(best_dest)[key] = deepcopy(vals)
             elif src_class[0] != 'global':
                 if sample_base == 'time':
@@ -1001,17 +1012,17 @@ class DcmMetaExtension(Nifti1Extension):
                     n_slices = self.n_slices
                     start_idx = idx * n_slices
                     end_idx = start_idx + n_slices
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = \
                             deepcopy(vals[start_idx:end_idx])
                         self._simplify(key)
                 else:
                     #Time slices are unchanged
-                    for key, vals in src_dict.iteritems():
+                    for key, vals in iteritems(src_dict):
                         self.get_class_dict(src_class)[key] = deepcopy(vals)
             else:
                 #Take a subset of global slices
-                for key, vals in src_dict.iteritems():
+                for key, vals in iteritems(src_dict):
                     subset_vals = \
                         other._global_slice_subset(key, sample_base, idx)
                     self.get_class_dict(src_class)[key] = deepcopy(subset_vals)
@@ -1034,7 +1045,7 @@ class DcmMetaExtension(Nifti1Extension):
                     other._content[classes[0]][classes[1]] = {}
         missing_keys = list(set(self.get_keys()) - set(other.get_keys()))
         for other_classes in other.get_valid_classes():
-            other_keys = other.get_class_dict(other_classes).keys()
+            other_keys = list(other.get_class_dict(other_classes).keys())
 
             #Treat missing keys as if they were in global const and have a value
             #of None
@@ -1118,7 +1129,7 @@ class DcmMetaExtension(Nifti1Extension):
             intlv = []
             loc_start = 0
             oth_start = 0
-            for vol_idx in xrange(n_vols):
+            for vol_idx in range(n_vols):
                 intlv += local_vals[loc_start:loc_start + n_slices]
                 intlv += other_vals[oth_start:oth_start + other_n_slices]
                 loc_start += n_slices
@@ -1168,7 +1179,7 @@ class DcmMetaExtension(Nifti1Extension):
                 intlv = []
                 loc_start = 0
                 oth_start = 0
-                for vec_idx in xrange(shape[4]):
+                for vec_idx in range(shape[4]):
                     intlv += local_vals[loc_start:loc_start+slices_per_vec]
                     intlv += other_vals[oth_start:oth_start+oth_slc_per_vec]
                     loc_start += slices_per_vec
@@ -1248,8 +1259,8 @@ class NiftiWrapper(object):
             if extension.get_code() == dcm_meta_ecode:
                 try:
                     extension.check_valid()
-                except InvalidExtensionError, e:
-                    print "Found candidate extension, but invalid: %s" % e
+                except InvalidExtensionError as e:
+                    print("Found candidate extension, but invalid: %s" % e)
                 else:
                     if not self.meta_ext is None:
                         raise ValueError('More than one valid DcmMeta '
@@ -1444,7 +1455,7 @@ class NiftiWrapper(object):
 
         split_hdr = header.copy()
         slices = [slice(None)] * len(shape)
-        for idx in xrange(shape[dim]):
+        for idx in range(shape[dim]):
             #Grab the split data, get rid of trailing singular dimensions
             if dim >= 3 and dim == len(shape) - 1:
                 slices[dim] = idx
@@ -1621,7 +1632,7 @@ class NiftiWrapper(object):
 
         #Pull out the three axes vectors for validation of other input affines
         axes = []
-        for axis_idx in xrange(3):
+        for axis_idx in range(3):
             axis_vec = affine[:3, axis_idx]
             if axis_idx == dim:
                 axis_vec = axis_vec.copy()
@@ -1729,12 +1740,12 @@ class NiftiWrapper(object):
                     hdr_info['sform_code'] = None
                 in_dim_info = list(input_hdr.get_dim_info())
                 if in_dim_info != hdr_info['dim_info']:
-                    for idx in xrange(3):
+                    for idx in range(3):
                         if in_dim_info[idx] != hdr_info['dim_info'][idx]:
                             hdr_info['dim_info'][idx] = None
                 in_xyzt_units = list(input_hdr.get_xyzt_units())
                 if in_xyzt_units != hdr_info['xyzt_units']:
-                    for idx in xrange(2):
+                    for idx in range(2):
                         if in_xyzt_units[idx] != hdr_info['xyzt_units'][idx]:
                             hdr_info['xyzt_units'][idx] = None
 
