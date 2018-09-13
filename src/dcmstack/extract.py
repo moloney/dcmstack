@@ -96,8 +96,12 @@ def simplify_csa_dict(csa_dict):
         return None
 
     result = OrderedDict()
-    for tag in csa_dict['tags']:
-        items = csa_dict['tags'][tag]['items']
+    for tag in sorted(csa_dict['tags']):
+        items = []
+        for item in csa_dict['tags'][tag]['items']:
+            if isinstance(item, byte_str):
+                item = get_text(item)
+            items.append(item)
         if len(items) == 0:
             continue
         elif len(items) == 1:
