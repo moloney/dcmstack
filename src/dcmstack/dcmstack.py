@@ -5,6 +5,11 @@ into the package namespace.
 import warnings, re
 from copy import deepcopy
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 import numpy as np
 try:
     import pydicom
@@ -1120,7 +1125,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
             full_key = tuple(full_key)
             full_results[full_key] = sub_res
 
-    return full_results
+    return OrderedDict(sorted(full_results.items()))
 
 def stack_group(group, warn_on_except=False, **stack_args):
     result = DicomStack(**stack_args)
