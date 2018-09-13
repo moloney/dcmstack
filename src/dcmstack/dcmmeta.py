@@ -3,8 +3,7 @@ DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
 from __future__ import print_function
 
-import sys
-import json, warnings
+import sys, re, json, warnings
 from copy import deepcopy
 try:
     from collections import OrderedDict
@@ -19,7 +18,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from nibabel.nicom.dicomwrappers import wrapper_from_data
 
-from .utils import iteritems, unicode_str
+from .utils import iteritems, unicode_str, PY2
 
 dcm_meta_ecode = 0
 
@@ -99,6 +98,7 @@ def is_repeating(sequence, period):
             return False
 
     return True
+
 
 class InvalidExtensionError(Exception):
     def __init__(self, msg):
@@ -703,7 +703,13 @@ class DcmMetaExtension(Nifti1Extension):
 
     def _mangle(self, value):
         '''Go from runtime representation to extension data.'''
-        return json.dumps(value, indent=4).encode('utf-8')
+        res = json.dumps(value, indent=4)
+        # Python 2 leaves some trailing white-space in the JSON output while
+        # python 3 does not. We strip it so output is binary identical across 
+        # versions
+        if PY2:
+            res = re.sub('[ \t]+$', '', res, 0, re.M)
+        return res.encode('utf-8')
 
     _const_tests = {('global', 'slices') : (('global', 'const'),
                                             ('vector', 'samples'),
