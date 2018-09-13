@@ -25,8 +25,8 @@ except ImportError:
     pass
 
 from .dcmstack import DicomStack
-from .utils import PY2
-from .utils import unicode_str
+from .utils import PY2, unicode_str, byte_str, str_types
+
 
 #This is needed to allow extraction on files with invalid values (e.g. too
 #long of a decimal string)
@@ -451,7 +451,7 @@ class MetaExtractor(object):
         dcm.decode()
 
         for elem in dcm:
-            if isinstance(elem.value, str) and elem.value.strip() == '':
+            if type(elem.value) in str_types and elem.value.strip() == '':
                 continue
 
             #Get the name for non-translated elements
