@@ -15,11 +15,11 @@ export PYBUILD_NAME = dcmstack
 
 # one ring to rule them all ...
 %:
-	dh $@ --with python2,sphinxdoc --buildsystem=pybuild
+	dh $@ --with python2,python3,sphinxdoc --buildsystem=pybuild
 
-override_dh_auto_build:
-	dh_auto_build
+override_dh_installdocs:
 	PYTHONPATH=. http_proxy='127.0.0.1:9' sphinx-build -N -bhtml doc/ build/html
+	dh_installdocs
 
 override_dh_installman:
 	mkdir -p build/man

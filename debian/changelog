@@ -1,7 +1,8 @@
 dcmstack (0.7-1) unstable; urgency=medium
 
   * Fresh upstream release
-    + includes python3 support
+    + includes python3 support. python3-dcmstack binary package was added
+      with necessary changes to debian/{control,rules}
     - debian/patches/* - upstreamed now
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 15 Oct 2018 16:48:07 -0400
