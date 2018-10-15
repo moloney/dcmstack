@@ -3,13 +3,21 @@ Command line interface to dcmstack.
 
 @author: moloney
 """
+from __future__ import print_function
+
 import os, sys, argparse, string
 from glob import glob
-import dicom
+
+try:
+    import pydicom
+except ImportError:
+    import dicom as pydicom
+
 from . import dcmstack
 from .dcmstack import (parse_and_group, stack_group, DicomOrdering,
                        default_group_keys)
 from .dcmmeta import NiftiWrapper
+from .utils import iteritems, ascii_letters
 from . import extract
 from .info import __version__
 
@@ -28,7 +36,7 @@ def parse_tags(opt_str):
         tokens = tag_str.split('_')
         if len(tokens) != 2:
             raise ValueError('Invalid str format for tags')
-        tags.append(dicom.tag.Tag(int(tokens[0].strip(), 16),
+        tags.append(pydicom.tag.Tag(int(tokens[0].strip(), 16),
                                   int(tokens[1].strip(), 16))
                    )
     return tags
@@ -36,7 +44,7 @@ def parse_tags(opt_str):
 def sanitize_path_comp(path_comp):
     result = []
     for char in path_comp:
-        if not char in string.letters + string.digits + '-_.':
+        if not char in ascii_letters + string.digits + '-_.':
             result.append('_')
         else:
             result.append(char)
@@ -153,23 +161,23 @@ def main(argv=sys.argv):
     args = arg_parser.parse_args(argv[1:])
 
     if args.version:
-        print __version__
+        print(__version__)
         return 0
 
     #Check if we are just listing the translators
     if args.list_translators:
         for translator in extract.default_translators:
-            print '%s -> %s' % (translator.tag, translator.name)
+            print('%s -> %s' % (translator.tag, translator.name))
         return 0
 
     #Check if we are just listing the default exclude regular expressions
     if args.default_regexes:
-        print 'Default exclude regular expressions:'
+        print('Default exclude regular expressions:')
         for regex in dcmstack.default_key_excl_res:
-            print '\t' + regex
-        print 'Default include regular expressions:'
+            print('\t' + regex)
+        print('Default include regular expressions:')
         for regex in dcmstack.default_key_incl_res:
-            print '\t' + regex
+            print('\t' + regex)
         return 0
 
     #Check if we are generating meta data
@@ -250,10 +258,10 @@ def main(argv=sys.argv):
     #Handle each source directory individually
     for src_dir in args.src_dirs:
         if not os.path.isdir(src_dir):
-            print >> sys.stderr, '%s is not a directory, skipping' % src_dir
+            print('%s is not a directory, skipping' % src_dir, file=sys.stderr)
 
         if args.verbose:
-            print "Processing source directory %s" % src_dir
+            print("Processing source directory %s" % src_dir)
 
         #Build a list of paths to source files
         glob_str = os.path.join(src_dir, '*')
@@ -262,7 +270,7 @@ def main(argv=sys.argv):
         src_paths = glob(glob_str)
 
         if args.verbose:
-            print "Found %d source files in the directory" % len(src_paths)
+            print("Found %d source files in the directory" % len(src_paths))
 
         #Group the files in this directory
         groups = parse_and_group(src_paths,
@@ -273,14 +281,14 @@ def main(argv=sys.argv):
                                 )
 
         if args.verbose:
-            print "Found %d groups of DICOM images" % len(groups)
+            print("Found %d groups of DICOM images" % len(groups))
 
         if len(groups) == 0:
-            print "No DICOM files found in %s" % src_dir
+            print("No DICOM files found in %s" % src_dir)
 
         out_idx = 0
         generated_outs = set()
-        for key, group in groups.iteritems():
+        for key, group in iteritems(groups):
             stack = stack_group(group,
                                 warn_on_except=not args.strict,
                                 time_order=time_order,
@@ -319,7 +327,7 @@ def main(argv=sys.argv):
                 out_path = os.path.join(src_dir, out_fn)
 
             if args.verbose:
-                print "Writing out stack to path %s" % out_path
+                print("Writing out stack to path %s" % out_path)
 
             nii = stack.to_nifti(args.voxel_order, gen_meta)
 

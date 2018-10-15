@@ -1,16 +1,22 @@
 """
 Extract meta data from a DICOM data set.
 """
-import struct, warnings
+import struct
+import warnings
 from collections import namedtuple, defaultdict
-import dicom
-from dicom.datadict import keyword_for_tag
-from nibabel.nicom import csareader
-from .dcmstack import DicomStack
+
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
+    
+try:
+    import pydicom
+    from pydicom.datadict import keyword_for_tag
+except ImportError:
+    import dicom as pydicom
+    from dicom.datadict import keyword_for_tag
+from nibabel.nicom import csareader
 try:
     import chardet
     have_chardet = True
@@ -18,13 +24,23 @@ except ImportError:
     have_chardet = False
     pass
 
+from .dcmstack import DicomStack
+from .utils import PY2, unicode_str, byte_str, str_types
+
+
 #This is needed to allow extraction on files with invalid values (e.g. too
 #long of a decimal string)
-dicom.config.enforce_valid_values = False
+pydicom.config.enforce_valid_values = False
 
 def is_ascii(in_str):
     '''Return true if the given string is valid ASCII.'''
-    if all(' ' <= c <= '~' for c in in_str):
+    # We do not want to deal with encode/decode ATM, so let's assume
+    # that no fancy unicode is in there and just do blunt comparison char
+    # by char
+    start, end = ' ', '~'
+    if not PY2 and isinstance(in_str, bytes):
+        start, end = ord(start), ord(end)
+    if all(start <= c <= end for c in in_str):
         return True
     return False
 
@@ -36,7 +52,7 @@ def ignore_private(elem):
     return False
 
 def ignore_pixel_data(elem):
-    return elem.tag == dicom.tag.Tag(0x7fe0, 0x10)
+    return elem.tag == pydicom.tag.Tag(0x7fe0, 0x10)
 
 def ignore_overlay_data(elem):
     return elem.tag.group & 0xff00 == 0x6000 and elem.tag.elem == 0x3000
@@ -58,7 +74,7 @@ Translator = namedtuple('Translator', ['name',
                                        'trans_func']
                        )
 '''A namedtuple for storing the four elements of a translator: a name, the
-dicom.tag.Tag that can be translated, the private creator string (optional), and
+pydicom.tag.Tag that can be translated, the private creator string (optional), and
 the function which takes the DICOM element and returns a dictionary.'''
 
 def simplify_csa_dict(csa_dict):
@@ -80,8 +96,12 @@ def simplify_csa_dict(csa_dict):
         return None
 
     result = OrderedDict()
-    for tag in csa_dict['tags']:
-        items = csa_dict['tags'][tag]['items']
+    for tag in sorted(csa_dict['tags']):
+        items = []
+        for item in csa_dict['tags'][tag]['items']:
+            if isinstance(item, byte_str):
+                item = get_text(item)
+            items.append(item)
         if len(items) == 0:
             continue
         elif len(items) == 1:
@@ -95,7 +115,7 @@ def csa_image_trans_func(elem):
     return simplify_csa_dict(csareader.read(elem.value))
 
 csa_image_trans = Translator('CsaImage',
-                             dicom.tag.Tag(0x29, 0x1010),
+                             pydicom.tag.Tag(0x29, 0x1010),
                              'SIEMENS CSA HEADER',
                              csa_image_trans_func)
 '''Translator for the CSA image sub header.'''
@@ -219,14 +239,14 @@ def csa_series_trans_func(elem):
     if not phx_src is None:
         phoenix_dict = parse_phoenix_prot(phx_src, csa_dict[phx_src])
         del csa_dict[phx_src]
-        for key, val in phoenix_dict.iteritems():
+        for key, val in phoenix_dict.items():
             new_key = '%s.%s' % ('MrPhoenixProtocol', key)
             csa_dict[new_key] = val
 
     return csa_dict
 
 csa_series_trans = Translator('CsaSeries',
-                              dicom.tag.Tag(0x29, 0x1020),
+                              pydicom.tag.Tag(0x29, 0x1020),
                               'SIEMENS CSA HEADER',
                               csa_series_trans_func)
 '''Translator for parsing the CSA series sub header.'''
@@ -292,12 +312,15 @@ def get_text(byte_str):
         if match['encoding'] is None:
             return None
         else:
-            return byte_str.decode(match['encoding'])
+            try:
+                return byte_str.decode(match['encoding'])
+            except UnicodeDecodeError:
+                pass
+
+    if not is_ascii(byte_str):
+        return None
     else:
-        if not is_ascii(byte_str):
-            return None
-        else:
-            return byte_str.decode('ascii')
+        return byte_str.decode('ascii')
 
 default_conversions = {'DS' : float,
                        'IS' : int,
@@ -307,8 +330,8 @@ default_conversions = {'DS' : float,
                        'OW or OB' : get_text,
                        'OB or OW' : get_text,
                        'UN' : get_text,
-                       'PN' : unicode,
-                       'UI' : unicode,
+                       'PN' : unicode_str,
+                       'UI' : unicode_str,
                       }
 
 class MetaExtractor(object):
@@ -406,7 +429,7 @@ class MetaExtractor(object):
 
         Parameters
         ----------
-        dcm : dicom.dataset.Dataset
+        dcm : pydicom.dataset.Dataset
             The DICOM dataset to extract the meta data from.
 
         Returns
@@ -432,7 +455,7 @@ class MetaExtractor(object):
         dcm.decode()
 
         for elem in dcm:
-            if isinstance(elem.value, str) and elem.value.strip() == '':
+            if type(elem.value) in str_types and elem.value.strip() == '':
                 continue
 
             #Get the name for non-translated elements
@@ -445,7 +468,7 @@ class MetaExtractor(object):
                     if translator.priv_creator == elem.value:
                         new_elem = ((translator.tag.elem & 0xff) |
                                     (elem.tag.elem * 16**2))
-                        new_tag = dicom.tag.Tag(elem.tag.group, new_elem)
+                        new_tag = pydicom.tag.Tag(elem.tag.group, new_elem)
                         if new_tag in trans_map:
                             raise ValueError('More than one translator '
                                              'for tag: %s' % new_tag)
@@ -459,7 +482,7 @@ class MetaExtractor(object):
                     if self.warn_on_trans_except:
                         warnings.warn("Exception from translator %s: %s" %
                                       (trans_map[elem.tag].name,
-                                       repr(unicode(e))))
+                                       repr(str(e))))
                     else:
                         raise
                 else:
@@ -469,7 +492,7 @@ class MetaExtractor(object):
             elif any(rule(elem) for rule in self.ignore_rules):
                 continue
             #Handle elements that are sequences with recursion
-            elif isinstance(elem.value, dicom.sequence.Sequence):
+            elif isinstance(elem.value, pydicom.sequence.Sequence):
                 value = []
                 for val in elem.value:
                     value.append(self(val))
@@ -494,8 +517,8 @@ class MetaExtractor(object):
             result[name] = value
 
         #Inject translator results
-        for trans_name, meta in trans_meta_dicts.iteritems():
-            for name, value in meta.iteritems():
+        for trans_name, meta in trans_meta_dicts.items():
+            for name, value in meta.items():
                 name = '%s.%s' % (trans_name, name)
                 result[name] = value
 

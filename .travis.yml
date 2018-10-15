@@ -1,0 +1,35 @@
+language: python
+
+python:
+  - "2.7"
+  - "3.5"
+  - "3.6"
+  - "3.7-dev"
+
+env:
+    global:
+        - DEPENDS="nose codecov coverage"
+        - OPTIONAL_DEPENDS=""
+
+install:
+  - pip install $DEPENDS $OPTIONAL_DEPENDS
+  - pip install -e .
+
+matrix:
+  include:
+    - python: 2.7
+    - python: 2.7
+      env:
+        - DEPENDS="pydicom==0.9.9"
+    - python: 2.7
+      env:
+        - OPTIONAL_DEPENDS="chardet"
+    - python: 3.7-dev
+      env:
+        - OPTIONAL_DEPENDS="chardet"
+
+script:
+  - nosetests -v --with-cov --cover-package dcmstack
+
+after_success:
+  - codecov

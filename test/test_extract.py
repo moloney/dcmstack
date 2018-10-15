@@ -3,27 +3,31 @@ Tests for dcmstack.extract
 """
 import sys, warnings
 from os import path
-from nose.tools import ok_, eq_, assert_raises
 
-test_dir = path.dirname(__file__)
-src_dir = path.normpath(path.join(test_dir, '../src'))
-sys.path.insert(0, src_dir)
+from nose.tools import ok_, eq_, assert_raises
+from nibabel.nicom import csareader
+try:
+    import pydicom
+except ImportError:
+    import dicom as pydicom
+
+from . import test_dir, src_dir
+
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from dcmstack import extract
-dicom, csareader = extract.dicom, extract.csareader
 
 class TestCsa(object):
     def setUp(self):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = dicom.read_file(data_fn)
+        self.data = pydicom.read_file(data_fn)
 
     def tearDown(self):
         del self.data
 
     def test_simplify(self):
         eq_(extract.simplify_csa_dict(None), None)
-        csa_dict = csareader.read(self.data[dicom.tag.Tag(0x29, 0x1010)].value)
+        csa_dict = csareader.read(self.data[pydicom.tag.Tag(0x29, 0x1010)].value)
         simp_dict = extract.simplify_csa_dict(csa_dict)
         for tag in csa_dict['tags']:
             items = csa_dict['tags'][tag]['items']
@@ -70,7 +74,7 @@ class TestCsa(object):
 class TestMetaExtractor(object):
     def setUp(self):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = dicom.read_file(data_fn)
+        self.data = pydicom.read_file(data_fn)
 
     def tearDown(self):
         del self.data
@@ -91,7 +95,7 @@ class TestMetaExtractor(object):
             value = extractor._get_elem_value(elem)
             if elem.VM > 1:
                 ok_(isinstance(value, list))
-            if elem.VR in extract.unpack_vr_map.keys() + ['DS', 'IS']:
+            if elem.VR in list(extract.unpack_vr_map) + ['DS', 'IS']:
                 if elem.VM == 1:
                     ok_(not isinstance(value, str))
                 else:
@@ -104,9 +108,9 @@ class TestMetaExtractor(object):
 
     def test_reloc_private(self):
         extractor = extract.MetaExtractor()
-        self.data[(0x29, 0x10)].tag = dicom.tag.Tag((0x29, 0x20))
-        self.data[(0x29, 0x1010)].tag = dicom.tag.Tag((0x29, 0x2010))
-        self.data[(0x29, 0x1020)].tag = dicom.tag.Tag((0x29, 0x2020))
+        self.data[(0x29, 0x10)].tag = pydicom.tag.Tag((0x29, 0x20))
+        self.data[(0x29, 0x1010)].tag = pydicom.tag.Tag((0x29, 0x2010))
+        self.data[(0x29, 0x1020)].tag = pydicom.tag.Tag((0x29, 0x2020))
         meta_dict = extractor(self.data)
         eq_(meta_dict["CsaImage.EchoLinePosition"], 64)
         ok_(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)
