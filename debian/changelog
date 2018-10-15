@@ -1,3 +1,11 @@
+dcmstack (0.7-1) unstable; urgency=medium
+
+  * Fresh upstream release
+    + includes python3 support
+    - debian/patches/* - upstreamed now
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 15 Oct 2018 16:48:07 -0400
+
 dcmstack (0.6.2+git36-gc12d27d-1) unstable; urgency=medium
 
   * New upstream snapshot from v0.6.2-36-gc12d27d
