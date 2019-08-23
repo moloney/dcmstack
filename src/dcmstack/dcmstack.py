@@ -764,6 +764,8 @@ class DicomStack(object):
         self._shape_dirty = False
         return self._shape
 
+    shape = property(fget=get_shape)
+
     def get_data(self):
         '''Get an array of the voxel values.
 
@@ -817,6 +819,8 @@ class DicomStack(object):
 
         return vox_array
 
+    data = property(fget=get_data)
+
     def get_affine(self):
         '''Get the affine transform for mapping row/column/slice indices
         to Nifti (RAS) patient space.
@@ -852,6 +856,8 @@ class DicomStack(object):
             aff[:3, 2] = scaled_slc_dir
 
         return aff
+
+    affine = property(fget=get_affine)
 
     def to_nifti(self, voxel_order='LAS', embed_meta=False):
         '''Returns a NiftiImage with the data and affine from the stack.
