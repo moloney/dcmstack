@@ -359,7 +359,7 @@ def _make_dummy(reference, meta, iop):
     aff = reference.nii_img.get_affine().copy()
     aff[:3, 3] = [iop[1], iop[0], iop[2]]
     nii_img = nb.nifti1.Nifti1Image(data, aff)
-    hdr = nii_img.get_header()
+    hdr = nii_img.header
     hdr.set_xyzt_units('mm', 'sec')
     dim_info = {'freq' : None,
                 'phase' : None,
@@ -914,7 +914,7 @@ class DicomStack(object):
 
         #Create the nifti image using the data array
         nifti_image = nb.Nifti1Image(data, affine)
-        nifti_header = nifti_image.get_header()
+        nifti_header = nifti_image.header
 
         #Set the units and dimension info
         nifti_header.set_xyzt_units('mm', 'msec')

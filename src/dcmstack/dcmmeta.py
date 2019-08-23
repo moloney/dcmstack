@@ -1253,7 +1253,7 @@ class NiftiWrapper(object):
 
     def __init__(self, nii_img, make_empty=False):
         self.nii_img = nii_img
-        hdr = nii_img.get_header()
+        hdr = nii_img.header
         self.meta_ext = None
         for extension in hdr.extensions:
             if extension.get_code() == dcm_meta_ecode:
@@ -1299,7 +1299,7 @@ class NiftiWrapper(object):
         if classification == ('time', 'samples'):
             return meta_shape[3:] == img_shape[3:]
 
-        hdr = self.nii_img.get_header()
+        hdr = self.nii_img.header
         if self.meta_ext.n_slices != hdr.get_n_slices():
             return False
 
@@ -1371,7 +1371,7 @@ class NiftiWrapper(object):
                 return values[index[4]]
 
             #Finally, if aligned, try per-slice values
-            slice_dim = self.nii_img.get_header().get_dim_info()[2]
+            slice_dim = self.nii_img.header.get_dim_info()[2]
             n_slices = shape[slice_dim]
             if classes == ('global', 'slices'):
                 val_idx = index[slice_dim]
@@ -1392,7 +1392,7 @@ class NiftiWrapper(object):
     def remove_extension(self):
         '''Remove the DcmMetaExtension from the header of nii_img. The
         attribute `meta_ext` will still point to the extension.'''
-        hdr = self.nii_img.get_header()
+        hdr = self.nii_img.header
         target_idx = None
         for idx, ext in enumerate(hdr.extensions):
             if id(ext) == id(self.meta_ext):
@@ -1414,7 +1414,7 @@ class NiftiWrapper(object):
 
         '''
         self.remove_extension()
-        self.nii_img.get_header().extensions.append(dcmmeta_ext)
+        self.nii_img.header.extensions.append(dcmmeta_ext)
         self.meta_ext = dcmmeta_ext
 
     def split(self, dim=None):
@@ -1436,7 +1436,7 @@ class NiftiWrapper(object):
         '''
         shape = self.nii_img.get_shape()
         data = self.nii_img.get_data()
-        header = self.nii_img.get_header()
+        header = self.nii_img.header
         slice_dim = header.get_dim_info()[2]
 
         #If dim is None, choose the vector/time/slice dim in that order
@@ -1541,7 +1541,7 @@ class NiftiWrapper(object):
 
         #Create the nifti image and set header data
         nii_img = nb.nifti1.Nifti1Image(data, affine)
-        hdr = nii_img.get_header()
+        hdr = nii_img.header
         hdr.set_xyzt_units('mm', 'sec')
         dim_info = {'freq' : None,
                     'phase' : None,
@@ -1606,7 +1606,7 @@ class NiftiWrapper(object):
         n_inputs = len(seq)
         first_input = seq[0]
         first_nii = first_input.nii_img
-        first_hdr = first_nii.get_header()
+        first_hdr = first_nii.header
         shape = first_nii.shape
         affine = first_nii.get_affine().copy()
 
@@ -1684,7 +1684,7 @@ class NiftiWrapper(object):
             input_wrp = seq[input_idx]
             input_nii = input_wrp.nii_img
             input_aff = input_nii.get_affine()
-            input_hdr = input_nii.get_header()
+            input_hdr = input_nii.header
 
             #Check that the affines match appropriately
             for axis_idx, axis_vec in enumerate(axes):
@@ -1773,7 +1773,7 @@ class NiftiWrapper(object):
 
         #Create the resulting Nifti and wrapper
         result_nii = nb.Nifti1Image(result_data, affine)
-        result_hdr = result_nii.get_header()
+        result_hdr = result_nii.header
 
         #Update the header with any info that is consistent across inputs
         if hdr_info['qform'] is not None and hdr_info['qform_code'] is not None:

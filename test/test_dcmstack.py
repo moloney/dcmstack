@@ -625,9 +625,9 @@ class TestToNifti(object):
         assert False # Unknown name
 
     def _chk(self, nii, ref_base_fn):
-        hdr = nii.get_header()
+        hdr = nii.header
         ref_nii = nb.load(path.join(self.data_dir, ref_base_fn) + '.nii.gz')
-        ref_hdr = ref_nii.get_header()
+        ref_hdr = ref_nii.header
 
         for key in self.eq_keys:
             print("Testing key %s" % key)
