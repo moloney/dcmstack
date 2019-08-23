@@ -1292,7 +1292,7 @@ class NiftiWrapper(object):
         if classification == ('global', 'const'):
             return True
 
-        img_shape = self.nii_img.get_shape()
+        img_shape = self.nii_img.shape
         meta_shape = self.meta_ext.shape
         if classification == ('vector', 'samples'):
             return meta_shape[4:] == img_shape[4:]
@@ -1357,7 +1357,7 @@ class NiftiWrapper(object):
         #If an index is provided check the varying values
         if not index is None:
             #Test if the index is valid
-            shape = self.nii_img.get_shape()
+            shape = self.nii_img.shape
             if len(index) != len(shape):
                 raise IndexError('Incorrect number of indices.')
             for dim, ind_val in enumerate(index):
@@ -1434,7 +1434,7 @@ class NiftiWrapper(object):
             along `dim`.
 
         '''
-        shape = self.nii_img.get_shape()
+        shape = self.nii_img.shape
         data = self.nii_img.get_data()
         header = self.nii_img.header
         slice_dim = header.get_dim_info()[2]

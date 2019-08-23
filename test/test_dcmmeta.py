@@ -1142,7 +1142,7 @@ def test_from_dicom():
     meta = {'EchoTime': 40}
     nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
     hdr = nw.nii_img.header
-    eq_(nw.nii_img.get_shape(), (192, 192, 1))
+    eq_(nw.nii_img.shape, (192, 192, 1))
     ok_(np.allclose(np.dot(np.diag([-1., -1., 1., 1.]), src_dw.get_affine()),
                     nw.nii_img.get_affine())
        )

@@ -750,7 +750,7 @@ class DicomStack(object):
                             num_vec_comps)
 
         #Stack appears to be valid, build the shape tuple
-        file_shape = self._files_info[0][0].nii_img.get_shape()
+        file_shape = self._files_info[0][0].nii_img.shape
         vol_shape = list(file_shape)
         if files_per_vol > 1:
             vol_shape[2] = files_per_vol
@@ -777,7 +777,7 @@ class DicomStack(object):
             The stack is incomplete or invalid.
         '''
         #Create a numpy array for storing the voxel data
-        stack_shape = self.get_shape()
+        stack_shape = self.shape
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
         bits_stored = self._files_info[0][0].get_meta('BitsStored', default=16)
@@ -795,7 +795,7 @@ class DicomStack(object):
         if len(stack_shape) > 4:
             n_vols *= stack_shape[4]
         files_per_vol = len(self._files_info) // n_vols
-        file_shape = self._files_info[0][0].nii_img.get_shape()
+        file_shape = self._files_info[0][0].nii_img.shape
         for vec_idx in range(stack_shape[4]):
             for time_idx in range(stack_shape[3]):
                 if files_per_vol == 1 and file_shape[2] != 1:
@@ -831,7 +831,7 @@ class DicomStack(object):
             The stack is incomplete or invalid.
         '''
         #Figure out the number of three (or two) dimensional volumes
-        shape = self.get_shape()
+        shape = self.shape
         n_vols = 1
         if len(shape) > 3:
             n_vols *= shape[3]
