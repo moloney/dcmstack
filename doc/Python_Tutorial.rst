@@ -62,7 +62,7 @@ the array of voxel data, get the affine transform, or create a Nifti1Image.
 .. code-block:: python
     
     >>> stack_data = my_stack.get_data()
-    >>> stack_affine = my_stack.get_affine()
+    >>> stack_affine = my_stack.affine
     >>> nii = my_stack.to_nifti()
     
 Embedding Meta Data

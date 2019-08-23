@@ -957,7 +957,7 @@ class TestMetaValid(object):
                 ok_(self.nw.meta_valid(classes))
 
     def test_slice_dir_changed(self):
-        aff = self.nw.nii_img.get_affine()
+        aff = self.nw.nii_img.affine
         aff[:] = np.c_[aff[2, :],
                        aff[1, :],
                        aff[0, :],
@@ -1092,7 +1092,7 @@ class TestSplit(object):
     def test_split_slice(self):
         for split_idx, nw_split in enumerate(self.nw.split(2)):
             eq_(nw_split.nii_img.shape, (3, 3, 1, 5, 7))
-            ok_(np.allclose(nw_split.nii_img.get_affine(),
+            ok_(np.allclose(nw_split.nii_img.affine,
                             np.c_[[1.1, 0.0, 0.0, 0.0],
                                   [0.0, 1.1, 0.0, 0.0],
                                   [0.0, 0.0, 1.1, 0.0],
@@ -1107,7 +1107,7 @@ class TestSplit(object):
     def test_split_time(self):
         for split_idx, nw_split in enumerate(self.nw.split(3)):
             eq_(nw_split.nii_img.shape, (3, 3, 3, 1, 7))
-            ok_(np.allclose(nw_split.nii_img.get_affine(),
+            ok_(np.allclose(nw_split.nii_img.affine,
                             np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() ==
                        self.arr[:, :, :, split_idx:split_idx+1, :])
@@ -1116,7 +1116,7 @@ class TestSplit(object):
     def test_split_vector(self):
         for split_idx, nw_split in enumerate(self.nw.split(4)):
             eq_(nw_split.nii_img.shape, (3, 3, 3, 5))
-            ok_(np.allclose(nw_split.nii_img.get_affine(),
+            ok_(np.allclose(nw_split.nii_img.affine,
                             np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() ==
                        self.arr[:, :, :, :, split_idx])
@@ -1143,8 +1143,8 @@ def test_from_dicom():
     nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
     hdr = nw.nii_img.header
     eq_(nw.nii_img.shape, (192, 192, 1))
-    ok_(np.allclose(np.dot(np.diag([-1., -1., 1., 1.]), src_dw.get_affine()),
-                    nw.nii_img.get_affine())
+    ok_(np.allclose(np.dot(np.diag([-1., -1., 1., 1.]), src_dw.affine),
+                    nw.nii_img.affine)
        )
     eq_(hdr.get_xyzt_units(), ('mm', 'sec'))
     eq_(hdr.get_dim_info(), (0, 1, 2))
@@ -1169,7 +1169,7 @@ def test_from_2d_slice_to_3d():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(slice_nws, 2)
     eq_(merged.nii_img.shape, (4, 4, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 0.5, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('EchoTime'),
@@ -1208,7 +1208,7 @@ def test_from_3d_time_to_4d():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(time_nws, 3)
     eq_(merged.nii_img.shape, (4, 4, 4, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 1.1, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('PatientID'),
@@ -1254,7 +1254,7 @@ def test_from_3d_vector_to_4d():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(vector_nws, 4)
     eq_(merged.nii_img.shape, (4, 4, 4, 1, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 1.1, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('PatientID'),
@@ -1326,7 +1326,7 @@ def test_merge_with_slc_and_without():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(input_nws)
     eq_(merged.nii_img.shape, (4, 4, 4, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 1.1, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('PatientID'),

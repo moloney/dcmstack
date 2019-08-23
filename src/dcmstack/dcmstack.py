@@ -356,7 +356,7 @@ def _make_dummy(reference, meta, iop):
     data[...] = np.iinfo(np.int16).max
 
     #Create the nifti image and set header data
-    aff = reference.nii_img.get_affine().copy()
+    aff = reference.nii_img.affine.copy()
     aff[:3, 3] = [iop[1], iop[0], iop[2]]
     nii_img = nb.nifti1.Nifti1Image(data, aff)
     hdr = nii_img.header
@@ -842,12 +842,12 @@ class DicomStack(object):
         files_per_vol = len(self._files_info) // n_vols
 
         #Pull the DICOM Patient Space affine from the first input
-        aff = self._files_info[0][0].nii_img.get_affine()
+        aff = self._files_info[0][0].nii_img.affine
 
         #If there is more than one file per volume, we need to fix slice scaling
         if files_per_vol > 1:
             first_offset = aff[:3, 3]
-            second_offset = self._files_info[1][0].nii_img.get_affine()[:3, 3]
+            second_offset = self._files_info[1][0].nii_img.affine[:3, 3]
             scaled_slc_dir = second_offset - first_offset
             aff[:3, 2] = scaled_slc_dir
 
@@ -873,7 +873,7 @@ class DicomStack(object):
         '''
         #Get the voxel data and affine
         data = self.get_data()
-        affine = self.get_affine()
+        affine = self.affine
 
         #Figure out the number of three (or two) dimensional volumes
         n_vols = 1

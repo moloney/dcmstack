@@ -1304,7 +1304,7 @@ class NiftiWrapper(object):
             return False
 
         slice_dim = hdr.get_dim_info()[2]
-        slice_dir = self.nii_img.get_affine()[slice_dim, :3]
+        slice_dir = self.nii_img.affine[slice_dim, :3]
         slices_aligned = np.allclose(slice_dir,
                                      self.meta_ext.slice_normal,
                                      atol=1e-6)
@@ -1533,7 +1533,7 @@ class NiftiWrapper(object):
         data = dcm_wrp.get_data()
 
         #The Nifti patient space flips the x and y directions
-        affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.get_affine())
+        affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
 
         #Make 2D data 3D
         if len(data.shape) == 2:
@@ -1608,7 +1608,7 @@ class NiftiWrapper(object):
         first_nii = first_input.nii_img
         first_hdr = first_nii.header
         shape = first_nii.shape
-        affine = first_nii.get_affine().copy()
+        affine = first_nii.affine.copy()
 
         #If dim is None, choose a sane default
         if dim is None:
@@ -1683,7 +1683,7 @@ class NiftiWrapper(object):
 
             input_wrp = seq[input_idx]
             input_nii = input_wrp.nii_img
-            input_aff = input_nii.get_affine()
+            input_aff = input_nii.affine
             input_hdr = input_nii.header
 
             #Check that the affines match appropriately
@@ -1768,7 +1768,7 @@ class NiftiWrapper(object):
         #If we joined along a spatial dim, rescale the appropriate axis
         scaled_dim_dir = None
         if dim < 3:
-            scaled_dim_dir = seq[1].nii_img.get_affine()[:3, 3] - trans
+            scaled_dim_dir = seq[1].nii_img.affine[:3, 3] - trans
             affine[:3, dim] = scaled_dim_dir
 
         #Create the resulting Nifti and wrapper

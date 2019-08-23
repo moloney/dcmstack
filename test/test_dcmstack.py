@@ -532,7 +532,7 @@ class TestGetAffine(object):
     def test_single_slice(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
-        affine = stack.get_affine()
+        affine = stack.affine
         ref = np.load(path.join(self.data_dir, 'single_slice_aff.npy'))
         ok_(np.allclose(affine, ref))
 
@@ -540,7 +540,7 @@ class TestGetAffine(object):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        affine = stack.get_affine()
+        affine = stack.affine
         ref = np.load(path.join(self.data_dir, 'single_vol_aff.npy'))
         ok_(np.allclose(affine, ref))
 
