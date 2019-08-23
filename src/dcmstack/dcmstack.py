@@ -988,7 +988,7 @@ class DicomStack(object):
                     for vec_idx in range(data.shape[4]):
                         start_idx = vec_idx * data.shape[3]
                         end_idx = start_idx + data.shape[3]
-                        meta = DcmMetaExtension.from_sequence(\
+                        meta = DcmMetaExtension.from_sequence(
                             vol_meta[start_idx:end_idx], 3)
                         vec_meta.append(meta)
                 else:
