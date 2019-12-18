@@ -1,3 +1,13 @@
+dcmstack (0.7-2) unstable; urgency=medium
+
+  * Team upload.
+  * Drop python2 support; Closes: #942992, #936372, #913015
+  * dont fail build if test fails
+  * Drop obsolete X-Python fields
+  * Build manpage in a PYBUILD_AFTER_INSTALL command
+
+ -- Sandro Tosi <morph@debian.org>  Tue, 17 Dec 2019 22:04:55 -0500
+
 dcmstack (0.7-1) unstable; urgency=medium
 
   * Fresh upstream release

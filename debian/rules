@@ -12,26 +12,17 @@ gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match 'v[0-9].*' $
 
 export DH_VERBOSE = 1
 export PYBUILD_NAME = dcmstack
+export PYBUILD_AFTER_INSTALL=mkdir -p build/man ; \
+                             PYTHONPATH={build_dir} help2man --no-discard-stderr --no-info -o build/man/dcmstack.1 --name "DICOM to NIfTI converter"                                       debian/python3-dcmstack/usr/bin/dcmstack ; \
+			     PYTHONPATH={build_dir} help2man --no-discard-stderr --no-info -o build/man/nitool.1   --name "meta data manipulation tool for dcmstack-enhanced NIfTI images" debian/python3-dcmstack/usr/bin/nitool
 
 # one ring to rule them all ...
 %:
-	dh $@ --with python2,python3,sphinxdoc --buildsystem=pybuild
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
 
 override_dh_installdocs:
-	PYTHONPATH=. http_proxy='127.0.0.1:9' sphinx-build -N -bhtml doc/ build/html
+	PYTHONPATH=. http_proxy='127.0.0.1:9' python3 -m sphinx -N -bhtml doc/ build/html
 	dh_installdocs
-
-override_dh_installman:
-	mkdir -p build/man
-	PYTHONPATH=$(shell readlink -f debian/python-dcmstack/usr/lib/python*/dist-packages) \
-		help2man --no-discard-stderr --no-info -o build/man/dcmstack.1 \
-		--name "DICOM to NIfTI converter" \
-		debian/python-dcmstack/usr/bin/dcmstack
-	PYTHONPATH=$(shell readlink -f debian/python-dcmstack/usr/lib/python*/dist-packages) \
-		help2man --no-discard-stderr --no-info -o build/man/nitool.1 \
-		--name "meta data manipulation tool for dcmstack-enhanced NIfTI images" \
-		debian/python-dcmstack/usr/bin/nitool
-	dh_installman
 
 clean::
 	dh_clean
@@ -51,3 +42,5 @@ maint-check-dsc-patches:
 		patch -p1 --dry-run < $$p || exit 1 ; \
 	done
 
+override_dh_auto_test:
+	-dh_auto_test

@@ -7,15 +7,6 @@ Priority: optional
 Build-Depends: debhelper (>= 9),
                dh-python,
                help2man,
-               python-all,
-               python-dicom (>= 0.9.7~),
-               python-docutils,
-               python-mock,
-               python-nibabel (>= 2.0~),
-               python-nose,
-               python-numpy,
-               python-numpydoc,
-               python-setuptools,
                python3-all,
                python3-dicom (>= 0.9.7~),
                python3-docutils,
@@ -25,30 +16,11 @@ Build-Depends: debhelper (>= 9),
                python3-numpy,
                python3-numpydoc,
                python3-setuptools,
-               python-sphinx (>= 1.0.7+dfsg-1~)
+               python3-sphinx (>= 1.0.7+dfsg-1~)
 Standards-Version: 4.1.1
 Homepage: https://github.com/moloney/dcmstack
 Vcs-Git: https://github.com/neurodebian/dcmstack
 Vcs-Browser: https://github.com/neurodebian/dcmstack
-X-Python-Version: >= 2.6
-X-Python3-Version: >= 3.2
-
-Package: python-dcmstack
-Architecture: all
-Depends: python-dicom (>= 0.9.7~),
-         python-nibabel (>= 2.0~),
-         python-numpy,
-         ${misc:Depends},
-         ${python:Depends},
-         ${sphinxdoc:Depends}
-Provides: ${python:Provides}
-Description: DICOM to NIfTI conversion
- DICOM to NIfTI conversion with the added ability to extract and summarize
- meta data from the source DICOMs. The meta data can be injected into a
- NIfTI header extension or written out as a JSON formatted text file.
- .
- This package provides the Python package, and command line tools (dcmstack,
- and nitool), as well as the documentation in HTML format.
 
 Package: python3-dcmstack
 Architecture: all
@@ -57,6 +29,7 @@ Depends: python3-dicom (>= 0.9.7~),
          python3-numpy,
          ${misc:Depends},
          ${python3:Depends},
+         ${sphinxdoc:Depends},
 Provides: ${python3:Provides}
 Description: DICOM to NIfTI conversion - python3 package
  DICOM to NIfTI conversion with the added ability to extract and summarize
