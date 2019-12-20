@@ -60,6 +60,7 @@ def make_key_regex_filter(exclude_res, force_include_res=None):
                 not (include_re and include_re.search(key)))
     return key_regex_filter
 
+
 default_key_excl_res = ['Patient',
                         'Physician',
                         'Operator',
@@ -93,15 +94,18 @@ default_key_excl_res = ['Patient',
 '''A list of regexes passed to `make_key_regex_filter` as `exclude_res` to
 create the `default_meta_filter`.'''
 
+
 default_key_incl_res = ['ImageOrientationPatient',
                         'ImagePositionPatient',
                        ]
 '''A list of regexes passed to `make_key_regex_filter` as `force_include_res`
 to create the `default_meta_filter`.'''
 
+
 default_meta_filter = make_key_regex_filter(default_key_excl_res,
                                             default_key_incl_res)
 '''Default meta_filter for `DicomStack`.'''
+
 
 def ornt_transform(start_ornt, end_ornt):
     '''Return the orientation that transforms from `start_ornt` to `end_ornt`.
@@ -140,6 +144,7 @@ def ornt_transform(start_ornt, end_ornt):
             raise ValueError("Unable to find out axis %d in start_ornt" %
                              end_out_idx)
     return result
+
 
 def axcodes2ornt(axcodes, labels=None):
     """ Convert axis codes `axcodes` to an orientation
@@ -182,6 +187,7 @@ def axcodes2ornt(axcodes, labels=None):
                     ornt[code_idx, :] = [label_idx, 1]
                 break
     return ornt
+
 
 def reorder_voxels(vox_array, affine, voxel_order):
     '''Reorder the given voxel array and corresponding affine.
@@ -247,6 +253,7 @@ def reorder_voxels(vox_array, affine, voxel_order):
 
     return (vox_array, affine, aff_trans, ornt_trans)
 
+
 def dcm_time_to_sec(time_str):
     '''Convert a DICOM time value (value representation of 'TM') to the number
     of seconds past midnight.
@@ -274,6 +281,7 @@ def dcm_time_to_sec(time_str):
 
     return float(result)
 
+
 class IncongruentImageError(Exception):
     def __init__(self, msg):
         '''An exception denoting that a DICOM with incorrect size or orientation
@@ -281,13 +289,21 @@ class IncongruentImageError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return 'The image is not congruent to the existing stack: %s' % self.msg
+        return "The image is not congruent to the existing stack: %s" % self.msg
+
 
 class ImageCollisionError(Exception):
     '''An exception denoting that a DICOM which collides with one already in
     the stack was passed to a `DicomStack.add_dcm`.'''
     def __str__(self):
-        return 'The image collides with one already in the stack'
+        return "The image collides with one already in the stack"
+
+
+class NonImageDataSetError(Exception):
+    '''The DICOM doesn't contain image data'''
+    def __str__(self):
+        return "The DICOM doesn't contain an image"
+    
 
 class InvalidStackError(Exception):
     def __init__(self, msg):
@@ -295,7 +311,8 @@ class InvalidStackError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return 'The DICOM stack is not valid: %s' % self.msg
+        return "The DICOM stack is not valid: %s" % self.msg
+
 
 class DicomOrdering(object):
     '''Object defining an ordering for a set of dicom datasets. Create a
@@ -349,6 +366,7 @@ class DicomOrdering(object):
 
         return val
 
+
 def _make_dummy(reference, meta, iop):
     '''Make a "dummy" NiftiWrapper (no valid pixel data).'''
     #Create the dummy data array filled with largest representable value
@@ -381,6 +399,7 @@ def _make_dummy(reference, meta, iop):
 
     return result
 
+
 default_group_keys =  ('SeriesInstanceUID',
                        'SeriesNumber',
                        'ProtocolName',
@@ -392,6 +411,17 @@ multi-dimensional array together.'''
 default_close_keys = ('ImageOrientationPatient',)
 '''Default keys needing np.allclose instead of equaulity testing when grouping 
 '''
+
+
+_pix_attrs = ('PixelData', 'FloatPixelData', 'DoubleFloatPixelData')
+
+
+def is_image(dcm):
+    '''Test if the data set is an image'''
+    if any(hasattr(dcm, attr) for attr in _pix_attrs):
+        return True
+    return False
+
 
 class DicomStack(object):
     '''Defines a method for stacking together DICOM data sets into a multi
@@ -506,7 +536,6 @@ class DicomStack(object):
                            )
         return is_dummy
 
-
     def add_dcm(self, dcm, meta=None):
         '''Add a pydicom dataset to the stack.
 
@@ -528,8 +557,13 @@ class DicomStack(object):
         ImageCollisionError
             The provided `dcm` has the same slice location and time/vector
             values.
-
+        
+        NonImageDataSetError
+            The provided `dcm` doesn't contain image data
         '''
+        if not is_image(dcm):
+            raise NonImageDataSetError()
+
         if meta is None:
             from .extract import default_extractor
             meta = default_extractor(dcm)
@@ -650,7 +684,6 @@ class DicomStack(object):
                             error_msg.append(' for vector component %s' %
                                              str(curr_vec_val))
                         raise InvalidStackError(''.join(error_msg))
-
 
     def get_shape(self):
         '''Get the shape of the stack.
@@ -1021,6 +1054,7 @@ class DicomStack(object):
         '''
         return NiftiWrapper(self.to_nifti(voxel_order, True))
 
+
 def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
                     force=False, warn_on_except=False,
                     close_tests=default_close_keys):
@@ -1077,6 +1111,11 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
             else:
                 raise
 
+        # Warn and skip non-image data sets
+        if not is_image(dcm):
+            warnings.warn("Skipping non-image data set: %s" % dcm_path)
+            continue
+
         #Extract the meta data and group
         meta = extractor(dcm)
         key_list = [] # Values from group_by elems with equality testing
@@ -1127,6 +1166,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
 
     return OrderedDict(sorted(full_results.items()))
 
+
 def stack_group(group, warn_on_except=False, **stack_args):
     result = DicomStack(**stack_args)
     for dcm, meta, fn in group:
@@ -1139,6 +1179,7 @@ def stack_group(group, warn_on_except=False, **stack_args):
             else:
                 raise
     return result
+
 
 def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None,
                     force=False, warn_on_except=False, **stack_args):
