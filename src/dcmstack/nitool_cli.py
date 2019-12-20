@@ -179,7 +179,7 @@ def check_overwrite():
 
 def embed(args):
     dest_nii = nb.load(args.dest_nii[0])
-    hdr = dest_nii.get_header()
+    hdr = dest_nii.header
     try:
         src_wrp = NiftiWrapper(dest_nii, False)
     except MissingExtensionError:

@@ -374,10 +374,10 @@ def _make_dummy(reference, meta, iop):
     data[...] = np.iinfo(np.int16).max
 
     #Create the nifti image and set header data
-    aff = reference.nii_img.get_affine().copy()
+    aff = reference.nii_img.affine.copy()
     aff[:3, 3] = [iop[1], iop[0], iop[2]]
     nii_img = nb.nifti1.Nifti1Image(data, aff)
-    hdr = nii_img.get_header()
+    hdr = nii_img.header
     hdr.set_xyzt_units('mm', 'sec')
     dim_info = {'freq' : None,
                 'phase' : None,
@@ -783,7 +783,7 @@ class DicomStack(object):
                             num_vec_comps)
 
         #Stack appears to be valid, build the shape tuple
-        file_shape = self._files_info[0][0].nii_img.get_shape()
+        file_shape = self._files_info[0][0].nii_img.shape
         vol_shape = list(file_shape)
         if files_per_vol > 1:
             vol_shape[2] = files_per_vol
@@ -796,6 +796,8 @@ class DicomStack(object):
 
         self._shape_dirty = False
         return self._shape
+
+    shape = property(fget=get_shape)
 
     def get_data(self):
         '''Get an array of the voxel values.
@@ -810,7 +812,7 @@ class DicomStack(object):
             The stack is incomplete or invalid.
         '''
         #Create a numpy array for storing the voxel data
-        stack_shape = self.get_shape()
+        stack_shape = self.shape
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
         bits_stored = self._files_info[0][0].get_meta('BitsStored', default=16)
@@ -828,7 +830,7 @@ class DicomStack(object):
         if len(stack_shape) > 4:
             n_vols *= stack_shape[4]
         files_per_vol = len(self._files_info) // n_vols
-        file_shape = self._files_info[0][0].nii_img.get_shape()
+        file_shape = self._files_info[0][0].nii_img.shape
         for vec_idx in range(stack_shape[4]):
             for time_idx in range(stack_shape[3]):
                 if files_per_vol == 1 and file_shape[2] != 1:
@@ -850,6 +852,8 @@ class DicomStack(object):
 
         return vox_array
 
+    data = property(fget=get_data)
+
     def get_affine(self):
         '''Get the affine transform for mapping row/column/slice indices
         to Nifti (RAS) patient space.
@@ -864,7 +868,7 @@ class DicomStack(object):
             The stack is incomplete or invalid.
         '''
         #Figure out the number of three (or two) dimensional volumes
-        shape = self.get_shape()
+        shape = self.shape
         n_vols = 1
         if len(shape) > 3:
             n_vols *= shape[3]
@@ -875,16 +879,18 @@ class DicomStack(object):
         files_per_vol = len(self._files_info) // n_vols
 
         #Pull the DICOM Patient Space affine from the first input
-        aff = self._files_info[0][0].nii_img.get_affine()
+        aff = self._files_info[0][0].nii_img.affine
 
         #If there is more than one file per volume, we need to fix slice scaling
         if files_per_vol > 1:
             first_offset = aff[:3, 3]
-            second_offset = self._files_info[1][0].nii_img.get_affine()[:3, 3]
+            second_offset = self._files_info[1][0].nii_img.affine[:3, 3]
             scaled_slc_dir = second_offset - first_offset
             aff[:3, 2] = scaled_slc_dir
 
         return aff
+
+    affine = property(fget=get_affine)
 
     def to_nifti(self, voxel_order='LAS', embed_meta=False):
         '''Returns a NiftiImage with the data and affine from the stack.
@@ -906,7 +912,7 @@ class DicomStack(object):
         '''
         #Get the voxel data and affine
         data = self.get_data()
-        affine = self.get_affine()
+        affine = self.affine
 
         #Figure out the number of three (or two) dimensional volumes
         n_vols = 1
@@ -947,7 +953,7 @@ class DicomStack(object):
 
         #Create the nifti image using the data array
         nifti_image = nb.Nifti1Image(data, affine)
-        nifti_header = nifti_image.get_header()
+        nifti_header = nifti_image.header
 
         #Set the units and dimension info
         nifti_header.set_xyzt_units('mm', 'msec')
@@ -1021,7 +1027,7 @@ class DicomStack(object):
                     for vec_idx in range(data.shape[4]):
                         start_idx = vec_idx * data.shape[3]
                         end_idx = start_idx + data.shape[3]
-                        meta = DcmMetaExtension.from_sequence(\
+                        meta = DcmMetaExtension.from_sequence(
                             vol_meta[start_idx:end_idx], 3)
                         vec_meta.append(meta)
                 else:

@@ -62,7 +62,7 @@ the array of voxel data, get the affine transform, or create a Nifti1Image.
 .. code-block:: python
     
     >>> stack_data = my_stack.get_data()
-    >>> stack_affine = my_stack.get_affine()
+    >>> stack_affine = my_stack.affine
     >>> nii = my_stack.to_nifti()
     
 Embedding Meta Data
@@ -150,25 +150,25 @@ method *split*.
     >>> from dcmstack.dcmmeta import NiftiWrapper
     >>> nw1 = NiftiWrapper.from_filename('img1.nii.gz')
     >>> nw2 = NiftiWrapper.from_filename('img2.nii.gz')
-    >>> print nw1.nii_img.get_shape()
+    >>> print nw1.nii_img.shape
     (384, 512, 60)
-    >>> print nw2.nii_img.get_shape()
+    >>> print nw2.nii_img.shape
     (384, 512, 60)
     >>> print nw1.get_meta('EchoTime')
     11.0
     >>> print nw2.get_meta('EchoTime')
     87.0
     >>> merged = NiftiWrapper.from_sequence([nw1, nw2])
-    >>> print merged.nii_img.get_shape()
+    >>> print merged.nii_img.shape
     (384, 512, 60, 2)
     >>> print merged.get_meta('EchoTime', index=(0,0,0,0)
     11.0
     >>> print merged.get_meta('EchoTime', index=(0,0,0,1)
     87.0
     >>> splits = list(merge.split())
-    >>> print splits[0].nii_img.get_shape()
+    >>> print splits[0].nii_img.shape
     (384, 512, 60)
-    >>> print splits[1].nii_img.get_shape()
+    >>> print splits[1].nii_img.shape
     (384, 512, 60)
     >>> print splits[0].get_meta('EchoTime')
     11.0
