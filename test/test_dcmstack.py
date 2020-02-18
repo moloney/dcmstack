@@ -43,6 +43,7 @@ def_dicom_attrs = {'file_meta' : _def_file_meta,
                    'BitsStored' : 16,
                    'PixelRepresentation' : 0,
                    'SamplesPerPixel' : 1,
+                   'PhotometricInterpretation': 'MONOCHROME2',
                   }
 
 def make_dicom(attrs=None, pix_val=1):
