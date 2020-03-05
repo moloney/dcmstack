@@ -30,6 +30,7 @@ Depends: python3-dicom (>= 0.9.7~),
          ${misc:Depends},
          ${python3:Depends},
          ${sphinxdoc:Depends},
+Conflicts: python-dcmstack
 Provides: ${python3:Provides}
 Description: DICOM to NIfTI conversion - python3 package
  DICOM to NIfTI conversion with the added ability to extract and summarize

@@ -2,6 +2,9 @@ dcmstack (0.8-1) unstable; urgency=medium
 
   * Fresh upstream release
     - should resolve incompatibility with fresh nibabel
+  * debian/control
+    - Announce that it conflicts with python-dcmstack because they
+      both provide /usr/bin scripts; Closes: #946992
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 05 Mar 2020 16:29:19 -0500
 
