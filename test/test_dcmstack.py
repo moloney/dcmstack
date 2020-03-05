@@ -43,6 +43,7 @@ def_dicom_attrs = {'file_meta' : _def_file_meta,
                    'BitsStored' : 16,
                    'PixelRepresentation' : 0,
                    'SamplesPerPixel' : 1,
+                   'PhotometricInterpretation': 'MONOCHROME2',
                   }
 
 def make_dicom(attrs=None, pix_val=1):
@@ -365,14 +366,14 @@ class TestGetShape(object):
     def test_single_slice(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
-        shape = stack.get_shape()
+        shape = stack.shape
         eq_(shape, (192, 192, 1))
 
     def test_three_dim(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        shape = stack.get_shape()
+        shape = stack.shape
         eq_(shape, (192, 192, 2))
 
     def test_four_dim(self):
@@ -381,7 +382,7 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
-        shape = stack.get_shape()
+        shape = stack.shape
         eq_(shape, (192, 192, 2, 2))
 
     def test_five_dim(self):
@@ -390,7 +391,7 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[1])
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
-        shape = stack.get_shape()
+        shape = stack.shape
         eq_(shape, (192, 192, 2, 1, 2))
 
     def test_allow_dummy(self):
@@ -399,7 +400,7 @@ class TestGetShape(object):
         stack = dcmstack.DicomStack(allow_dummies=True)
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        shape = stack.get_shape()
+        shape = stack.shape
         eq_(shape, (192, 192, 2))
 
 class TestGuessDim(object):
@@ -435,7 +436,7 @@ class TestGuessDim(object):
             for idx, in_dcm in enumerate(self.inputs):
                 setattr(in_dcm, key, self._get_vr_ord(key, idx))
                 stack.add_dcm(in_dcm)
-            eq_(stack.get_shape(), (192, 192, 2, 2))
+            eq_(stack.shape, (192, 192, 2, 2))
             for in_dcm in self.inputs:
                 delattr(in_dcm, key)
 
@@ -450,7 +451,7 @@ class TestGuessDim(object):
                     dcmstack.DicomStack.sort_guesses[-1],
                     self._get_vr_ord(key, idx) )
             stack.add_dcm(in_dcm)
-        eq_(stack.get_shape(), (192, 192, 2, 2))
+        eq_(stack.shape, (192, 192, 2, 2))
 
 class TestGetData(object):
     def setUp(self):
@@ -470,7 +471,7 @@ class TestGetData(object):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         data = stack.get_data()
-        eq_(data.shape, stack.get_shape())
+        eq_(data.shape, stack.shape)
         eq_(sha256(data).hexdigest(),
             '15cfa107ca73810a1c97f1c1872a7a4a05808ba6147e039cef3f63fa08735f5d')
 
@@ -479,7 +480,7 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         data = stack.get_data()
-        eq_(data.shape, stack.get_shape())
+        eq_(data.shape, stack.shape)
         eq_(sha256(data).hexdigest(),
             'ab5225fdbedceeea3442b2c9387e1abcbf398c71f525e0017251849c3cfbf49c')
 
@@ -490,7 +491,7 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
         data = stack.get_data()
-        eq_(data.shape, stack.get_shape())
+        eq_(data.shape, stack.shape)
         eq_(sha256(data).hexdigest(),
             'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a')
 
@@ -501,7 +502,7 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
         data = stack.get_data()
-        eq_(data.shape, stack.get_shape())
+        eq_(data.shape, stack.shape)
         eq_(sha256(data).hexdigest(),
             'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a')
 
@@ -512,7 +513,7 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         data = stack.get_data()
-        eq_(data.shape, stack.get_shape())
+        eq_(data.shape, stack.shape)
         ok_(np.all(data[:, :, -1] == np.iinfo(np.int16).max))
         eq_(sha256(data).hexdigest(),
             '7d85fbcb60a5021a45df3975613dcb7ac731830e0a268590cc798dc39897c04b')
@@ -532,7 +533,7 @@ class TestGetAffine(object):
     def test_single_slice(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
-        affine = stack.get_affine()
+        affine = stack.affine
         ref = np.load(path.join(self.data_dir, 'single_slice_aff.npy'))
         ok_(np.allclose(affine, ref))
 
@@ -540,7 +541,7 @@ class TestGetAffine(object):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
-        affine = stack.get_affine()
+        affine = stack.affine
         ref = np.load(path.join(self.data_dir, 'single_vol_aff.npy'))
         ok_(np.allclose(affine, ref))
 
@@ -625,9 +626,9 @@ class TestToNifti(object):
         assert False # Unknown name
 
     def _chk(self, nii, ref_base_fn):
-        hdr = nii.get_header()
+        hdr = nii.header
         ref_nii = nb.load(path.join(self.data_dir, ref_base_fn) + '.nii.gz')
-        ref_hdr = ref_nii.get_header()
+        ref_hdr = ref_nii.header
 
         for key in self.eq_keys:
             print("Testing key %s" % key)

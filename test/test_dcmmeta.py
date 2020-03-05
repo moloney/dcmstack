@@ -908,7 +908,7 @@ def test_nifti_wrapper_init():
     assert_raises(dcmmeta.MissingExtensionError,
                   dcmmeta.NiftiWrapper,
                   nii)
-    hdr = nii.get_header()
+    hdr = nii.header
     ext = dcmmeta.DcmMetaExtension.make_empty((5, 5, 5), np.eye(4))
     hdr.extensions.append(ext)
     nw = dcmmeta.NiftiWrapper(nii)
@@ -922,7 +922,7 @@ def test_nifti_wrapper_init():
 class TestMetaValid(object):
     def setUp(self):
         nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
-        hdr = nii.get_header()
+        hdr = nii.header
         hdr.set_dim_info(None, None, 2)
         self.nw = dcmmeta.NiftiWrapper(nii, True)
         for classes in self.nw.meta_ext.get_valid_classes():
@@ -957,7 +957,7 @@ class TestMetaValid(object):
                 ok_(self.nw.meta_valid(classes))
 
     def test_slice_dir_changed(self):
-        aff = self.nw.nii_img.get_affine()
+        aff = self.nw.nii_img.affine
         aff[:] = np.c_[aff[2, :],
                        aff[1, :],
                        aff[0, :],
@@ -973,7 +973,7 @@ class TestMetaValid(object):
 class TestGetMeta(object):
     def setUp(self):
         nii = nb.Nifti1Image(np.zeros((5, 5, 5, 7, 9)), np.eye(4))
-        hdr = nii.get_header()
+        hdr = nii.header
         hdr.set_dim_info(None, None, 2)
         self.nw = dcmmeta.NiftiWrapper(nii, True)
 
@@ -1075,7 +1075,7 @@ class TestSplit(object):
     def setUp(self):
         self.arr = np.arange(3 * 3 * 3 * 5 * 7).reshape(3, 3, 3, 5, 7)
         nii = nb.Nifti1Image(self.arr, np.diag([1.1, 1.1, 1.1, 1.0]))
-        hdr = nii.get_header()
+        hdr = nii.header
         hdr.set_dim_info(None, None, 2)
         self.nw = dcmmeta.NiftiWrapper(nii, True)
 
@@ -1092,7 +1092,7 @@ class TestSplit(object):
     def test_split_slice(self):
         for split_idx, nw_split in enumerate(self.nw.split(2)):
             eq_(nw_split.nii_img.shape, (3, 3, 1, 5, 7))
-            ok_(np.allclose(nw_split.nii_img.get_affine(),
+            ok_(np.allclose(nw_split.nii_img.affine,
                             np.c_[[1.1, 0.0, 0.0, 0.0],
                                   [0.0, 1.1, 0.0, 0.0],
                                   [0.0, 0.0, 1.1, 0.0],
@@ -1107,7 +1107,7 @@ class TestSplit(object):
     def test_split_time(self):
         for split_idx, nw_split in enumerate(self.nw.split(3)):
             eq_(nw_split.nii_img.shape, (3, 3, 3, 1, 7))
-            ok_(np.allclose(nw_split.nii_img.get_affine(),
+            ok_(np.allclose(nw_split.nii_img.affine,
                             np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() ==
                        self.arr[:, :, :, split_idx:split_idx+1, :])
@@ -1116,7 +1116,7 @@ class TestSplit(object):
     def test_split_vector(self):
         for split_idx, nw_split in enumerate(self.nw.split(4)):
             eq_(nw_split.nii_img.shape, (3, 3, 3, 5))
-            ok_(np.allclose(nw_split.nii_img.get_affine(),
+            ok_(np.allclose(nw_split.nii_img.affine,
                             np.diag([1.1, 1.1, 1.1, 1.0])))
             ok_(np.all(nw_split.nii_img.get_data() ==
                        self.arr[:, :, :, :, split_idx])
@@ -1141,10 +1141,10 @@ def test_from_dicom():
     src_dw = nb.nicom.dicomwrappers.wrapper_from_data(src_dcm)
     meta = {'EchoTime': 40}
     nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
-    hdr = nw.nii_img.get_header()
-    eq_(nw.nii_img.get_shape(), (192, 192, 1))
+    hdr = nw.nii_img.header
+    eq_(nw.nii_img.shape, (192, 192, 1))
     ok_(np.allclose(np.dot(np.diag([-1., -1., 1., 1.]), src_dw.get_affine()),
-                    nw.nii_img.get_affine())
+                    nw.nii_img.affine)
        )
     eq_(hdr.get_xyzt_units(), ('mm', 'sec'))
     eq_(hdr.get_dim_info(), (0, 1, 2))
@@ -1159,7 +1159,7 @@ def test_from_2d_slice_to_3d():
         aff = np.diag((1.1, 1.1, 1.1, 1.0))
         aff[:3, 3] += [0.0, 0.0, idx * 0.5]
         nii = nb.Nifti1Image(arr, aff)
-        hdr = nii.get_header()
+        hdr = nii.header
         hdr.set_dim_info(0, 1, 2)
         hdr.set_xyzt_units('mm', 'sec')
         nw = dcmmeta.NiftiWrapper(nii, True)
@@ -1169,7 +1169,7 @@ def test_from_2d_slice_to_3d():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(slice_nws, 2)
     eq_(merged.nii_img.shape, (4, 4, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 0.5, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('EchoTime'),
@@ -1178,7 +1178,7 @@ def test_from_2d_slice_to_3d():
     eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
         (list(range(3)), ('global', 'slices'))
        )
-    merged_hdr = merged.nii_img.get_header()
+    merged_hdr = merged.nii_img.header
     eq_(merged_hdr.get_dim_info(), (0, 1, 2))
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
     merged_data = merged.nii_img.get_data()
@@ -1194,7 +1194,7 @@ def test_from_3d_time_to_4d():
                         (idx + 1) * (4 * 4 * 4)
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
-        hdr = nii.get_header()
+        hdr = nii.header
         hdr.set_dim_info(0, 1, 2)
         hdr.set_xyzt_units('mm', 'sec')
         nw = dcmmeta.NiftiWrapper(nii, True)
@@ -1208,7 +1208,7 @@ def test_from_3d_time_to_4d():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(time_nws, 3)
     eq_(merged.nii_img.shape, (4, 4, 4, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 1.1, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('PatientID'),
@@ -1223,7 +1223,7 @@ def test_from_3d_time_to_4d():
     eq_(merged.meta_ext.get_values_and_class('AcquisitionTime'),
         (list(range(4 * 3)), ('global', 'slices'))
        )
-    merged_hdr = merged.nii_img.get_header()
+    merged_hdr = merged.nii_img.header
     eq_(merged_hdr.get_dim_info(), (0, 1, 2))
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
     merged_data = merged.nii_img.get_data()
@@ -1240,7 +1240,7 @@ def test_from_3d_vector_to_4d():
                         (idx + 1) * (4 * 4 * 4)
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
-        hdr = nii.get_header()
+        hdr = nii.header
         hdr.set_dim_info(0, 1, 2)
         hdr.set_xyzt_units('mm', 'sec')
         nw = dcmmeta.NiftiWrapper(nii, True)
@@ -1254,7 +1254,7 @@ def test_from_3d_vector_to_4d():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(vector_nws, 4)
     eq_(merged.nii_img.shape, (4, 4, 4, 1, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 1.1, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('PatientID'),
@@ -1269,7 +1269,7 @@ def test_from_3d_vector_to_4d():
     eq_(merged.meta_ext.get_values_and_class('AcquisitionTime'),
         (list(range(4 * 3)), ('global', 'slices'))
        )
-    merged_hdr = merged.nii_img.get_header()
+    merged_hdr = merged.nii_img.header
     eq_(merged_hdr.get_dim_info(), (0, 1, 2))
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))
     merged_data = merged.nii_img.get_data()
@@ -1288,7 +1288,7 @@ def test_merge_inconsistent_hdr():
                         (idx + 1) * (4 * 4 * 4)
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
-        hdr = nii.get_header()
+        hdr = nii.header
         if idx == 1:
             hdr.set_dim_info(1, 0, 2)
             hdr.set_xyzt_units('mm', None)
@@ -1299,7 +1299,7 @@ def test_merge_inconsistent_hdr():
         time_nws.append(nw)
 
     merged = dcmmeta.NiftiWrapper.from_sequence(time_nws)
-    merged_hdr = merged.nii_img.get_header()
+    merged_hdr = merged.nii_img.header
     eq_(merged_hdr.get_dim_info(), (None, None, 2))
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'unknown'))
 
@@ -1311,7 +1311,7 @@ def test_merge_with_slc_and_without():
                         (idx + 1) * (4 * 4 * 4)
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
-        hdr = nii.get_header()
+        hdr = nii.header
         if idx == 0:
             hdr.set_dim_info(0, 1, 2)
         hdr.set_xyzt_units('mm', 'sec')
@@ -1326,7 +1326,7 @@ def test_merge_with_slc_and_without():
 
     merged = dcmmeta.NiftiWrapper.from_sequence(input_nws)
     eq_(merged.nii_img.shape, (4, 4, 4, 3))
-    ok_(np.allclose(merged.nii_img.get_affine(),
+    ok_(np.allclose(merged.nii_img.affine,
                     np.diag((1.1, 1.1, 1.1, 1.0)))
        )
     eq_(merged.meta_ext.get_values_and_class('PatientID'),
@@ -1338,5 +1338,5 @@ def test_merge_with_slc_and_without():
     eq_(merged.meta_ext.get_values_and_class('SliceLocation'),
         (list(range(4)) + ([None] * 8), ('global', 'slices'))
        )
-    merged_hdr = merged.nii_img.get_header()
+    merged_hdr = merged.nii_img.header
     eq_(merged_hdr.get_xyzt_units(), ('mm', 'sec'))

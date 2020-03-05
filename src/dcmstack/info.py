@@ -4,7 +4,7 @@ not import dcmstack.
 import sys
 
 _version_major = 0
-_version_minor = 7
+_version_minor = 8
 _version_micro = 0
 _version_extra = ''
 __version__ = "%s.%s.%s%s" % (_version_major,
@@ -24,7 +24,7 @@ description = 'Stack DICOM images into volumes and convert to Nifti'
 
 # Hard dependencies
 install_requires = ['pydicom >= 0.9.7',
-                    'nibabel >= 2.0.0',
+                    'nibabel >= 2.1.0',
                    ]
 # Add version specific dependencies
 if sys.version_info < (2, 6):
