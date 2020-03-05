@@ -5,6 +5,8 @@ dcmstack (0.8-1) unstable; urgency=medium
   * debian/control
     - Announce that it conflicts with python-dcmstack because they
       both provide /usr/bin scripts; Closes: #946992
+  * debian/gbp.conf
+    - Added to facilitate usability of our non-standard VCS setup
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 05 Mar 2020 16:29:19 -0500
 
