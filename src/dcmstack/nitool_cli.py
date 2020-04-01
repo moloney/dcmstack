@@ -16,7 +16,9 @@ prog_descrip = """Work with extended Nifti files created by dcmstack"""
 def main(argv=sys.argv):
     #Setup the top level parser
     arg_parser = argparse.ArgumentParser(description=prog_descrip)
-    sub_parsers = arg_parser.add_subparsers(title="Subcommands")
+    sub_parsers = arg_parser.add_subparsers(title="Subcommands",
+                                            dest='cmd',
+                                            required=True)
 
     #Split command
     split_help = ("Split src_nii file along a dimension. Defaults to the slice "
