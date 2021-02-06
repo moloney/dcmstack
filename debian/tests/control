@@ -1,2 +1,2 @@
-Test-Command: nosetests-3 .
+Test-Command: python3 -m nose .
 Depends: @, @builddeps@

@@ -1,3 +1,10 @@
+dcmstack (0.8-2) unstable; urgency=medium
+
+  * Replace nosetests-3 with python3 -m nose for autopkgtest invocation
+    (Closes: #982119)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 06 Feb 2021 12:29:32 -0500
+
 dcmstack (0.8-1) unstable; urgency=medium
 
   * Fresh upstream release
