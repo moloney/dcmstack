@@ -24,7 +24,7 @@ description = 'Stack DICOM images into volumes and convert to Nifti'
 
 # Hard dependencies
 install_requires = ['pydicom >= 0.9.7',
-                    'nibabel >= 2.1.0',
+                    'nibabel >= 2.5.1',
                    ]
 # Add version specific dependencies
 if sys.version_info < (2, 6):

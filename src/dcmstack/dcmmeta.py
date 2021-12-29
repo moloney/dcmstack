@@ -1533,7 +1533,7 @@ class NiftiWrapper(object):
         data = dcm_wrp.get_data()
 
         #The Nifti patient space flips the x and y directions
-        affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.get_affine())
+        affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
 
         #Make 2D data 3D
         if len(data.shape) == 2:
