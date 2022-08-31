@@ -5,8 +5,6 @@ from glob import glob
 
 import numpy as np
 
-from nose.tools import ok_, eq_
-
 from . import test_dir, src_dir
 
 from dcmstack import dcmstack_cli, nitool_cli
@@ -55,11 +53,11 @@ class CliTest(object):
 class TestDcmstackCli(CliTest):
     def test_basic(self):
         nii_paths = make_niftis(self.out_dir)
-        eq_(len(nii_paths), 1)
+        assert len(nii_paths) == 1
 
     def test_embed(self):
         nii_paths = make_niftis(self.out_dir, ['--embed'])
-        eq_(len(nii_paths), 1)
+        assert len(nii_paths) == 1
 
 
 class TestNitoolCli(CliTest):
@@ -70,11 +68,11 @@ class TestNitoolCli(CliTest):
         with open(json_path) as fp:
             meta = json.load(fp)
         print(json.dumps(meta, indent=4))
-        ok_('dcmmeta_version' in meta)
-        ok_('dcmmeta_affine' in meta)
-        ok_('dcmmeta_reorient_transform' in meta)
-        eq_(meta['dcmmeta_shape'], [192, 192, 2, 2])
-        eq_(meta['dcmmeta_slice_dim'], 2)
-        eq_(meta['global']['const']['Rows'], 192)
-        eq_(meta['global']['const']['Columns'], 192)
-        ok_(np.allclose(meta['time']['samples']['EchoTime'], [20.0, 40.0]))
+        assert('dcmmeta_version' in meta)
+        assert('dcmmeta_affine' in meta)
+        assert('dcmmeta_reorient_transform' in meta)
+        assert meta['dcmmeta_shape'] == [192, 192, 2, 2]
+        assert meta['dcmmeta_slice_dim'] ==  2
+        assert meta['global']['const']['Rows'] == 192
+        assert meta['global']['const']['Columns'] == 192
+        assert(np.allclose(meta['time']['samples']['EchoTime'], [20.0, 40.0]))

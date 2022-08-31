@@ -34,7 +34,7 @@ elif sys.version_info < (2, 7):
 
 # Extra requirements for building documentation and testing
 extras_requires = {'doc':  ["sphinx", "numpydoc"],
-                   'test': ["nose"],
+                   'test': ["pytest"],
                   }
 
 

@@ -26,5 +26,5 @@ setup(name=NAME,
                            'nitool = dcmstack.nitool_cli:main',
                           ],
                      },
-      test_suite = 'nose.collector'
+      test_suite = 'pytest'
      )
