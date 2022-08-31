@@ -110,10 +110,10 @@ class TestMetaExtractor(object):
         self.data[(0x29, 0x1020)].tag = pydicom.tag.Tag((0x29, 0x2020))
         meta_dict = extractor(self.data)
         assert meta_dict["CsaImage.EchoLinePosition"] == 64
-        assert(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)
+        assert meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'] == 1
 
     def test_non_reloc_private(self):
         extractor = extract.MetaExtractor()
         meta_dict = extractor(self.data)
         assert meta_dict["CsaImage.EchoLinePosition"] == 64
-        assert(meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'], 1)
+        assert meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'] == 1
