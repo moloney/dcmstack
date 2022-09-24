@@ -12,12 +12,12 @@ If you have an acquisition that you would like to turn into a single
 
 .. code-block:: python
     
-    >>> import dcmstack, dicom
+    >>> import dcmstack, pydicom
     >>> from glob import glob
     >>> src_paths = glob('032-MPRAGEAXTI900Pre/*.dcm')
     >>> my_stack = dcmstack.DicomStack()
     >>> for src_path in src_paths:
-    ...     src_dcm = dicom.read_file(src_path)
+    ...     src_dcm = pydicom.dcmread(src_path)
     ...     my_stack.add_dcm(src_dcm)
 
 If you are unsure how many stacks you want from a collection of DICOM data 
@@ -89,12 +89,12 @@ these can be created directly from a *DicomStack*.
 
 .. code-block:: python
     
-    >>> import dcmstack, dicom
+    >>> import dcmstack, pydicom
     >>> from glob import glob
     >>> src_paths = glob('032-MPRAGEAXTI900Pre/*.dcm')
     >>> my_stack = dcmstack.DicomStack()
     >>> for src_path in src_paths:
-    ...     src_dcm = dicom.read_file(src_path)
+    ...     src_dcm = pydicom.dcmread(src_path)
     ...     my_stack.add_dcm(src_dcm)
     ...
     >>> nii_wrp = my_stack.to_nifti_wrapper()
@@ -196,6 +196,3 @@ extension directly.
     [11.0, 87.0]
     >>> print nw.meta_ext.get_classification('EchoTime')
     ('time', 'samples')
-    
-    
-    
