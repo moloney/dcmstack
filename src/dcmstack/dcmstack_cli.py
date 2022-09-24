@@ -64,10 +64,6 @@ def main(argv=sys.argv):
     input_opt.add_argument('--file-ext', default='.dcm', help=('Only try reading '
                            'files with the given extension. Default: '
                            '%(default)s'))
-    input_opt.add_argument('--allow-dummies', action='store_true', default=False,
-                           help=('Allow DICOM files that are missing pixel '
-                           'data, filling that slice of the output nifti with '
-                           'the maximum representable value.'))
 
     output_opt = arg_parser.add_argument_group('Output options')
     output_opt.add_argument('--dest-dir', default=None,
@@ -293,7 +289,6 @@ def main(argv=sys.argv):
                                 warn_on_except=not args.strict,
                                 time_order=time_order,
                                 vector_order=vector_order,
-                                allow_dummies=args.allow_dummies,
                                 meta_filter=meta_filter)
             meta = group[0][1]
 

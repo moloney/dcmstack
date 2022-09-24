@@ -291,16 +291,6 @@ class TestInvalidStack(object):
         self.stack = dcmstack.DicomStack()
         self._chk()
 
-    def test_only_dummy(self):
-        self.stack = dcmstack.DicomStack(allow_dummies=True)
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        del self.inputs[1].Rows
-        del self.inputs[1].Columns
-        self.stack.add_dcm(self.inputs[0])
-        self.stack.add_dcm(self.inputs[1])
-        self._chk()
-
     def test_missing_slice(self):
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.inputs[0])
@@ -367,15 +357,6 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[3])
         shape = stack.shape
         assert shape == (192, 192, 2, 1, 2)
-
-    def test_allow_dummy(self):
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        stack = dcmstack.DicomStack(allow_dummies=True)
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        shape = stack.shape
-        assert shape == (192, 192, 2)
 
 class TestGuessDim(object):
     def setup_method(self, method):
@@ -479,18 +460,6 @@ class TestGetData(object):
         assert data.shape == stack.shape
         assert sha256(data).hexdigest() == \
             'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a'
-
-    def test_allow_dummy(self):
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        stack = dcmstack.DicomStack(allow_dummies=True)
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        data = stack.get_data()
-        assert data.shape == stack.shape
-        assert(np.all(data[:, :, -1] == np.iinfo(np.int16).max))
-        assert sha256(data).hexdigest() == \
-            '7d85fbcb60a5021a45df3975613dcb7ac731830e0a268590cc798dc39897c04b'
 
 class TestGetAffine(object):
     def setup_method(self, method):
@@ -648,16 +617,6 @@ class TestToNifti(object):
         for tst in ('two_vector_vol', 'two_vector_vol_meta'):
             nii = self._build_nii(tst)
             self._chk(nii, tst)
-
-    def test_allow_dummies(self):
-        del self.inputs[0].Rows
-        del self.inputs[0].Columns
-        stack = dcmstack.DicomStack(allow_dummies=True)
-        stack.add_dcm(self.inputs[0])
-        stack.add_dcm(self.inputs[1])
-        nii = stack.to_nifti()
-        data = nii.get_data()
-        assert(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
 
 
 class TestParseAndGroup(object):
