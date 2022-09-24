@@ -29,7 +29,10 @@ from nibabel.orientations import aff2axcodes
 
 import dcmstack
 
-_def_file_meta = pydicom.dataset.FileMetaDataset()
+if hasattr(pydicom, "FileMetaDataset"):
+    _def_file_meta = pydicom.dataset.FileMetaDataset()
+else:
+     _def_file_meta = pydicom.dataset.Dataset()
 _def_file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
 
 def_dicom_attrs = {'file_meta' : _def_file_meta,
