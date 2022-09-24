@@ -1144,7 +1144,10 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
             # Look for a matching sub_result
             for c_list, sub_res in results[key]:
                 for c_idx, c_val in enumerate(c_list):
-                    if not np.allclose(c_val, close_list[c_idx], atol=5e-5):
+                    if not (
+                        (c_val is None and close_list[c_idx] is None) or
+                        np.allclose(c_val, close_list[c_idx], atol=5e-5)
+                    ):
                         break
                 else:
                     sub_res.append((dcm, meta, dcm_path))
