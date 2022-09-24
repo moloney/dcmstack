@@ -32,7 +32,8 @@ install_requires = ['pydicom >= 0.9.7',
 extras_requires = {'doc':  ["sphinx", "numpydoc"],
                    'test': [
                         'pytest <= 4.6 ; python_version == "2.7"',
-                        'pytest ; python_version > "2.7"'
+                        'pytest ; python_version > "2.7"',
+                        'pytest-cov',
                     ],
                   }
 
