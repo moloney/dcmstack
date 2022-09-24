@@ -1,0 +1,60 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    env:
+      NO_ET: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-2019
+          - ubuntu-latest
+          - macos-latest
+        python:
+          - '2.7'
+          - '3.7'
+          - '3.8'
+          - '3.9'
+          - '3.10'
+        mode:
+          - normal
+
+    steps:
+
+    - name: Set up Python ${{ matrix.python }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip wheel
+        pip install ".[test]"
+
+    - name: Run all tests
+      run: |
+        python -m pytest -s -v --cov=dcmstack --cov-report=xml dcmstack
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v2
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        # name: codecov-umbrella
+        # yml: ./codecov.yml
+        fail_ci_if_error: false
