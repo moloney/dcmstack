@@ -1045,7 +1045,7 @@ def test_from_dicom():
     nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
     hdr = nw.nii_img.header
     assert nw.nii_img.shape == (192, 192, 1)
-    assert(np.allclose(np.dot(np.diag([-1., -1., 1., 1.]), src_dw.get_affine()),
+    assert(np.allclose(np.dot(np.diag([-1., -1., 1., 1.]), src_dw.affine),
                     nw.nii_img.affine)
        )
     assert hdr.get_xyzt_units() == ('mm', 'sec')

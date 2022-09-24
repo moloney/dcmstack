@@ -25,16 +25,15 @@ description = 'Stack DICOM images into volumes and convert to Nifti'
 # Hard dependencies
 install_requires = ['pydicom >= 0.9.7',
                     'nibabel >= 2.5.1',
+                    'requires-python = ">=2.7"'
                    ]
-# Add version specific dependencies
-if sys.version_info < (2, 6):
-    raise Exception("must use python 2.6 or greater")
-elif sys.version_info < (2, 7):
-    install_requires.append('ordereddict')
 
 # Extra requirements for building documentation and testing
 extras_requires = {'doc':  ["sphinx", "numpydoc"],
-                   'test': ["pytest"],
+                   'test': [
+                        'pytest <= 4.6 ; python_version == "2.7"',
+                        'pytest ; python_version > "2.7"'
+                    ],
                   }
 
 
