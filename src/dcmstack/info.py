@@ -4,9 +4,9 @@ not import dcmstack.
 import sys
 
 _version_major = 0
-_version_minor = 9
+_version_minor = 10
 _version_micro = 0
-_version_extra = ''
+_version_extra = 'dev0'
 __version__ = "%s.%s.%s%s" % (_version_major,
                               _version_minor,
                               _version_micro,
