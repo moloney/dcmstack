@@ -1435,7 +1435,7 @@ class NiftiWrapper(object):
 
         '''
         shape = self.nii_img.shape
-        data = self.nii_img.get_data()
+        data = np.asanyarray(self.nii_img.dataobj)
         header = self.nii_img.header
         slice_dim = header.get_dim_info()[2]
 
@@ -1647,7 +1647,7 @@ class NiftiWrapper(object):
             result_shape.append(1)
         result_shape[dim] = n_inputs
 
-        result_dtype = max(input_wrp.nii_img.get_data().dtype
+        result_dtype = max(input_wrp.nii_img.get_data_dtype()
                            for input_wrp in seq)
         result_data = np.empty(result_shape, dtype=result_dtype)
 
@@ -1721,7 +1721,7 @@ class NiftiWrapper(object):
 
 
             data_slices[dim] = input_idx
-            result_data[tuple(data_slices)] = input_nii.get_data().squeeze()
+            result_data[tuple(data_slices)] = np.asanyarray(input_nii.dataobj).squeeze()
 
             if input_idx != 0:
                 if (hdr_info['qform'] is None or
