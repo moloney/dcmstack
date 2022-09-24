@@ -7,6 +7,7 @@ exec(open(info_file).read())
 
 
 setup(name=NAME,
+      python_requires=">=2.7",
       description=DESCRIPTION,
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
