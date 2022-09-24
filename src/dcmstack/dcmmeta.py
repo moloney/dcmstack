@@ -1462,7 +1462,7 @@ class NiftiWrapper(object):
             else:
                 slices[dim] = slice(idx, idx+1)
 
-            split_data = data[slices].copy()
+            split_data = data[tuple(slices)].copy()
 
             #Update the translation in any affines if needed
             if not trans_update is None and idx != 0:
@@ -1721,7 +1721,7 @@ class NiftiWrapper(object):
 
 
             data_slices[dim] = input_idx
-            result_data[data_slices] = input_nii.get_data().squeeze()
+            result_data[tuple(data_slices)] = input_nii.get_data().squeeze()
 
             if input_idx != 0:
                 if (hdr_info['qform'] is None or

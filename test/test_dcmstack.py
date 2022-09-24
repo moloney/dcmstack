@@ -11,7 +11,7 @@ from hashlib import sha256
 from os import path
 
 import numpy as np
-from nose.tools import ok_, eq_, assert_raises
+import pytest
 
 from . import test_dir, src_dir
 
@@ -70,53 +70,33 @@ def make_dicom(attrs=None, pix_val=1):
 def test_key_regex_filter():
         filt = dcmstack.make_key_regex_filter(['test', 'another'],
                                               ['2', 'another test'])
-        ok_(filt('test', 1))
-        ok_(filt('test another', 1))
-        ok_(filt('another tes', 1))
-        ok_(not filt('test2', 1))
-        ok_(not filt('2 another', 1))
-        ok_(not filt('another test', 1))
+        assert(filt('test', 1))
+        assert(filt('test another', 1))
+        assert(filt('another tes', 1))
+        assert(not filt('test2', 1))
+        assert(not filt('2 another', 1))
+        assert(not filt('another test', 1))
 
 class TestReorderVoxels(object):
-    def setUp(self):
+    def setup_method(self, method):
         self.vox_array = np.arange(16).reshape((2, 2, 2, 2))
         self.affine = np.eye(4)
 
     def test_invalid_vox_order(self):
-        assert_raises(ValueError,
-                      dcmstack.reorder_voxels,
-                      self.vox_array,
-                      self.affine,
-                      'lra',
-                      )
-        assert_raises(ValueError,
-                      dcmstack.reorder_voxels,
-                      self.vox_array,
-                      self.affine,
-                      'rpil',
-                      )
-        assert_raises(ValueError,
-                      dcmstack.reorder_voxels,
-                      self.vox_array,
-                      self.affine,
-                      'lrz',
-                      )
+        with pytest.raises(ValueError):
+            dcmstack.reorder_voxels(self.vox_array, self.affine, 'lra')
+        with pytest.raises(ValueError):
+            dcmstack.reorder_voxels(self.vox_array, self.affine, 'rpil')
+        with pytest.raises(ValueError):
+            dcmstack.reorder_voxels(self.vox_array, self.affine, 'lrz')
 
     def test_invalid_vox_array(self):
-        assert_raises(ValueError,
-                      dcmstack.reorder_voxels,
-                      np.eye(2),
-                      self.affine,
-                      'rpi',
-                     )
+        with pytest.raises(ValueError):
+            dcmstack.reorder_voxels(np.eye(2), self.affine, 'rpi')
 
     def test_invalid_affine(self):
-        assert_raises(ValueError,
-                      dcmstack.reorder_voxels,
-                      self.vox_array,
-                      np.eye(3),
-                      'rpi',
-                     )
+        with pytest.raises(ValueError):
+            dcmstack.reorder_voxels(self.vox_array, np.eye(3), 'rpi')
 
     def test_no_op(self):
         vox_order = ''.join(aff2axcodes(self.affine))
@@ -126,11 +106,11 @@ class TestReorderVoxels(object):
          ornt_trans) = dcmstack.reorder_voxels(self.vox_array,
                                                self.affine,
                                                vox_order)
-        ok_((vox_array == self.vox_array).all())
-        ok_((affine == self.affine).all())
-        ok_((aff_trans == np.eye(4)).all())
-        ok_(np.allclose(ornt_trans, [[0, 1], [1, 1], [2, 1]]))
-        eq_(np.may_share_memory(affine, self.affine), False)
+        assert((vox_array == self.vox_array).all())
+        assert((affine == self.affine).all())
+        assert((aff_trans == np.eye(4)).all())
+        assert(np.allclose(ornt_trans, [[0, 1], [1, 1], [2, 1]]))
+        assert np.may_share_memory(affine, self.affine) == False
 
     def test_reorder(self):
         (vox_array,
@@ -139,7 +119,7 @@ class TestReorderVoxels(object):
          ornt_trans) = dcmstack.reorder_voxels(self.vox_array,
                                                self.affine,
                                                'PRS')
-        ok_(np.all(vox_array == np.array([[[[4, 5],
+        assert(np.all(vox_array == np.array([[[[4, 5],
                                             [6, 7]],
                                            [[12, 13],
                                             [14,15]]
@@ -153,7 +133,7 @@ class TestReorderVoxels(object):
                                         )
                   )
            )
-        ok_(np.allclose(affine,
+        assert(np.allclose(affine,
                         np.array([[0,1,0,0],
                                   [-1,0,0,1],
                                   [0,0,1,0],
@@ -170,7 +150,7 @@ class TestReorderVoxels(object):
          ornt_trans) = dcmstack.reorder_voxels(self.vox_array,
                                                self.affine,
                                                'PLS')
-        ok_(np.allclose(affine,
+        assert(np.allclose(affine,
                         np.array([[0,-1,0,1],
                                   [-1,0,0,3],
                                   [0,0,1,0],
@@ -179,50 +159,46 @@ class TestReorderVoxels(object):
            )
 
 def test_dcm_time_to_sec():
-    eq_(dcmstack.dcm_time_to_sec('100235.123456'), 36155.123456)
-    eq_(dcmstack.dcm_time_to_sec('100235'), 36155)
-    eq_(dcmstack.dcm_time_to_sec('1002'), 36120)
-    eq_(dcmstack.dcm_time_to_sec('10'), 36000)
+    assert dcmstack.dcm_time_to_sec('100235.123456') == 36155.123456
+    assert dcmstack.dcm_time_to_sec('100235') == 36155
+    assert dcmstack.dcm_time_to_sec('1002') == 36120
+    assert dcmstack.dcm_time_to_sec('10') == 36000
 
     #Allow older NEMA style values
-    eq_(dcmstack.dcm_time_to_sec('10:02:35.123456'), 36155.123456)
-    eq_(dcmstack.dcm_time_to_sec('10:02:35'), 36155)
-    eq_(dcmstack.dcm_time_to_sec('10:02'), 36120)
-    eq_(dcmstack.dcm_time_to_sec('10'), 36000)
+    assert dcmstack.dcm_time_to_sec('10:02:35.123456') == 36155.123456
+    assert dcmstack.dcm_time_to_sec('10:02:35') == 36155
+    assert dcmstack.dcm_time_to_sec('10:02') == 36120
+    assert dcmstack.dcm_time_to_sec('10') == 36000
 
 class TestDicomOrdering(object):
-    def setUp(self):
+    def setup_method(self, method):
         self.ds = {'EchoTime' : 2}
 
     def test_missing_key(self):
         ordering = dcmstack.DicomOrdering('blah')
-        eq_(ordering.get_ordinate(self.ds), None)
+        assert ordering.get_ordinate(self.ds) == None
 
     def test_non_abs(self):
         ordering = dcmstack.DicomOrdering('EchoTime')
-        eq_(ordering.get_ordinate(self.ds), self.ds['EchoTime'])
+        assert ordering.get_ordinate(self.ds) == self.ds['EchoTime']
 
     def test_abs(self):
         abs_order = [1,2,3]
         ordering = dcmstack.DicomOrdering('EchoTime', abs_ordering=abs_order)
-        eq_(ordering.get_ordinate(self.ds),
-            abs_order.index(self.ds['EchoTime']))
+        assert ordering.get_ordinate(self.ds) == abs_order.index(self.ds['EchoTime'])
 
     def test_abs_as_str(self):
         abs_order = ['1','2','3']
         ordering = dcmstack.DicomOrdering('EchoTime',
                                           abs_ordering=abs_order,
                                           abs_as_str=True)
-        eq_(ordering.get_ordinate(self.ds),
-            abs_order.index(str(self.ds['EchoTime'])))
+        assert ordering.get_ordinate(self.ds) == abs_order.index(str(self.ds['EchoTime']))
 
     def test_abs_missing(self):
         abs_order = [1,3]
         ordering = dcmstack.DicomOrdering('EchoTime', abs_ordering=abs_order)
-        assert_raises(ValueError,
-                      ordering.get_ordinate,
-                      self.ds
-                     )
+        with pytest.raises(ValueError):
+            ordering.get_ordinate(self.ds)
 
 def test_image_collision():
     dcm_path = path.join(test_dir,
@@ -233,12 +209,11 @@ def test_image_collision():
     dcm = pydicom.read_file(dcm_path)
     stack = dcmstack.DicomStack('EchoTime')
     stack.add_dcm(dcm)
-    assert_raises(dcmstack.ImageCollisionError,
-                  stack.add_dcm,
-                  dcm)
+    with pytest.raises(dcmstack.ImageCollisionError):
+        stack.add_dcm(dcm)
 
 class TestIncongruentImage(object):
-    def setUp(self):
+    def setup_method(self, method):
         dcm_path = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -251,9 +226,8 @@ class TestIncongruentImage(object):
         self.dcm = pydicom.read_file(dcm_path)
 
     def _chk_raises(self):
-        assert_raises(dcmstack.IncongruentImageError,
-                      self.stack.add_dcm,
-                      self.dcm)
+        with pytest.raises(dcmstack.IncongruentImageError):
+            self.stack.add_dcm(self.dcm)
 
     def test_rows(self):
         self.dcm.Rows += 1
@@ -289,7 +263,7 @@ class TestIncongruentImage(object):
 
 
 class TestInvalidStack(object):
-    def setUp(self):
+    def setup_method(self, method):
         data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -304,14 +278,14 @@ class TestInvalidStack(object):
                       ]
 
     def _chk(self):
-        assert_raises(dcmstack.InvalidStackError,
-                      self.stack.get_shape)
-        assert_raises(dcmstack.InvalidStackError,
-                      self.stack.get_affine)
-        assert_raises(dcmstack.InvalidStackError,
-                      self.stack.get_data)
-        assert_raises(dcmstack.InvalidStackError,
-                      self.stack.to_nifti)
+        with pytest.raises(dcmstack.InvalidStackError):
+            self.stack.get_shape()
+        with pytest.raises(dcmstack.InvalidStackError):
+                      self.stack.get_affine()
+        with pytest.raises(dcmstack.InvalidStackError):
+                      self.stack.get_data()
+        with pytest.raises(dcmstack.InvalidStackError):
+                      self.stack.to_nifti()
 
     def test_empty(self):
         self.stack = dcmstack.DicomStack()
@@ -350,7 +324,7 @@ class TestInvalidStack(object):
         self._chk()
 
 class TestGetShape(object):
-    def setUp(self):
+    def setup_method(self, method):
         data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -367,14 +341,14 @@ class TestGetShape(object):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         shape = stack.shape
-        eq_(shape, (192, 192, 1))
+        assert shape == (192, 192, 1)
 
     def test_three_dim(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         shape = stack.shape
-        eq_(shape, (192, 192, 2))
+        assert shape == (192, 192, 2)
 
     def test_four_dim(self):
         stack = dcmstack.DicomStack(time_order='EchoTime')
@@ -383,7 +357,7 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
         shape = stack.shape
-        eq_(shape, (192, 192, 2, 2))
+        assert shape == (192, 192, 2, 2)
 
     def test_five_dim(self):
         stack = dcmstack.DicomStack(vector_order='EchoTime')
@@ -392,7 +366,7 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
         shape = stack.shape
-        eq_(shape, (192, 192, 2, 1, 2))
+        assert shape == (192, 192, 2, 1, 2)
 
     def test_allow_dummy(self):
         del self.inputs[0].Rows
@@ -401,10 +375,10 @@ class TestGetShape(object):
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         shape = stack.shape
-        eq_(shape, (192, 192, 2))
+        assert shape == (192, 192, 2)
 
 class TestGuessDim(object):
-    def setUp(self):
+    def setup_method(self, method):
         data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -436,7 +410,7 @@ class TestGuessDim(object):
             for idx, in_dcm in enumerate(self.inputs):
                 setattr(in_dcm, key, self._get_vr_ord(key, idx))
                 stack.add_dcm(in_dcm)
-            eq_(stack.shape, (192, 192, 2, 2))
+            assert stack.shape == (192, 192, 2, 2)
             for in_dcm in self.inputs:
                 delattr(in_dcm, key)
 
@@ -451,10 +425,10 @@ class TestGuessDim(object):
                     dcmstack.DicomStack.sort_guesses[-1],
                     self._get_vr_ord(key, idx) )
             stack.add_dcm(in_dcm)
-        eq_(stack.shape, (192, 192, 2, 2))
+        assert stack.shape == (192, 192, 2, 2)
 
 class TestGetData(object):
-    def setUp(self):
+    def setup_method(self, method):
         data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -471,18 +445,18 @@ class TestGetData(object):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         data = stack.get_data()
-        eq_(data.shape, stack.shape)
-        eq_(sha256(data).hexdigest(),
-            '15cfa107ca73810a1c97f1c1872a7a4a05808ba6147e039cef3f63fa08735f5d')
+        assert data.shape == stack.shape
+        assert sha256(data).hexdigest() == \
+            '15cfa107ca73810a1c97f1c1872a7a4a05808ba6147e039cef3f63fa08735f5d'
 
     def test_three_dim(self):
         stack = dcmstack.DicomStack()
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         data = stack.get_data()
-        eq_(data.shape, stack.shape)
-        eq_(sha256(data).hexdigest(),
-            'ab5225fdbedceeea3442b2c9387e1abcbf398c71f525e0017251849c3cfbf49c')
+        assert data.shape == stack.shape
+        assert sha256(data).hexdigest() == \
+            'ab5225fdbedceeea3442b2c9387e1abcbf398c71f525e0017251849c3cfbf49c'
 
     def test_four_dim(self):
         stack = dcmstack.DicomStack(time_order='EchoTime')
@@ -491,9 +465,9 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
         data = stack.get_data()
-        eq_(data.shape, stack.shape)
-        eq_(sha256(data).hexdigest(),
-            'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a')
+        assert data.shape == stack.shape
+        assert sha256(data).hexdigest() == \
+            'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a'
 
     def test_five_dim(self):
         stack = dcmstack.DicomStack(vector_order='EchoTime')
@@ -502,9 +476,9 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[2])
         stack.add_dcm(self.inputs[3])
         data = stack.get_data()
-        eq_(data.shape, stack.shape)
-        eq_(sha256(data).hexdigest(),
-            'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a')
+        assert data.shape == stack.shape
+        assert sha256(data).hexdigest() == \
+            'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a'
 
     def test_allow_dummy(self):
         del self.inputs[0].Rows
@@ -513,13 +487,13 @@ class TestGetData(object):
         stack.add_dcm(self.inputs[0])
         stack.add_dcm(self.inputs[1])
         data = stack.get_data()
-        eq_(data.shape, stack.shape)
-        ok_(np.all(data[:, :, -1] == np.iinfo(np.int16).max))
-        eq_(sha256(data).hexdigest(),
-            '7d85fbcb60a5021a45df3975613dcb7ac731830e0a268590cc798dc39897c04b')
+        assert data.shape == stack.shape
+        assert(np.all(data[:, :, -1] == np.iinfo(np.int16).max))
+        assert sha256(data).hexdigest() == \
+            '7d85fbcb60a5021a45df3975613dcb7ac731830e0a268590cc798dc39897c04b'
 
 class TestGetAffine(object):
-    def setUp(self):
+    def setup_method(self, method):
         self.data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -535,7 +509,7 @@ class TestGetAffine(object):
         stack.add_dcm(self.inputs[0])
         affine = stack.affine
         ref = np.load(path.join(self.data_dir, 'single_slice_aff.npy'))
-        ok_(np.allclose(affine, ref))
+        assert(np.allclose(affine, ref))
 
     def test_three_dim(self):
         stack = dcmstack.DicomStack()
@@ -543,7 +517,7 @@ class TestGetAffine(object):
         stack.add_dcm(self.inputs[1])
         affine = stack.affine
         ref = np.load(path.join(self.data_dir, 'single_vol_aff.npy'))
-        ok_(np.allclose(affine, ref))
+        assert(np.allclose(affine, ref))
 
 class TestToNifti(object):
 
@@ -586,7 +560,7 @@ class TestToNifti(object):
                   'srow_z',
                  ]
 
-    def setUp(self):
+    def setup_method(self, method):
         self.data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -648,7 +622,7 @@ class TestToNifti(object):
 
         for key in self.close_keys:
             print("Testing key %s" % key)
-            ok_(np.allclose(hdr[key], ref_hdr[key]))
+            assert(np.allclose(hdr[key], ref_hdr[key]))
 
     def test_single_slice(self):
         for tst in ('single_slice', 'single_slice_meta'):
@@ -683,11 +657,11 @@ class TestToNifti(object):
         stack.add_dcm(self.inputs[1])
         nii = stack.to_nifti()
         data = nii.get_data()
-        ok_(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
+        assert(np.all(data[:, :, 0] == np.iinfo(np.int16).max))
 
 
 class TestParseAndGroup(object):
-    def setUp(self):
+    def setup_method(self, method):
         self.data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -702,18 +676,18 @@ class TestParseAndGroup(object):
 
     def test_default(self):
         res = dcmstack.parse_and_group(self.in_paths)
-        eq_(len(res), 1)
+        assert len(res) == 1
         ds = pydicom.read_file(self.in_paths[0])
         group_key = list(res.keys())[0]
         for attr_idx, attr in enumerate(dcmstack.default_group_keys):
             if attr in dcmstack.default_close_keys:
-                ok_(np.allclose(group_key[attr_idx], getattr(ds, attr)))
+                assert(np.allclose(group_key[attr_idx], getattr(ds, attr)))
             else:
-                eq_(group_key[attr_idx], getattr(ds, attr))
+                assert group_key[attr_idx] == getattr(ds, attr)
 
 
 class TestParseAndStack(object):
-    def setUp(self):
+    def setup_method(self, method):
         self.data_dir = path.join(test_dir,
                              'data',
                              'dcmstack',
@@ -728,18 +702,18 @@ class TestParseAndStack(object):
 
     def test_default(self):
         res = dcmstack.parse_and_stack(self.in_paths)
-        eq_(len(res), 1)
+        assert len(res) == 1
         ds = pydicom.read_file(self.in_paths[0])
         group_key = list(res.keys())[0]
         for attr_idx, attr in enumerate(dcmstack.default_group_keys):
             if attr in dcmstack.default_close_keys:
-                ok_(np.allclose(group_key[attr_idx], getattr(ds, attr)))
+                assert(np.allclose(group_key[attr_idx], getattr(ds, attr)))
             else:
-                eq_(group_key[attr_idx], getattr(ds, attr))
+                assert group_key[attr_idx] == getattr(ds, attr)
         stack = list(res.values())[0]
-        ok_(isinstance(stack, dcmstack.DicomStack))
+        assert(isinstance(stack, dcmstack.DicomStack))
         stack_data = stack.get_data()
-        eq_(stack_data.ndim, 4)
+        assert stack_data.ndim == 4
 
 
 def test_fsl_hack():
@@ -747,8 +721,8 @@ def test_fsl_hack():
     stack = dcmstack.DicomStack()
     stack.add_dcm(ds)
     data = stack.get_data()    
-    eq_(np.max(data), (2**14 - 1))
-    eq_(data.dtype, np.int16)
+    assert np.max(data) == (2**14 - 1)
+    assert data.dtype == np.int16
 
 
 def test_pix_overflow():
@@ -756,5 +730,5 @@ def test_pix_overflow():
     stack = dcmstack.DicomStack()
     stack.add_dcm(ds)
     data = stack.get_data()    
-    eq_(np.max(data), (2**16 - 1))
-    eq_(data.dtype, np.uint16)
+    assert np.max(data) == (2**16 - 1)
+    assert data.dtype == np.uint16
