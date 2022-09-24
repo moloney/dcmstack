@@ -770,13 +770,13 @@ class DicomStack(object):
                 if files_per_vol == 1 and file_shape[2] != 1:
                     file_idx = vec_idx*(stack_shape[3]) + time_idx
                     vox_array[:, :, :, time_idx, vec_idx] = \
-                        self._files_info[file_idx][0].nii_img.get_data()
+                        np.asanyarray(self._files_info[file_idx][0].nii_img.dataobj)
                 else:
                     for slice_idx in range(files_per_vol):
                         file_idx = (vec_idx*(stack_shape[3]*stack_shape[2]) +
                                     time_idx*(stack_shape[2]) + slice_idx)
                         vox_array[:, :, slice_idx, time_idx, vec_idx] = \
-                            self._files_info[file_idx][0].nii_img.get_data()[:, :, 0]
+                            np.asanyarray(self._files_info[file_idx][0].nii_img.dataobj[:, :, 0])
 
         #Trim unused time/vector dimensions
         if stack_shape[4] == 1:
@@ -845,7 +845,7 @@ class DicomStack(object):
         A nibabel.nifti1.Nifti1Image created with the stack's data and affine.
         '''
         #Get the voxel data and affine
-        data = self.get_data()
+        data = self.data
         affine = self.affine
 
         #Figure out the number of three (or two) dimensional volumes

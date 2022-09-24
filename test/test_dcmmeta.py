@@ -972,7 +972,7 @@ class TestGetMeta(object):
 
 class TestSplit(object):
     def setUp(self):
-        self.arr = np.arange(3 * 3 * 3 * 5 * 7).reshape(3, 3, 3, 5, 7)
+        self.arr = np.arange(3 * 3 * 3 * 5 * 7, dtype=np.int32).reshape(3, 3, 3, 5, 7)
         nii = nb.Nifti1Image(self.arr, np.diag([1.1, 1.1, 1.1, 1.0]))
         hdr = nii.header
         hdr.set_dim_info(None, None, 2)
@@ -1002,7 +1002,7 @@ class TestSplit(object):
                                  ]
                            )
                )
-            assert(np.all(nw_split.nii_img.get_data() ==
+            assert(np.all(np.asanyarray(nw_split.nii_img.dataobj) ==
                        self.arr[:, :, split_idx:split_idx+1, :, :])
                )
 
@@ -1011,7 +1011,7 @@ class TestSplit(object):
             assert nw_split.nii_img.shape == (3, 3, 3, 1, 7)
             assert(np.allclose(nw_split.nii_img.affine,
                             np.diag([1.1, 1.1, 1.1, 1.0])))
-            assert(np.all(nw_split.nii_img.get_data() ==
+            assert(np.all(np.asanyarray(nw_split.nii_img.dataobj) ==
                        self.arr[:, :, :, split_idx:split_idx+1, :])
                )
 
@@ -1020,12 +1020,12 @@ class TestSplit(object):
             assert nw_split.nii_img.shape == (3, 3, 3, 5)
             assert(np.allclose(nw_split.nii_img.affine,
                             np.diag([1.1, 1.1, 1.1, 1.0])))
-            assert(np.all(nw_split.nii_img.get_data() ==
+            assert(np.all(np.asanyarray(nw_split.nii_img.dataobj) ==
                        self.arr[:, :, :, :, split_idx])
                )
 
 def test_split_keep_spatial():
-    arr = np.arange(3 * 3 * 3).reshape(3, 3, 3)
+    arr = np.arange(3 * 3 * 3, dtype=np.int32).reshape(3, 3, 3)
     nii = nb.Nifti1Image(arr, np.eye(4))
     nw = dcmmeta.NiftiWrapper(nii, True)
 
@@ -1055,7 +1055,7 @@ def test_from_dicom():
 def test_from_2d_slice_to_3d():
     slice_nws = []
     for idx in range(3):
-        arr = np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4, 1)
+        arr = np.arange(idx * (4 * 4), (idx + 1) * (4 * 4), dtype=np.int32).reshape(4, 4, 1)
         aff = np.diag((1.1, 1.1, 1.1, 1.0))
         aff[:3, 3] += [0.0, 0.0, idx * 0.5]
         nii = nb.Nifti1Image(arr, aff)
@@ -1077,17 +1077,18 @@ def test_from_2d_slice_to_3d():
     merged_hdr = merged.nii_img.header
     assert merged_hdr.get_dim_info() == (0, 1, 2)
     assert merged_hdr.get_xyzt_units() == ('mm', 'sec')
-    merged_data = merged.nii_img.get_data()
+    merged_data = np.asanyarray(merged.nii_img.dataobj)
     for idx in range(3):
         assert(np.all(merged_data[:, :, idx] ==
-                   np.arange(idx * (4 * 4), (idx + 1) * (4 * 4)).reshape(4, 4))
+                   np.arange(idx * (4 * 4), (idx + 1) * (4 * 4), dtype=np.int32).reshape(4, 4))
            )
 
 def test_from_3d_time_to_4d():
     time_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4)
+                        (idx + 1) * (4 * 4 * 4), 
+                        dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
         hdr = nii.header
@@ -1114,18 +1115,20 @@ def test_from_3d_time_to_4d():
     merged_hdr = merged.nii_img.header
     assert merged_hdr.get_dim_info() == (0, 1, 2)
     assert merged_hdr.get_xyzt_units() == ('mm', 'sec')
-    merged_data = merged.nii_img.get_data()
+    merged_data = np.asanyarray(merged.nii_img.dataobj)
     for idx in range(3):
         assert(np.all(merged_data[:, :, :, idx] ==
                    np.arange(idx * (4 * 4 * 4),
-                             (idx + 1) * (4 * 4 * 4)).reshape(4, 4, 4))
+                             (idx + 1) * (4 * 4 * 4), 
+                             dtype=np.int32).reshape(4, 4, 4))
            )
 
 def test_from_3d_vector_to_4d():
     vector_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4)
+                        (idx + 1) * (4 * 4 * 4), 
+                        dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
         hdr = nii.header
@@ -1152,11 +1155,12 @@ def test_from_3d_vector_to_4d():
     merged_hdr = merged.nii_img.header
     assert merged_hdr.get_dim_info() == (0, 1, 2)
     assert merged_hdr.get_xyzt_units(), ('mm', 'sec')
-    merged_data = merged.nii_img.get_data()
+    merged_data = np.asanyarray(merged.nii_img.dataobj)
     for idx in range(3):
         assert(np.all(merged_data[:, :, :, 0, idx] ==
                    np.arange(idx * (4 * 4 * 4),
-                             (idx + 1) * (4 * 4 * 4)).reshape(4, 4, 4))
+                             (idx + 1) * (4 * 4 * 4), 
+                             dtype=np.int32).reshape(4, 4, 4))
            )
 
 def test_merge_inconsistent_hdr():
@@ -1165,7 +1169,8 @@ def test_merge_inconsistent_hdr():
     time_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4)
+                        (idx + 1) * (4 * 4 * 4), 
+                        dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
         hdr = nii.header
@@ -1188,7 +1193,8 @@ def test_merge_with_slc_and_without():
     input_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4)
+                        (idx + 1) * (4 * 4 * 4), 
+                        dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
         hdr = nii.header

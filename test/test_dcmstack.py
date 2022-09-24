@@ -29,7 +29,7 @@ from nibabel.orientations import aff2axcodes
 
 import dcmstack
 
-_def_file_meta = pydicom.dataset.Dataset()
+_def_file_meta = pydicom.dataset.FileMetaDataset()
 _def_file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
 
 def_dicom_attrs = {'file_meta' : _def_file_meta,
@@ -64,7 +64,7 @@ def make_dicom(attrs=None, pix_val=1):
             arr_dtype = np.int16
         arr = np.empty((ds.Rows, ds.Columns), dtype=arr_dtype)
         arr[:, :] = pix_val
-        ds.PixelData = arr.tostring()
+        ds.PixelData = arr.tobytes()
     return ds
 
 def test_key_regex_filter():
