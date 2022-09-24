@@ -49,7 +49,7 @@ jobs:
 
     - name: Run all tests
       run: |
-        python -m pytest -s -v --cov=dcmstack --cov-report=xml dcmstack
+        python -m pytest -s -v --cov=dcmstack --cov-report=xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2
