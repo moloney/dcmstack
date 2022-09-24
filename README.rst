@@ -1,6 +1,3 @@
-.. -*- rest -*-
-.. vim:syntax=rest
-
 ========
 dcmstack
 ========
@@ -14,7 +11,7 @@ formatted text file.
 Installing
 ----------
 
-You can the latest release from PyPI by doing
+You can the latest release from PyPI by doing:
 
 .. code-block:: console
 
@@ -43,5 +40,11 @@ And then view doc/_build/html/index.html with a web browser.
 Running Tests
 -------------
 
-You can install dcmstack along with any test dependencies by installing the `test` 
-extra. Then you can run the `pytest` command to run the test-suite
+You can install dcmstack along with any test dependencies by installing the ``test`` 
+extra. Then you can run the ``pytest`` command to run the test-suite:
+
+.. code-block:: console
+  
+  $ pip install dcmstack[test]
+  $ pytest
+
