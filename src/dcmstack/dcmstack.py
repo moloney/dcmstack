@@ -636,7 +636,8 @@ class DicomStack(object):
             return self._shape
 
         #We need at least one file in the stack
-        if len(self._files_info) == 0:
+        n_files = len(self._files_info)
+        if n_files == 0:
             raise InvalidStackError("No files in the stack")
 
         #Figure out number of files and slices per volume
@@ -654,10 +655,10 @@ class DicomStack(object):
                 raise InvalidStackError("Slice spacings are not consistent")
 
         #Simple check for an incomplete stack
-        if len(self._files_info) % files_per_vol != 0:
+        if n_files % files_per_vol != 0:
             raise InvalidStackError("Number of files is not an even multiple "
                                     "of the number of unique slice positions.")
-        num_volumes = len(self._files_info) // files_per_vol
+        num_volumes = n_files // files_per_vol
 
         #Figure out the number of vector components and time points
         num_vec_comps = len(self._vector_vals)
@@ -677,7 +678,9 @@ class DicomStack(object):
                 vals = set([file_info[0].get_meta(key)
                             for file_info in self._files_info]
                           )
-                if len(vals) == num_volumes or len(vals) == len(self._files_info):
+                if any(v is None for v in vals):
+                    continue
+                if len(vals) == num_volumes or len(vals) == n_files:
                     possible_orders.append(key)
             if len(possible_orders) == 0:
                 raise InvalidStackError("Unable to guess key for sorting the "
@@ -686,7 +689,7 @@ class DicomStack(object):
             #Try out each possible sort order
             for time_order in possible_orders:
                 #Update sorting tuples
-                for idx in range(len(self._files_info)):
+                for idx in range(n_files):
                     nii_wrp, curr_tuple = self._files_info[idx]
                     self._files_info[idx] = (nii_wrp,
                                              (curr_tuple[0],
