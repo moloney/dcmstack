@@ -418,12 +418,15 @@ class DicomStack(object):
     guessed based off the data sets.
     '''
 
-    sort_guesses = ['EchoTime',
+    sort_guesses = ['EffectiveEchoTime',
+                    'EchoTime',
                     'InversionTime',
                     'RepetitionTime',
                     'FlipAngle',
                     'TriggerTime',
+                    'FrameAcquisitionDateTime',
                     'AcquisitionTime',
+                    'AcquisitionDateTime',
                     'ContentTime',
                     'AcquisitionNumber',
                     'InstanceNumber',
@@ -437,8 +440,6 @@ class DicomStack(object):
                         'PixelSpacing',
                         'ImageOrientationPatient',
                         'InPlanePhaseEncodingDirection',
-                        'RepetitionTime',
-                        'AcquisitionTime',
                        ] +
                        list(default_group_keys)
                       )
