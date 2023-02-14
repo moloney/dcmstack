@@ -1603,6 +1603,8 @@ class NiftiWrapper(object):
                     meta_dict["SharedFunctionalGroupsSequence"][0]
                 ):
                     if k in global_meta:
+                        if global_meta[k] == v:
+                            continue
                         k = f"Shared.{k}"
                     global_meta[k] = v
                 fg_seqs = meta_dict.get("PerFrameFunctionalGroupsSequence")
