@@ -440,6 +440,8 @@ class DicomStack(object):
                         'PixelSpacing',
                         'ImageOrientationPatient',
                         'InPlanePhaseEncodingDirection',
+                        'SharedFunctionalGroupsSequence',
+                        'PerFrameFunctionalGroupsSequence',
                        ] +
                        list(default_group_keys)
                       )
