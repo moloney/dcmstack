@@ -438,7 +438,7 @@ class DicomStack(object):
                         'ImageOrientationPatient',
                         'InPlanePhaseEncodingDirection',
                         'RepetitionTime',
-                        'AcquisitionTime'
+                        'AcquisitionTime',
                        ] +
                        list(default_group_keys)
                       )
@@ -521,6 +521,9 @@ class DicomStack(object):
 
         self._phase_enc_dirs.add(meta.get('InPlanePhaseEncodingDirection'))
         self._repetition_times.add(meta.get('RepetitionTime'))
+        self._slope_inter.add(
+            (float(meta.get('RescaleSlope', 1.0)), float(meta.get('RescaleIntercept', 0.0)))
+        )
 
         #Pull the info used for sorting
         slice_pos = dw.slice_indicator
@@ -570,6 +573,7 @@ class DicomStack(object):
 
         self._phase_enc_dirs = set()
         self._repetition_times = set()
+        self._slope_inter = set()
 
         self._ref_input = None
 
@@ -736,8 +740,13 @@ class DicomStack(object):
 
     shape = property(fget=get_shape)
 
-    def get_data(self):
+    def get_data(self, scaled=True):
         '''Get an array of the voxel values.
+
+        Parameters
+        ----------
+        scaled
+            Set to False to get unscaled data
 
         Returns
         -------
@@ -751,14 +760,21 @@ class DicomStack(object):
         #Create a numpy array for storing the voxel data
         stack_shape = self.shape
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
-        stack_dtype = self._files_info[0][0].nii_img.get_data_dtype()
+        stack_dtype = self._files_info[0][0].nii_img.dataobj.dtype
         bits_stored = self._files_info[0][0].get_meta('BitsStored', default=16)
+        out_dtype = stack_dtype
+        if scaled:
+            if len(self._slope_inter) > 1 or list(self._slope_inter)[0] != (1.0, 0.0):
+                out_dtype = np.float32
+            else:
+                scaled = False
+            
         # This is a hack to keep fslview happy, it does not like unsigned short
         # data. If less than 16 bits are being used for each pixel we default 
         # to signed short.        
-        if stack_dtype == np.uint16 and bits_stored < 16:
-            stack_dtype = np.int16
-        vox_array = np.empty(stack_shape, dtype=stack_dtype)
+        if out_dtype == np.uint16 and bits_stored < 16:
+            out_dtype = np.int16
+        vox_array = np.empty(stack_shape, dtype=out_dtype)
 
         #Fill the array with data
         n_vols = 1
@@ -773,13 +789,21 @@ class DicomStack(object):
                 if files_per_vol == 1 and file_shape[2] != 1:
                     file_idx = vec_idx*(stack_shape[3]) + time_idx
                     vox_array[:, :, :, time_idx, vec_idx] = \
-                        np.asanyarray(self._files_info[file_idx][0].nii_img.dataobj)
+                        np.asarray(self._files_info[file_idx][0].nii_img.dataobj)
+                    if scaled:
+                        slope, inter = self._files_info[file_idx][0].nii_img.header.get_slope_inter()
+                        vox_array[:, :, :, time_idx, vec_idx] *= slope
+                        vox_array[:, :, :, time_idx, vec_idx] += inter
                 else:
                     for slice_idx in range(files_per_vol):
                         file_idx = (vec_idx*(stack_shape[3]*stack_shape[2]) +
                                     time_idx*(stack_shape[2]) + slice_idx)
                         vox_array[:, :, slice_idx, time_idx, vec_idx] = \
-                            np.asanyarray(self._files_info[file_idx][0].nii_img.dataobj[:, :, 0])
+                             np.asarray(self._files_info[file_idx][0].nii_img.dataobj[:, :, 0])
+                        if scaled:
+                            slope, inter = self._files_info[file_idx][0].nii_img.header.get_slope_inter()
+                            vox_array[:, :, slice_idx, time_idx, vec_idx] *= slope
+                            vox_array[:, :, slice_idx, time_idx, vec_idx] += inter
 
         #Trim unused time/vector dimensions
         if stack_shape[4] == 1:
@@ -848,7 +872,8 @@ class DicomStack(object):
         A nibabel.nifti1.Nifti1Image created with the stack's data and affine.
         '''
         #Get the voxel data and affine
-        data = self.data
+        pre_scaled = len(self._slope_inter) > 1
+        data = self.get_data(scaled=pre_scaled)
         affine = self.affine
 
         #Figure out the number of three (or two) dimensional volumes
@@ -891,6 +916,10 @@ class DicomStack(object):
         #Create the nifti image using the data array
         nifti_image = nb.Nifti1Image(data, affine)
         nifti_header = nifti_image.header
+        if not pre_scaled:
+            slope, inter = list(self._slope_inter)[0]
+            if (slope, inter) != (1.0, 0.0):
+                nifti_header.set_slope_inter(slope, inter)
 
         #Set the units and dimension info
         nifti_header.set_xyzt_units('mm', 'msec')
@@ -906,6 +935,7 @@ class DicomStack(object):
                 dim_info['phase'] = permutation[0]
                 dim_info['freq'] = permutation[1]
         nifti_header.set_dim_info(**dim_info)
+        
         n_slices = data.shape[slice_dim]
 
         #Set the slice timing header info

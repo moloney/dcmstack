@@ -463,6 +463,22 @@ class TestGetData(object):
         assert data.shape == stack.shape
         assert sha256(data).hexdigest() == \
             'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a'
+    
+    def test_data_scaling(self):
+        inputs = deepcopy(self.inputs)
+        for input in inputs:
+            input.RescaleSlope = 10.0
+        stack = dcmstack.DicomStack(vector_order='EchoTime')
+        stack.add_dcm(inputs[0])
+        stack.add_dcm(inputs[1])
+        stack.add_dcm(inputs[2])
+        stack.add_dcm(inputs[3])
+        data = stack.get_data()
+        unscl_data = stack.get_data(scaled=False)
+        assert data.dtype == np.float32
+        assert unscl_data.dtype == np.int16
+        assert np.allclose(data, unscl_data*10.0)
+
 
 class TestGetAffine(object):
     def setup_method(self, method):

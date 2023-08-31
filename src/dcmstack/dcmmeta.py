@@ -1530,7 +1530,7 @@ class NiftiWrapper(object):
             the `extract` module for generating this dict.
 
         '''
-        data = dcm_wrp.get_data()
+        data = dcm_wrp.get_pixel_array()
 
         #The Nifti patient space flips the x and y directions
         affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
@@ -1542,6 +1542,10 @@ class NiftiWrapper(object):
         #Create the nifti image and set header data
         nii_img = nb.nifti1.Nifti1Image(data, affine)
         hdr = nii_img.header
+        slope = float(dcm_wrp.get('RescaleSlope', 1.0))
+        inter = float(dcm_wrp.get('RescaleIntercept', 0.0))
+        if (slope, inter) != (1.0, 0.0):
+            hdr.set_slope_inter(slope, inter)
         hdr.set_xyzt_units('mm', 'sec')
         dim_info = {'freq' : None,
                     'phase' : None,
@@ -1556,6 +1560,7 @@ class NiftiWrapper(object):
                 dim_info['phase'] = 0
                 dim_info['freq'] = 1
         hdr.set_dim_info(**dim_info)
+        
 
         #Embed the meta data extension
         result = klass(nii_img, make_empty=True)
