@@ -1530,7 +1530,14 @@ class NiftiWrapper(object):
             the `extract` module for generating this dict.
 
         '''
-        data = dcm_wrp.get_pixel_array()
+        # This is kinda hacky, but no great way to get unscaled data out of 
+        # the dicom wrapper classes
+        orig_scale_data = dcm_wrp._scale_data
+        dcm_wrp._scale_data = lambda data: data
+        try:
+            data = dcm_wrp.get_data()
+        finally:
+            dcm_wrp._scale_data = orig_scale_data 
 
         #The Nifti patient space flips the x and y directions
         affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
