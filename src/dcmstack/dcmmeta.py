@@ -1608,6 +1608,7 @@ class NiftiWrapper(object):
                         k = f"Shared.{k}"
                     global_meta[k] = v
                 fg_seqs = meta_dict.get("PerFrameFunctionalGroupsSequence")
+                dcm_wrp.img_shape
                 sorted_indices = np.lexsort(dcm_wrp._frame_indices.T)
                 slice_meta = {}
                 for slice_count, slice_idx in enumerate(sorted_indices):
