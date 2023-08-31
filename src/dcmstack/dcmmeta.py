@@ -1229,6 +1229,21 @@ def patch_dcm_ds_is(dcm):
                     elem.value = [int(val) for val in elem.value]
 
 
+def gen_simplified_sequences(meta_dict):
+    """Get rid of useless nesting of meta data from multiframe DICOM"""
+    for k, v in meta_dict.items():
+        if isinstance(v, list):
+            if len(v) == 0:
+                continue
+            if len(v) == 1:
+                for sub_key, sub_val in v[0].items():
+                    yield sub_key, sub_val
+                continue
+        yield k, v
+    
+
+
+
 class NiftiWrapper(object):
     '''Wraps a Nifti1Image object containing a DcmMeta header extension.
     Provides access to the meta data and the ability to split or merge the
@@ -1530,7 +1545,14 @@ class NiftiWrapper(object):
             the `extract` module for generating this dict.
 
         '''
-        data = dcm_wrp.get_data()
+        # This is kinda hacky, but no great way to get unscaled data out of 
+        # the dicom wrapper classes
+        orig_scale_data = dcm_wrp._scale_data
+        dcm_wrp._scale_data = lambda data: data
+        try:
+            data = dcm_wrp.get_data()
+        finally:
+            dcm_wrp._scale_data = orig_scale_data 
 
         #The Nifti patient space flips the x and y directions
         affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
@@ -1538,10 +1560,18 @@ class NiftiWrapper(object):
         #Make 2D data 3D
         if len(data.shape) == 2:
             data = data.reshape(data.shape + (1,))
+        elif len(data.shape) > 3:
+            data = np.squeeze(data)
+        if len(data.shape) > 3:
+            raise ValueError("4D+ Multiframe not supported yet")
 
         #Create the nifti image and set header data
         nii_img = nb.nifti1.Nifti1Image(data, affine)
         hdr = nii_img.header
+        slope = float(dcm_wrp.get('RescaleSlope', 1.0))
+        inter = float(dcm_wrp.get('RescaleIntercept', 0.0))
+        if (slope, inter) != (1.0, 0.0):
+            hdr.set_slope_inter(slope, inter)
         hdr.set_xyzt_units('mm', 'sec')
         dim_info = {'freq' : None,
                     'phase' : None,
@@ -1556,13 +1586,60 @@ class NiftiWrapper(object):
                 dim_info['phase'] = 0
                 dim_info['freq'] = 1
         hdr.set_dim_info(**dim_info)
+        
 
-        #Embed the meta data extension
+        # Create result and embed any provided meta data
         result = klass(nii_img, make_empty=True)
-
         result.meta_ext.reorient_transform = np.eye(4)
         if meta_dict:
-            result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
+            if not dcm_wrp.is_multiframe:
+                result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
+            else:
+                global_meta = meta_dict.copy()
+                del global_meta["SharedFunctionalGroupsSequence"]
+                del global_meta["PerFrameFunctionalGroupsSequence"]
+                assert len(meta_dict["SharedFunctionalGroupsSequence"]) == 1
+                for k, v in gen_simplified_sequences(
+                    meta_dict["SharedFunctionalGroupsSequence"][0]
+                ):
+                    if k in global_meta:
+                        if global_meta[k] == v:
+                            continue
+                        k = f"Shared.{k}"
+                    global_meta[k] = v
+                fg_seqs = meta_dict.get("PerFrameFunctionalGroupsSequence")
+                dcm_wrp.image_shape
+                sorted_indices = np.lexsort(dcm_wrp._frame_indices.T)
+                slice_meta = {}
+                for slice_count, slice_idx in enumerate(sorted_indices):
+                    for k, v in gen_simplified_sequences(fg_seqs[slice_idx]):
+                        if k in global_meta:
+                            k = f"PerFrame.{k}"
+                        if k not in slice_meta:
+                            if slice_count == 0:
+                                slice_meta[k] = [v]
+                            else:
+                                slice_meta[k] = [None] * slice_count
+                                slice_meta[k].append(v)
+                        else:
+                            n_vals = len(slice_meta[k])
+                            if n_vals != slice_count:
+                                slice_meta[k] += [None] * (slice_count - n_vals)
+                            slice_meta[k].append(v)
+                moved = []
+                for k, vals in slice_meta.items():
+                    if len(vals) != data.shape[-1]:
+                        vals += [None] * (data.shape[-1] - len(vals))
+                    if all(x == vals[0] for x in vals):
+                        moved.append(k)
+                        if k.startswith("PerFrame."):
+                            if global_meta[k.split('.')[1]] == vals[0]:
+                                continue
+                        global_meta[k] = vals[0]
+                for k in moved:
+                    del slice_meta[k]
+                result.meta_ext.get_class_dict(('global', 'const')).update(global_meta)
+                result.meta_ext.get_class_dict(('global', 'slices')).update(slice_meta)
 
         return result
 
