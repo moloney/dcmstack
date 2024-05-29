@@ -43,10 +43,10 @@ def make_niftis(out_dir, extra_args=tuple()):
 
 
 class CliTest(object):
-    def setup(self):
+    def setup_method(self):
         self.out_dir = mkdtemp(prefix='dcmstack_cli_test_out')
 
-    def teardown(self):
+    def teardown_method(self):
         shutil.rmtree(self.out_dir)
 
 
