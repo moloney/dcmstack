@@ -14,7 +14,10 @@
 import sys, os
 
 #Mock unavailable packages for ReadTheDocs
-import mock
+try:
+    from unitttest import mock
+except ImportError:
+    import mock
  
 MOCK_MODULES = ['numpy', 
                 'nibabel',
