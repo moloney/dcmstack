@@ -416,7 +416,7 @@ class MetaExtractor(object):
                 value = elem.value
 
         #Handle any conversions
-        if elem.VR in self.conversions:
+        if elem.VR in self.conversions and value is not None:
             if n_vals == 1:
                 value = self.conversions[elem.VR](value)
             else:

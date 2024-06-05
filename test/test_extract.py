@@ -117,3 +117,9 @@ class TestMetaExtractor(object):
         meta_dict = extractor(self.data)
         assert meta_dict["CsaImage.EchoLinePosition"] == 64
         assert meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'] == 1
+
+    def test_none_vals(self):
+        extractor = extract.MetaExtractor()
+        self.data.PercentSampling = None
+        meta_data = extractor(self.data)
+        assert "PercentSampling" not in meta_data
