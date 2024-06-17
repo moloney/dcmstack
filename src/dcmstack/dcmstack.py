@@ -2,7 +2,7 @@
 Stack DICOM datasets into volumes. The contents of this module are imported
 into the package namespace.
 """
-import warnings, re
+import warnings, re, traceback
 from copy import deepcopy
 
 try:
@@ -303,6 +303,11 @@ class NonImageDataSetError(Exception):
     '''The DICOM doesn't contain image data'''
     def __str__(self):
         return "The DICOM doesn't contain an image"
+
+
+class DicomConversionError(Exception):
+    def __str__(self):
+        return "Unable to convert DICOM"
     
 
 class InvalidStackError(Exception):
@@ -338,7 +343,7 @@ class DicomOrdering(object):
         self.abs_ordering = abs_ordering
         self.abs_as_str = abs_as_str
 
-    def get_ordinate(self, ds):
+    def get_ordinate(self, nw):
         '''Get the ordinate for the given DICOM data set.
 
         Parameters
@@ -354,16 +359,11 @@ class DicomOrdering(object):
         just be the value for the keyword `key`. Otherwise it will be an
         integer.
         '''
-        try:
-            val = ds[self.key]
-        except KeyError:
-            return None
-
+        val = nw.get_meta(self.key)
         if self.abs_ordering:
             if self.abs_as_str:
                 val = str(val)
             return self.abs_ordering.index(val)
-
         return val
 
 
@@ -466,25 +466,16 @@ class DicomStack(object):
         #Sets all the state variables to their defaults
         self.clear()
 
-    def _chk_equal(self, keys, meta1, meta2):
-        for key in keys:
-            if meta1[key] != meta2[key]:
-                raise IncongruentImageError("%s does not match" % key)
-
-    def _chk_close(self, keys, meta1, meta2):
-        for key in keys:
-            if not np.allclose(meta1[key], meta2[key], atol=5e-5):
-                raise IncongruentImageError("%s is not close to matching" %
-                                            key)
-
-    def _chk_congruent(self, meta):
+    def _chk_congruent(self, in_wrp):
         if not self._ref_input is None:
-            self._chk_close(('PixelSpacing',
-                             'ImageOrientationPatient'),
-                             meta,
-                             self._ref_input
-                            )
-            self._chk_equal(('Rows', 'Columns'), meta, self._ref_input)
+            if self._ref_input.nii_img.shape != in_wrp.nii_img.shape:
+                raise IncongruentImageError("Mismatch in data array shapes")
+            if not np.allclose(
+                self._ref_input.nii_img.affine[:3, :3], 
+                in_wrp.nii_img.affine[:3, :3], 
+                atol=5e-5,
+            ):
+                raise IncongruentImageError("Mismatch in affine transforms")
 
     def add_dcm(self, dcm, meta=None):
         '''Add a pydicom dataset to the stack.
@@ -513,56 +504,46 @@ class DicomStack(object):
         '''
         if not is_image(dcm):
             raise NonImageDataSetError()
-
+        # Extract at least some minimal meta data
         if meta is None:
             from .extract import default_extractor
             meta = default_extractor(dcm)
-
+        # Covert to DicomWrapper and NiftiWrapper
         dw = wrapper_from_data(dcm)
-
-        self._chk_congruent(meta)
-
-        self._phase_enc_dirs.add(meta.get('InPlanePhaseEncodingDirection'))
-        self._repetition_times.add(meta.get('RepetitionTime'))
-        self._slope_inter.add(
-            (float(meta.get('RescaleSlope', 1.0)), float(meta.get('RescaleIntercept', 0.0)))
-        )
-
-        #Pull the info used for sorting
+        nii_wrp = NiftiWrapper.from_dicom_wrapper(dw, meta)
+        # TODO: Look into if / why this check is needed?
+        if nii_wrp is None:
+            raise DicomConversionError()
+        # Sanity check against existing inputs, then pull some data we will need later
+        self._chk_congruent(nii_wrp)
+        slp = nii_wrp.get_meta('RescaleSlope', default=1.0)
+        inter = nii_wrp.get_meta('RescaleIntercept', default=0.0)
+        self._slope_inter.add((slp, inter))
+        self._phase_enc_dirs.add(nii_wrp.get_meta('InPlanePhaseEncodingDirection'))
+        self._repetition_times.add(nii_wrp.get_meta('RepetitionTime'))
+        # Pull the info used for sorting if the keys to use are already specified
         slice_pos = dw.slice_indicator
         self._slice_pos_vals.add(slice_pos)
         time_val = None
         if self._time_order:
-            time_val = self._time_order.get_ordinate(meta)
+            time_val = self._time_order.get_ordinate(nii_wrp)
         self._time_vals.add(time_val)
         vector_val = None
         if self._vector_order:
-            vector_val = self._vector_order.get_ordinate(meta)
+            vector_val = self._vector_order.get_ordinate(nii_wrp)
         self._vector_vals.add(vector_val)
-
-        #Create a tuple with the sorting values
         sorting_tuple = (vector_val, time_val, slice_pos)
-
-        #If a explicit order was specified, raise an exception if image
-        #collides with another already in the stack
+        # Also check for collisions if we already know how to sort
         if ((not self._time_order is None or
              not self._vector_order is None) and
             sorting_tuple in self._sorting_tuples
            ):
             raise ImageCollisionError()
+        # Add image to our internal set
         self._sorting_tuples.add(sorting_tuple)
-
-        #Create a NiftiWrapper for this input if possible
-        nii_wrp = None
-        nii_wrp = NiftiWrapper.from_dicom_wrapper(dw, meta)
+        self._files_info.append((nii_wrp, sorting_tuple))
         if self._ref_input is None:
-            #We don't have a reference input yet, use this one
             self._ref_input = nii_wrp
-
-        #If we made a NiftiWrapper add it to the stack
-        if not nii_wrp is None:
-            self._files_info.append((nii_wrp, sorting_tuple))
-
         #Set the dirty flags
         self._shape_dirty = True
         self._meta_dirty = True
@@ -573,19 +554,14 @@ class DicomStack(object):
         self._time_vals = set()
         self._vector_vals = set()
         self._sorting_tuples = set()
-
         self._phase_enc_dirs = set()
         self._repetition_times = set()
         self._slope_inter = set()
-
         self._ref_input = None
-
         self._shape_dirty = True
         self._shape = None
-
         self._meta_dirty = True
         self._meta = None
-
         self._files_info = []
 
     def _chk_order(self, slice_positions, files_per_vol, num_volumes,
@@ -760,7 +736,7 @@ class DicomStack(object):
         InvalidStackError
             The stack is incomplete or invalid.
         '''
-        #Create a numpy array for storing the voxel data
+        # Create a numpy array for storing the voxel data
         stack_shape = self.shape
         stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         stack_dtype = self._files_info[0][0].nii_img.dataobj.dtype
@@ -779,7 +755,7 @@ class DicomStack(object):
             out_dtype = np.int16
         vox_array = np.empty(stack_shape, dtype=out_dtype)
 
-        #Fill the array with data
+        # Fill the array with data
         n_vols = 1
         if len(stack_shape) > 3:
             n_vols *= stack_shape[3]
@@ -808,7 +784,7 @@ class DicomStack(object):
                             vox_array[:, :, slice_idx, time_idx, vec_idx] *= slope
                             vox_array[:, :, slice_idx, time_idx, vec_idx] += inter
 
-        #Trim unused time/vector dimensions
+        # Trim unused time/vector dimensions
         if stack_shape[4] == 1:
             vox_array = vox_array[...,0]
             if stack_shape[3] == 1:
@@ -1153,8 +1129,9 @@ def stack_group(group, warn_on_except=False, **stack_args):
             result.add_dcm(dcm, meta)
         except Exception as e:
             if warn_on_except:
-                warnings.warn('Error adding file %s to stack: %s' %
-                              (fn, str(e)))
+                tb_str = "\n".join(traceback.format_tb(e.__traceback__))
+                warnings.warn('Error adding file %s to stack: %s\n%s' %
+                              (fn, str(e), tb_str))
             else:
                 raise
     return result

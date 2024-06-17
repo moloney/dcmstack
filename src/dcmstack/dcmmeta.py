@@ -1587,7 +1587,6 @@ class NiftiWrapper(object):
                 dim_info['freq'] = 1
         hdr.set_dim_info(**dim_info)
         
-
         # Create result and embed any provided meta data
         result = klass(nii_img, make_empty=True)
         result.meta_ext.reorient_transform = np.eye(4)
@@ -1632,7 +1631,7 @@ class NiftiWrapper(object):
                         vals += [None] * (data.shape[-1] - len(vals))
                     if all(x == vals[0] for x in vals):
                         moved.append(k)
-                        if k.startswith("PerFrame."):
+                        if isinstance(k, str) and k.startswith("PerFrame."):
                             if global_meta[k.split('.')[1]] == vals[0]:
                                 continue
                         global_meta[k] = vals[0]
