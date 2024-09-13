@@ -209,7 +209,7 @@ def test_image_collision():
                          'dcmstack',
                          '2D_16Echo_qT2',
                          'TE_20_SlcPos_-33.707626341697.dcm')
-    dcm = pydicom.read_file(dcm_path)
+    dcm = pydicom.dcmread(dcm_path)
     stack = dcmstack.DicomStack('EchoTime')
     stack.add_dcm(dcm)
     with pytest.raises(dcmstack.ImageCollisionError):
@@ -222,11 +222,11 @@ class TestIncongruentImage(object):
                              'dcmstack',
                              '2D_16Echo_qT2',
                              'TE_20_SlcPos_-33.707626341697.dcm')
-        self.dcm = pydicom.read_file(dcm_path)
+        self.dcm = pydicom.dcmread(dcm_path)
 
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.dcm)
-        self.dcm = pydicom.read_file(dcm_path)
+        self.dcm = pydicom.dcmread(dcm_path)
 
     def _chk_raises(self):
         with pytest.raises(dcmstack.IncongruentImageError):
@@ -271,7 +271,7 @@ class TestInvalidStack(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -322,7 +322,7 @@ class TestGetShape(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -367,7 +367,7 @@ class TestGuessDim(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -417,7 +417,7 @@ class TestGetData(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -470,7 +470,7 @@ class TestGetAffine(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm'
                                  )
@@ -537,7 +537,7 @@ class TestToNifti(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -639,7 +639,7 @@ class TestParseAndGroup(object):
     def test_default(self):
         res = dcmstack.parse_and_group(self.in_paths)
         assert len(res) == 1
-        ds = pydicom.read_file(self.in_paths[0])
+        ds = pydicom.dcmread(self.in_paths[0])
         group_key = list(res.keys())[0]
         for attr_idx, attr in enumerate(dcmstack.default_group_keys):
             if attr in dcmstack.default_close_keys:
@@ -665,7 +665,7 @@ class TestParseAndStack(object):
     def test_default(self):
         res = dcmstack.parse_and_stack(self.in_paths)
         assert len(res) == 1
-        ds = pydicom.read_file(self.in_paths[0])
+        ds = pydicom.dcmread(self.in_paths[0])
         group_key = list(res.keys())[0]
         for attr_idx, attr in enumerate(dcmstack.default_group_keys):
             if attr in dcmstack.default_close_keys:

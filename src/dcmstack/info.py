@@ -23,7 +23,7 @@ CLASSIFIERS = ["Development Status :: 3 - Alpha",
 description = 'Stack DICOM images into volumes and convert to Nifti'
 
 # Hard dependencies
-install_requires = ['pydicom >= 0.9.7',
+install_requires = ['pydicom >= 1.0.0',
                     'nibabel >= 2.5.1',
                     'pylibjpeg-libjpeg ; python_version >= "3.7"',
                    ]

@@ -1046,7 +1046,7 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
     for dcm_path in src_paths:
         #Read the DICOM file
         try:
-            dcm = pydicom.read_file(dcm_path, force=force)
+            dcm = pydicom.dcmread(dcm_path, force=force)
         except Exception as e:
             if warn_on_except:
                 warnings.warn('Error reading file %s: %s' % (dcm_path, str(e)))
