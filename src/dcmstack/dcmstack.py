@@ -958,7 +958,7 @@ class DicomStack(object):
                             for file_info in self._files_info]
 
             #Build meta data for each time point / vector component
-            if len(data.shape) == 5:
+            if len(data.shape) == 5 and len(vol_meta) > 1:
                 if data.shape[3] != 1:
                     vec_meta = []
                     for vec_idx in range(data.shape[4]):
@@ -971,7 +971,7 @@ class DicomStack(object):
                     vec_meta = vol_meta
 
                 meta_ext = DcmMetaExtension.from_sequence(vec_meta, 4)
-            elif len(data.shape) == 4:
+            elif len(data.shape) == 4 and len(vol_meta) > 1:
                 meta_ext = DcmMetaExtension.from_sequence(vol_meta, 3)
             else:
                 meta_ext = vol_meta[0]
