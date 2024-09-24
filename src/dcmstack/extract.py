@@ -9,7 +9,7 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-    
+
 try:
     import pydicom
     from pydicom.datadict import keyword_for_tag
@@ -410,7 +410,9 @@ class MetaExtractor(object):
         else:
             #Otherwise, just take a copy if the value is a list
             n_vals = elem.VM
-            if n_vals > 1:
+            if n_vals == 0:
+                return None
+            elif n_vals > 1:
                 value = elem.value[:]
             else:
                 value = elem.value
