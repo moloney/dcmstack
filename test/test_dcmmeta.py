@@ -108,7 +108,7 @@ class TestCheckValid(object):
     def test_const(self):
         self.ext.get_class_dict(('global', 'const'))['ConstTest'] = 2
         self.ext.check_valid()
-        del self.ext._content['global']['const']
+        del self.ext.get_content()['global']['const']
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
@@ -119,7 +119,7 @@ class TestCheckValid(object):
             self.ext.check_valid()
         cls_dict['SliceTest'] = [0] * 24
         self.ext.check_valid()
-        del self.ext._content['global']['slices']
+        del self.ext.get_content()['global']['slices']
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
@@ -133,7 +133,7 @@ class TestCheckValid(object):
             self.ext.check_valid()
         cls_dict['TimeSampleTest'] = [0] * 12
         self.ext.check_valid()
-        del self.ext._content['time']['samples']
+        del self.ext.get_content()['time']['samples']
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
@@ -144,8 +144,8 @@ class TestCheckValid(object):
             self.ext.check_valid()
         cls_dict['TimeSliceTest'] = [0] * 2
         self.ext.check_valid()
-        del self.ext._content['time']['slices']
-        with pytest.raises(dcmmeta.InvalidExtensionError): 
+        del self.ext.get_content()['time']['slices']
+        with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
     def test_vector_samples(self):
@@ -155,7 +155,7 @@ class TestCheckValid(object):
             self.ext.check_valid()
         cls_dict['VectorSampleTest'] = [0] * 4
         self.ext.check_valid()
-        del self.ext._content['vector']['samples']
+        del self.ext.get_content()['vector']['samples']
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
@@ -166,28 +166,28 @@ class TestCheckValid(object):
             self.ext.check_valid()
         cls_dict['VectorSliceTest'] = [0] * 6
         self.ext.check_valid()
-        del self.ext._content['vector']['slices']
+        del self.ext.get_content()['vector']['slices']
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
     def test_invalid_affine(self):
-        self.ext._content['dcmmeta_affine'] = np.eye(3).tolist()
+        self.ext.get_content()['dcmmeta_affine'] = np.eye(3).tolist()
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
     def test_invalid_slice_dim(self):
-        self.ext._content['dcmmeta_slice_dim'] = 3
+        self.ext.get_content()['dcmmeta_slice_dim'] = 3
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
-        self.ext._content['dcmmeta_slice_dim'] = -1
+        self.ext.get_content()['dcmmeta_slice_dim'] = -1
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
     def test_invalid_shape(self):
-        self.ext._content['dcmmeta_shape'] = [2, 2]
+        self.ext.get_content()['dcmmeta_shape'] = [2, 2]
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
-        self.ext._content['dcmmeta_shape'] = [2, 2, 1, 1, 1, 2]
+        self.ext.get_content()['dcmmeta_shape'] = [2, 2, 1, 1, 1, 2]
         with pytest.raises(dcmmeta.InvalidExtensionError):
             self.ext.check_valid()
 
@@ -285,7 +285,7 @@ class TestGetKeysClassesValues(object):
         for classes in self.ext.get_valid_classes():
             key = '%s_%s_test' % classes
             assert self.ext.get_values(key) == [0] * self.ext.get_multiplicity(classes)
-               
+
 
     def test_get_vals_and_class(self):
         assert self.ext.get_values_and_class('foo') == (None, None)
@@ -1087,7 +1087,7 @@ def test_from_3d_time_to_4d():
     time_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4),
                         dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
@@ -1119,7 +1119,7 @@ def test_from_3d_time_to_4d():
     for idx in range(3):
         assert(np.all(merged_data[:, :, :, idx] ==
                    np.arange(idx * (4 * 4 * 4),
-                             (idx + 1) * (4 * 4 * 4), 
+                             (idx + 1) * (4 * 4 * 4),
                              dtype=np.int32).reshape(4, 4, 4))
            )
 
@@ -1127,7 +1127,7 @@ def test_from_3d_vector_to_4d():
     vector_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4),
                         dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
@@ -1159,7 +1159,7 @@ def test_from_3d_vector_to_4d():
     for idx in range(3):
         assert(np.all(merged_data[:, :, :, 0, idx] ==
                    np.arange(idx * (4 * 4 * 4),
-                             (idx + 1) * (4 * 4 * 4), 
+                             (idx + 1) * (4 * 4 * 4),
                              dtype=np.int32).reshape(4, 4, 4))
            )
 
@@ -1169,7 +1169,7 @@ def test_merge_inconsistent_hdr():
     time_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4),
                         dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))
@@ -1193,7 +1193,7 @@ def test_merge_with_slc_and_without():
     input_nws = []
     for idx in range(3):
         arr = np.arange(idx * (4 * 4 * 4),
-                        (idx + 1) * (4 * 4 * 4), 
+                        (idx + 1) * (4 * 4 * 4),
                         dtype=np.int32
                        ).reshape(4, 4, 4)
         nii = nb.Nifti1Image(arr, np.diag((1.1, 1.1, 1.1, 1.0)))

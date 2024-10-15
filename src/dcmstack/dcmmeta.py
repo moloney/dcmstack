@@ -121,9 +121,9 @@ class DcmMetaExtension(Nifti1Extension):
         needed) into the same space as the affine.'''
         if self.version < 0.6:
             return None
-        if self._content['dcmmeta_reorient_transform'] is None:
+        if self.get_content()['dcmmeta_reorient_transform'] is None:
             return None
-        return np.array(self._content['dcmmeta_reorient_transform'])
+        return np.array(self.get_content()['dcmmeta_reorient_transform'])
 
     @reorient_transform.setter
     def reorient_transform(self, value):
@@ -131,57 +131,57 @@ class DcmMetaExtension(Nifti1Extension):
             raise ValueError("The reorient_transform must be none or (4,4) "
             "array")
         if value is None:
-            self._content['dcmmeta_reorient_transform'] = None
+            self.get_content()['dcmmeta_reorient_transform'] = None
         else:
-            self._content['dcmmeta_reorient_transform'] = value.tolist()
+            self.get_content()['dcmmeta_reorient_transform'] = value.tolist()
 
     @property
     def affine(self):
         '''The affine associated with the meta data. If this differs from the
         image affine, the per-slice meta data will not be used. '''
-        return np.array(self._content['dcmmeta_affine'])
+        return np.array(self.get_content()['dcmmeta_affine'])
 
     @affine.setter
     def affine(self, value):
         if value.shape != (4, 4):
             raise ValueError("Invalid shape for affine")
-        self._content['dcmmeta_affine'] = value.tolist()
+        self.get_content()['dcmmeta_affine'] = value.tolist()
 
     @property
     def slice_dim(self):
         '''The index of the slice dimension associated with the per-slice
         meta data.'''
-        return self._content['dcmmeta_slice_dim']
+        return self.get_content()['dcmmeta_slice_dim']
 
     @slice_dim.setter
     def slice_dim(self, value):
         if not value is None and not (0 <= value < 3):
             raise ValueError("The slice dimension must be between zero and "
                              "two")
-        self._content['dcmmeta_slice_dim'] = value
+        self.get_content()['dcmmeta_slice_dim'] = value
 
     @property
     def shape(self):
         '''The shape of the data associated with the meta data. Defines the
         number of values for the meta data classifications.'''
-        return tuple(self._content['dcmmeta_shape'])
+        return tuple(self.get_content()['dcmmeta_shape'])
 
     @shape.setter
     def shape(self, value):
         if not (3 <= len(value) < 6):
             raise ValueError("The shape must have a length between three and "
                              "six")
-        self._content['dcmmeta_shape'][:] = value
+        self.get_content()['dcmmeta_shape'][:] = value
 
     @property
     def version(self):
         '''The version of the meta data extension.'''
-        return self._content['dcmmeta_version']
+        return self.get_content()['dcmmeta_version']
 
     @version.setter
     def version(self, value):
         '''Set the version of the meta data extension.'''
-        self._content['dcmmeta_version'] = value
+        self.get_content()['dcmmeta_version'] = value
 
     @property
     def slice_normal(self):
@@ -285,7 +285,7 @@ class DcmMetaExtension(Nifti1Extension):
             classification.
         '''
         #Check for the required base keys in the json data
-        if not _req_base_keys_map[self.version] <= set(self._content):
+        if not _req_base_keys_map[self.version] <= set(self.get_content()):
             raise InvalidExtensionError('Missing one or more required keys')
 
         #Check the orientation/shape/version
@@ -302,10 +302,10 @@ class DcmMetaExtension(Nifti1Extension):
         #multiplicity
         valid_classes = self.get_valid_classes()
         for classes in valid_classes:
-            if not classes[0] in self._content:
+            if not classes[0] in self.get_content():
                 raise InvalidExtensionError('Missing required base '
                                             'classification %s' % classes[0])
-            if not classes[1] in self._content[classes[0]]:
+            if not classes[1] in self.get_content()[classes[0]]:
                 raise InvalidExtensionError(('Missing required sub '
                                              'classification %s in base '
                                              'classification %s') % classes)
@@ -340,7 +340,7 @@ class DcmMetaExtension(Nifti1Extension):
         '''Get a list of all the meta data keys that are available.'''
         keys = []
         for base_class, sub_class in self.get_valid_classes():
-            keys += self._content[base_class][sub_class].keys()
+            keys += self.get_content()[base_class][sub_class].keys()
         return keys
 
     def get_classification(self, key):
@@ -359,7 +359,7 @@ class DcmMetaExtension(Nifti1Extension):
 
         '''
         for base_class, sub_class in self.get_valid_classes():
-            if key in self._content[base_class][sub_class]:
+            if key in self.get_content()[base_class][sub_class]:
                     return (base_class, sub_class)
 
         return None
@@ -378,7 +378,7 @@ class DcmMetaExtension(Nifti1Extension):
             The dictionary for the provided classification.
         '''
         base, sub = classification
-        return self._content[base][sub]
+        return self.get_content()[base][sub]
 
     def get_values(self, key):
         '''Get all values for the provided key.
@@ -503,7 +503,7 @@ class DcmMetaExtension(Nifti1Extension):
     def to_json(self):
         '''Return the extension encoded as a JSON string.'''
         self.check_valid()
-        return json.dumps(self._content, indent=4)
+        return json.dumps(self.get_content(), indent=4)
 
     @classmethod
     def from_json(klass, json_str):
@@ -541,21 +541,22 @@ class DcmMetaExtension(Nifti1Extension):
 
         '''
         result = klass(dcm_meta_ecode, '{}')
-        result._content['global'] = OrderedDict()
-        result._content['global']['const'] = OrderedDict()
-        result._content['global']['slices'] = OrderedDict()
+        result.get_content()['global'] = OrderedDict()
+        result.get_content()['global']['const'] = OrderedDict()
+        result.get_content()['global']['slices'] = OrderedDict()
 
         if len(shape) > 3 and shape[3] != 1:
-            result._content['time'] = OrderedDict()
-            result._content['time']['samples'] = OrderedDict()
-            result._content['time']['slices'] = OrderedDict()
+            result.get_content()['time'] = OrderedDict()
+            result.get_content()['time']['samples'] = OrderedDict()
+            result.get_content()['time']['slices'] = OrderedDict()
 
         if len(shape) > 4:
-            result._content['vector'] = OrderedDict()
-            result._content['vector']['samples'] = OrderedDict()
-            result._content['vector']['slices'] = OrderedDict()
+            result.get_content()['vector'] = OrderedDict()
+            result.get_content()['vector']['samples'] = OrderedDict()
+            result.get_content()['vector']['slices'] = OrderedDict()
 
-        result._content['dcmmeta_shape'] = []
+        result.get_content()['dcmmeta_shape'] = []
+        result.shape = shape
         result.shape = shape
         result.affine = affine
         result.reorient_transform = reorient_transform
@@ -570,7 +571,7 @@ class DcmMetaExtension(Nifti1Extension):
         dictionaries).
         '''
         result = klass(dcm_meta_ecode, '{}')
-        result._content = runtime_repr
+        result.set_content(runtime_repr)
         result.check_valid()
         return result
 
@@ -635,7 +636,7 @@ class DcmMetaExtension(Nifti1Extension):
         for classes in first_input.get_valid_classes():
             if classes[1] == 'slices' and not use_slices:
                 continue
-            result._content[classes[0]][classes[1]] = \
+            result.get_content()[classes[0]][classes[1]] = \
                 deepcopy(first_input.get_class_dict(classes))
 
         #Adjust the shape to what the extension actually contains
@@ -673,7 +674,7 @@ class DcmMetaExtension(Nifti1Extension):
         return result
 
     def __str__(self):
-        return self._mangle(self._content)
+        return self._mangle(self.get_content())
 
     def __eq__(self, other):
         if not np.allclose(self.affine, other.affine):
@@ -705,7 +706,7 @@ class DcmMetaExtension(Nifti1Extension):
         '''Go from runtime representation to extension data.'''
         res = json.dumps(value, indent=4)
         # Python 2 leaves some trailing white-space in the JSON output while
-        # python 3 does not. We strip it so output is binary identical across 
+        # python 3 does not. We strip it so output is binary identical across
         # versions
         if PY2:
             res = re.sub('[ \t]+$', '', res, 0, re.M)
@@ -769,7 +770,7 @@ class DcmMetaExtension(Nifti1Extension):
         #Test if the values are constant with some period
         dests = self._const_tests[curr_class]
         for dest_cls in dests:
-            if dest_cls[0] in self._content:
+            if dest_cls[0] in self.get_content():
                 period = self._get_const_period(curr_class, dest_cls)
                 #If the period is one, the two classifications have the
                 #same multiplicity so we are dealing with a degenerate
@@ -786,7 +787,7 @@ class DcmMetaExtension(Nifti1Extension):
         else: #Otherwise test if values are repeating with some period
             if curr_class in self._repeat_tests:
                 for dest_cls in self._repeat_tests[curr_class]:
-                    if dest_cls[0] in self._content:
+                    if dest_cls[0] in self.get_content():
                         dest_mult = self.get_multiplicity(dest_cls)
                         if is_repeating(values, dest_mult):
                             self.get_class_dict(dest_cls)[key] = \
@@ -1042,7 +1043,7 @@ class DcmMetaExtension(Nifti1Extension):
             for classes in other.get_valid_classes():
                 if classes[1] == 'slices':
                     other_slc_meta[classes] = other.get_class_dict(classes)
-                    other._content[classes[0]][classes[1]] = {}
+                    other.get_content()[classes[0]][classes[1]] = {}
         missing_keys = list(set(self.get_keys()) - set(other.get_keys()))
         for other_classes in other.get_valid_classes():
             other_keys = list(other.get_class_dict(other_classes).keys())
@@ -1065,7 +1066,7 @@ class DcmMetaExtension(Nifti1Extension):
                     elif not local_classes in other_allow:
                         best_dest = None
                         for dest_class in local_allow:
-                            if (dest_class[0] in self._content and
+                            if (dest_class[0] in self.get_content() and
                                dest_class in other_allow):
                                 best_dest = dest_class
                                 break
@@ -1086,7 +1087,7 @@ class DcmMetaExtension(Nifti1Extension):
         if not use_slices:
             for classes in other.get_valid_classes():
                 if classes[1] == 'slices':
-                    other._content[classes[0]][classes[1]] = \
+                    other.get_content()[classes[0]][classes[1]] = \
                         other_slc_meta[classes]
 
     def _insert_slice(self, key, other):
@@ -1098,7 +1099,7 @@ class DcmMetaExtension(Nifti1Extension):
         if classes == ('global', 'const'):
             if local_vals != other_vals:
                 for dest_base in ('time', 'vector', 'global'):
-                    if dest_base in self._content:
+                    if dest_base in self.get_content():
                         self._change_class(key, (dest_base, 'slices'))
                         other_vals = other._get_changed_class(key,
                                                               (dest_base,
