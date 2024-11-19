@@ -53,7 +53,7 @@ class TestCsa(object):
         assert extract._parse_phoenix_line("test = 0x2") == ('test', 2)
         assert extract._parse_phoenix_line("test = 2.") == ('test', 2.0)
 
-        
+
         with pytest.raises(extract.PhoenixParseError):
             extract._parse_phoenix_line('test = blah')
         with pytest.raises(extract.PhoenixParseError):
@@ -89,7 +89,9 @@ class TestMetaExtractor(object):
         extractor = extract.MetaExtractor(ignore_rules=ignore_rules)
         for elem in self.data:
             value = extractor._get_elem_value(elem)
-            if elem.VM > 1:
+            if elem.VM == 0:
+                assert(value is None)
+            elif elem.VM > 1:
                 assert(isinstance(value, list))
             if elem.VR in list(extract.unpack_vr_map) + ['DS', 'IS']:
                 if elem.VM == 1:
