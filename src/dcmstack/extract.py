@@ -273,32 +273,6 @@ unpack_vr_map = {'SL' : 'i',
 '''Dictionary mapping value representations to corresponding format strings for
 the struct.unpack function.'''
 
-def tm_to_seconds(time_str):
-    '''Convert a DICOM time value (value representation of 'TM') to the number
-    of seconds past midnight.
-
-    Parameters
-    ----------
-    time_str : str
-        The DICOM time value string
-
-    Returns
-    -------
-    A floating point representing the number of seconds past midnight
-    '''
-    #Allow ACR/NEMA style format by removing any colon chars
-    time_str = time_str.replace(':', '')
-
-    #Only the hours portion is required
-    result = int(time_str[:2]) * 3600
-
-    str_len = len(time_str)
-    if str_len > 2:
-        result += int(time_str[2:4]) * 60
-    if str_len > 4:
-        result += float(time_str[4:])
-
-    return float(result)
 
 def get_text(byte_str):
     '''If the given byte string contains text data return it as unicode,
@@ -322,6 +296,7 @@ def get_text(byte_str):
     else:
         return byte_str.decode('ascii')
 
+
 default_conversions = {'DS' : float,
                        'IS' : int,
                        'AT' : str,
@@ -333,6 +308,8 @@ default_conversions = {'DS' : float,
                        'PN' : unicode_str,
                        'UI' : unicode_str,
                       }
+
+
 
 class MetaExtractor(object):
     '''Callable object for extracting meta data from a dicom dataset.

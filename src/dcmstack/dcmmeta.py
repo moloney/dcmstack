@@ -3,6 +3,7 @@ DcmMeta header extension and NiftiWrapper for working with extended Niftis.
 """
 from __future__ import print_function
 
+import itertools
 import sys, re, json, warnings
 from copy import deepcopy
 try:
@@ -1242,6 +1243,30 @@ def gen_simplified_sequences(meta_dict):
         yield k, v
     
 
+def _get_fg_const_and_varying(fg_seqs):
+    varying = {}
+    for idx, fg_seq in enumerate(fg_seqs):
+        for k, v in gen_simplified_sequences(fg_seq):
+            if k not in varying:
+                if idx == 0:
+                    varying[k] = [v]
+                else:
+                    varying[k] = [None] * idx
+                    varying[k].append(v)
+            else:
+                n_vals = len(varying[k])
+                if n_vals != idx:
+                    varying[k] += [None] * (idx - n_vals)
+                varying[k].append(v)
+    const = {}
+    for k, vals in varying.items():
+        if len(vals) != len(fg_seqs):
+            vals += [None] * (len(fg_seqs) - len(vals))
+        if all(x == vals[0] for x in vals):
+            const[k] = vals[0]
+    for k in const:
+        del varying[k]
+    return const, varying
 
 
 class NiftiWrapper(object):
@@ -1543,50 +1568,56 @@ class NiftiWrapper(object):
         meta_dict : dict
             An optional dictionary of meta data extracted from `dcm_data`. See
             the `extract` module for generating this dict.
-
         '''
-        # This is kinda hacky, but no great way to get unscaled data out of 
-        # the dicom wrapper classes
-        orig_scale_data = dcm_wrp._scale_data
-        dcm_wrp._scale_data = lambda data: data
-        try:
+        shape = dcm_wrp.image_shape
+        n_dims = len(shape)
+        if n_dims > 4:
+            raise ValueError("5D+ multiframe not supported")
+        # Figure out any data rescaling
+        scale_factors = dcm_wrp.scale_factors
+        if dcm_wrp.is_multiframe and scale_factors.shape[1] > 1:
+            slope, inter = 1, 0
             data = dcm_wrp.get_data()
-        finally:
-            dcm_wrp._scale_data = orig_scale_data 
-
-        #The Nifti patient space flips the x and y directions
+        else:
+            slope, inter = scale_factors[:, 0]
+            data = dcm_wrp.get_unscaled_data()
+        # The Nifti patient space flips the x and y directions
         affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
-
-        #Make 2D data 3D
-        if len(data.shape) == 2:
+        n_vols = 1
+        if n_dims == 2:
             data = data.reshape(data.shape + (1,))
-        elif len(data.shape) > 3:
+            slices_per_vol = 1
+        elif n_dims >= 3:
             data = np.squeeze(data)
-        if len(data.shape) > 3:
-            raise ValueError("4D+ Multiframe not supported yet")
-
-        #Create the nifti image and set header data
+            slices_per_vol = shape[2]
+        if n_dims == 4:
+            n_vols = shape[3]
+        # Create the nifti image and set header data
         nii_img = nb.nifti1.Nifti1Image(data, affine)
         hdr = nii_img.header
-        slope = float(dcm_wrp.get('RescaleSlope', 1.0))
-        inter = float(dcm_wrp.get('RescaleIntercept', 0.0))
         if (slope, inter) != (1.0, 0.0):
             hdr.set_slope_inter(slope, inter)
         hdr.set_xyzt_units('mm', 'sec')
-        dim_info = {'freq' : None,
-                    'phase' : None,
-                    'slice' : 2
-                   }
-        phase_dir = dcm_wrp.get('InPlanePhaseEncodingDirection')
+        # Determine phase encoding direction, set dimension info in header
+        phase_info = None
+        if dcm_wrp.is_multiframe:
+            phase_info = dcm_wrp.shared.get("MRFOVGeometrySequence")
+            if phase_info is None and "MRFOVGeometrySequence" in dcm_wrp.frames[0]:
+                phase_info = [f.get("MRFOVGeometrySequence")[0] for f in dcm_wrp.frames]
+        if phase_info is None:
+            phase_info = dcm_wrp
+        phase_dirs = set(d.get('InPlanePhaseEncodingDirection') for d in phase_info)
+        if len(phase_dirs) > 1:
+            phase_dir = None
+        else:
+            phase_dir = phase_dirs.pop()
+        dim_info = {'freq' : None, 'phase' : None, 'slice' : 2}
         if phase_dir:
             if phase_dir == 'ROW':
-                dim_info['phase'] = 1
-                dim_info['freq'] = 0
+                dim_info['phase'], dim_info['freq'] = 1, 0
             else:
-                dim_info['phase'] = 0
-                dim_info['freq'] = 1
+                dim_info['phase'], dim_info['freq'] = 0, 1
         hdr.set_dim_info(**dim_info)
-        
         # Create result and embed any provided meta data
         result = klass(nii_img, make_empty=True)
         result.meta_ext.reorient_transform = np.eye(4)
@@ -1594,6 +1625,7 @@ class NiftiWrapper(object):
             if not dcm_wrp.is_multiframe:
                 result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
             else:
+                # Unpack and sort meta data from multiframe file that varies
                 global_meta = meta_dict.copy()
                 del global_meta["SharedFunctionalGroupsSequence"]
                 del global_meta["PerFrameFunctionalGroupsSequence"]
@@ -1607,39 +1639,64 @@ class NiftiWrapper(object):
                         k = f"Shared.{k}"
                     global_meta[k] = v
                 fg_seqs = meta_dict.get("PerFrameFunctionalGroupsSequence")
-                dcm_wrp.image_shape
-                sorted_indices = np.lexsort(dcm_wrp._frame_indices.T)
-                slice_meta = {}
-                for slice_count, slice_idx in enumerate(sorted_indices):
-                    for k, v in gen_simplified_sequences(fg_seqs[slice_idx]):
-                        if k in global_meta:
-                            k = f"PerFrame.{k}"
-                        if k not in slice_meta:
-                            if slice_count == 0:
-                                slice_meta[k] = [v]
-                            else:
-                                slice_meta[k] = [None] * slice_count
-                                slice_meta[k].append(v)
-                        else:
-                            n_vals = len(slice_meta[k])
-                            if n_vals != slice_count:
-                                slice_meta[k] += [None] * (slice_count - n_vals)
-                            slice_meta[k].append(v)
-                moved = []
-                for k, vals in slice_meta.items():
-                    if len(vals) != data.shape[-1]:
-                        vals += [None] * (data.shape[-1] - len(vals))
-                    if all(x == vals[0] for x in vals):
-                        moved.append(k)
-                        if isinstance(k, str) and k.startswith("PerFrame."):
-                            if global_meta[k.split('.')[1]] == vals[0]:
+                sorted_indices = dcm_wrp.frame_order
+                fg_keys = set()
+                slice_keys = set()
+                vol_results = []
+                for vol_idx in range(n_vols):
+                    start = vol_idx * slices_per_vol
+                    end = start + slices_per_vol
+                    vol_res = _get_fg_const_and_varying(
+                        [fg_seqs[x] for x in sorted_indices[start:end]]
+                    )
+                    vol_results.append(vol_res)
+                    for res in vol_res:
+                        for k in res:
+                            fg_keys.add(k)
+                    for k in vol_res[1]:
+                        slice_keys.add(k)
+                global_slices = result.meta_ext.get_class_dict(('global', 'slices'))
+                if n_vols > 1:
+                    for vconst, vslices in vol_results:
+                        for k in fg_keys:
+                            if k not in vconst and k not in vslices:
+                                vconst[k] = None
+                        for k in slice_keys:
+                            if k in vconst:
+                                vslices[k] = [vconst[k]] * slices_per_vol
+                                del vconst[k]
+                    time_samples = result.meta_ext.get_class_dict(('time', 'samples'))
+                    time_slices = result.meta_ext.get_class_dict(('time', 'slices'))
+                    for k, first_val in vol_results[0][0].items():
+                        dest_key = k if k not in global_meta else f"PerFrame.{k}"
+                        vals = [vconst[k] for vconst, _ in vol_results]
+                        if all(v == first_val for v in vals):
+                            if k in global_meta and global_meta[k] == first_val:
                                 continue
-                        global_meta[k] = vals[0]
-                for k in moved:
-                    del slice_meta[k]
+                            global_meta[dest_key] = first_val
+                        else:
+                            time_samples[dest_key] = vals
+                    for k, first_val in vol_results[0][1].items():
+                        dest_key = k if k not in global_meta else f"PerFrame.{k}"
+                        vals = [vslices[k] for _, vslices in vol_results]
+                        if all(v == first_val for v in vals):
+                            time_slices[dest_key] = first_val
+                        else:
+                            global_slices[dest_key] = list(itertools.chain(*vals))
+                else:
+                    vconst, vslices = vol_results[0]
+                    for k, val in vconst.items():
+                        if k in global_meta:
+                            if global_meta[k] != val:
+                                global_meta[f"PerFrame.{k}"] = val
+                        else:
+                            global_meta[k] = val
+                    for k, vals in vslices.items():
+                        if k in global_meta:
+                            global_slices[f"PerFrame.{k}"] = vals
+                        else:
+                            global_slices[k] = vals
                 result.meta_ext.get_class_dict(('global', 'const')).update(global_meta)
-                result.meta_ext.get_class_dict(('global', 'slices')).update(slice_meta)
-
         return result
 
     @classmethod

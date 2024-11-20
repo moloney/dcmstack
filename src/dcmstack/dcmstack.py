@@ -25,6 +25,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from nibabel.nicom.dicomwrappers import wrapper_from_data
 
+from . import snd
 from .dcmmeta import DcmMetaExtension, NiftiWrapper
 from .utils import iteritems
 
@@ -254,34 +255,6 @@ def reorder_voxels(vox_array, affine, voxel_order):
     return (vox_array, affine, aff_trans, ornt_trans)
 
 
-def dcm_time_to_sec(time_str):
-    '''Convert a DICOM time value (value representation of 'TM') to the number
-    of seconds past midnight.
-
-    Parameters
-    ----------
-    time_str : str
-        The DICOM time value string
-
-    Returns
-    -------
-    A floating point representing the number of seconds past midnight
-    '''
-    #Allow ACR/NEMA style format by removing any colon chars
-    time_str = time_str.replace(':', '')
-
-    #Only the hours portion is required
-    result = int(time_str[:2]) * 3600
-
-    str_len = len(time_str)
-    if str_len > 2:
-        result += int(time_str[2:4]) * 60
-    if str_len > 4:
-        result += float(time_str[4:])
-
-    return float(result)
-
-
 class IncongruentImageError(Exception):
     def __init__(self, msg):
         '''An exception denoting that a DICOM with incorrect size or orientation
@@ -418,16 +391,11 @@ class DicomStack(object):
     guessed based off the data sets.
     '''
 
-    sort_guesses = ['EffectiveEchoTime',
-                    'EchoTime',
-                    'InversionTime',
-                    'RepetitionTime',
-                    'FlipAngle',
-                    'TriggerTime',
-                    'FrameAcquisitionDateTime',
-                    'AcquisitionTime',
-                    'AcquisitionDateTime',
-                    'ContentTime',
+    sort_guesses = ['SND.EchoTime',
+                    'SND.InversionTime',
+                    'SND.RepetitionTime',
+                    'SND.FlipAngle',
+                    'SND.AcquisitionTimeStamp',
                     'AcquisitionNumber',
                     'InstanceNumber',
                    ]
@@ -457,12 +425,10 @@ class DicomStack(object):
             self._vector_order = DicomOrdering(vector_order)
         else:
             self._vector_order = vector_order
-
         if meta_filter is None:
             self._meta_filter = default_meta_filter
         else:
             self._meta_filter = meta_filter
-
         #Sets all the state variables to their defaults
         self.clear()
 
@@ -514,6 +480,8 @@ class DicomStack(object):
         # TODO: Look into if / why this check is needed?
         if nii_wrp is None:
             raise DicomConversionError()
+        # Inject our slightly normalized DICOM meta data
+        snd.inject(nii_wrp.meta_ext)
         # Sanity check against existing inputs, then pull some data we will need later
         self._chk_congruent(nii_wrp)
         slp = nii_wrp.get_meta('RescaleSlope', default=1.0)
@@ -736,9 +704,7 @@ class DicomStack(object):
         InvalidStackError
             The stack is incomplete or invalid.
         '''
-        # Create a numpy array for storing the voxel data
-        stack_shape = self.shape
-        stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
+        # Determine output dtype
         stack_dtype = self._files_info[0][0].nii_img.dataobj.dtype
         bits_stored = self._files_info[0][0].get_meta('BitsStored', default=16)
         out_dtype = stack_dtype
@@ -747,14 +713,25 @@ class DicomStack(object):
                 out_dtype = np.float32
             else:
                 scaled = False
-            
         # This is a hack to keep fslview happy, it does not like unsigned short
         # data. If less than 16 bits are being used for each pixel we default 
         # to signed short.        
         if out_dtype == np.uint16 and bits_stored < 16:
             out_dtype = np.int16
+        # Optimization for single file
+        if len(self._files_info) == 1:
+            vox_array = np.asarray(
+                self._files_info[0][0].nii_img.dataobj, dtype=out_dtype
+            )
+            if scaled:
+                slope, inter = self._files_info[0][0].nii_img.header.get_slope_inter()
+                vox_array *= slope
+                vox_array += inter
+            return vox_array
+        # Allocate output array
+        stack_shape = self.shape
+        stack_shape = tuple(list(stack_shape) + ((5 - len(stack_shape)) * [1]))
         vox_array = np.empty(stack_shape, dtype=out_dtype)
-
         # Fill the array with data
         n_vols = 1
         if len(stack_shape) > 3:
@@ -781,15 +758,17 @@ class DicomStack(object):
                              np.asarray(self._files_info[file_idx][0].nii_img.dataobj[:, :, 0])
                         if scaled:
                             slope, inter = self._files_info[file_idx][0].nii_img.header.get_slope_inter()
+                            if slope is None:
+                                slope = 1.0
+                            if inter is None:
+                                inter = 0.0
                             vox_array[:, :, slice_idx, time_idx, vec_idx] *= slope
                             vox_array[:, :, slice_idx, time_idx, vec_idx] += inter
-
         # Trim unused time/vector dimensions
         if stack_shape[4] == 1:
             vox_array = vox_array[...,0]
             if stack_shape[3] == 1:
                 vox_array = vox_array[...,0]
-
         return vox_array
 
     data = property(fget=get_data)
@@ -862,6 +841,7 @@ class DicomStack(object):
         if len(data.shape) > 4:
             n_vols *= data.shape[4]
 
+        vols_per_file = n_vols // len(self._files_info)
         files_per_vol = len(self._files_info) // n_vols
 
         #Reorder the voxel data if requested
@@ -918,11 +898,11 @@ class DicomStack(object):
         n_slices = data.shape[slice_dim]
 
         #Set the slice timing header info
-        has_acq_time = (self._files_info[0][0].get_meta('AcquisitionTime') !=
+        has_acq_time = (self._files_info[0][0].get_meta('SND.AcquisitionTimeStamp') !=
                         None)
         if files_per_vol > 1 and has_acq_time:
             #Pull out the relative slice times for the first volume
-            slice_times = np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime'])
+            slice_times = np.array([file_info[0]['SND.AcquisitionTimeStamp']
                                     for file_info in self._files_info[:n_slices]]
                                   )
             slice_times -= np.min(slice_times)
@@ -934,7 +914,7 @@ class DicomStack(object):
                 end_slice = start_slice + n_slices
                 slices_info = self._files_info[start_slice:end_slice]
                 vol_slc_times = \
-                    np.array([dcm_time_to_sec(file_info[0]['AcquisitionTime'])
+                    np.array([file_info[0]['SND.AcquisitionTimeStamp']
                               for file_info in slices_info]
                             )
                 vol_slc_times -= np.min(vol_slc_times)
@@ -952,42 +932,44 @@ class DicomStack(object):
 
         #Embed the meta data extension if requested
         if embed_meta:
-            #Build meta data for each volume if needed
-            vol_meta = []
-            if files_per_vol > 1:
-                for vol_idx in range(n_vols):
-                    start_slice = vol_idx * n_slices
-                    end_slice = start_slice + n_slices
-                    exts = [file_info[0].meta_ext
-                            for file_info in self._files_info[start_slice:end_slice]]
-                    meta = DcmMetaExtension.from_sequence(exts, 2)
-                    vol_meta.append(meta)
-            else:
-                vol_meta = [file_info[0].meta_ext
-                            for file_info in self._files_info]
-
-            #Build meta data for each time point / vector component
-            if len(data.shape) == 5:
-                if data.shape[3] != 1:
-                    vec_meta = []
-                    for vec_idx in range(data.shape[4]):
-                        start_idx = vec_idx * data.shape[3]
-                        end_idx = start_idx + data.shape[3]
-                        meta = DcmMetaExtension.from_sequence(
-                            vol_meta[start_idx:end_idx], 3)
-                        vec_meta.append(meta)
+            if len(self._files_info) > 1:
+                #Build meta data for each volume if needed
+                vol_meta = []
+                if files_per_vol > 1:
+                    for vol_idx in range(n_vols):
+                        start_slice = vol_idx * n_slices
+                        end_slice = start_slice + n_slices
+                        exts = [file_info[0].meta_ext
+                                for file_info in self._files_info[start_slice:end_slice]]
+                        meta = DcmMetaExtension.from_sequence(exts, 2)
+                        vol_meta.append(meta)
                 else:
-                    vec_meta = vol_meta
+                    vol_meta = [file_info[0].meta_ext
+                                for file_info in self._files_info]
+                #Build meta data for each time point / vector component
+                if len(data.shape) == 5:
+                    if data.shape[3] != 1:
+                        vec_meta = []
+                        for vec_idx in range(data.shape[4]):
+                            start_idx = vec_idx * data.shape[3]
+                            end_idx = start_idx + data.shape[3]
+                            meta = DcmMetaExtension.from_sequence(
+                                vol_meta[start_idx:end_idx], 3)
+                            vec_meta.append(meta)
+                    else:
+                        vec_meta = vol_meta
 
-                meta_ext = DcmMetaExtension.from_sequence(vec_meta, 4)
-            elif len(data.shape) == 4:
-                meta_ext = DcmMetaExtension.from_sequence(vol_meta, 3)
+                    meta_ext = DcmMetaExtension.from_sequence(vec_meta, 4)
+                elif len(data.shape) == 4:
+                    meta_ext = DcmMetaExtension.from_sequence(vol_meta, 3)
+                else:
+                    meta_ext = vol_meta[0]
+                    # TODO(BUG): file_info is not available here!
+                    if meta_ext is self._files_info[0][0].meta_ext:
+                        meta_ext = deepcopy(meta_ext)
             else:
-                meta_ext = vol_meta[0]
-                # TODO(BUG): file_info is not available here!
-                if meta_ext is self._files_info[0][0].meta_ext:
-                    meta_ext = deepcopy(meta_ext)
-
+                meta_ext = self._files_info[0][0].meta_ext
+               
             meta_ext.shape = data.shape
             meta_ext.slice_dim = slice_dim
             meta_ext.affine = nifti_header.get_best_affine()
