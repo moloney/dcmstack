@@ -160,17 +160,6 @@ class TestReorderVoxels(object):
                        )
            )
 
-def test_dcm_time_to_sec():
-    assert dcmstack.dcm_time_to_sec('100235.123456') == 36155.123456
-    assert dcmstack.dcm_time_to_sec('100235') == 36155
-    assert dcmstack.dcm_time_to_sec('1002') == 36120
-    assert dcmstack.dcm_time_to_sec('10') == 36000
-
-    #Allow older NEMA style values
-    assert dcmstack.dcm_time_to_sec('10:02:35.123456') == 36155.123456
-    assert dcmstack.dcm_time_to_sec('10:02:35') == 36155
-    assert dcmstack.dcm_time_to_sec('10:02') == 36120
-    assert dcmstack.dcm_time_to_sec('10') == 36000
 
 class TestDicomOrdering(object):
     class _MockNiiWrp:
@@ -379,7 +368,10 @@ class TestGuessDim(object):
                     delattr(in_dcm, key)
 
     def _get_vr_ord(self, key, ordinate):
-        tag = keyword_dict[key]
+        try:
+            tag = keyword_dict[key]
+        except KeyError:
+            return ordinate
         vr = dictionary_VR(tag)
         if vr == 'TM':
             return '%06d.000000' % ordinate

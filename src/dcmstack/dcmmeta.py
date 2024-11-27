@@ -1579,7 +1579,7 @@ class NiftiWrapper(object):
             slope, inter = 1, 0
             data = dcm_wrp.get_data()
         else:
-            slope, inter = scale_factors[:, 0]
+            slope, inter = scale_factors[0, :]
             data = dcm_wrp.get_unscaled_data()
         # The Nifti patient space flips the x and y directions
         affine = np.dot(np.diag([-1., -1., 1., 1.]), dcm_wrp.affine)
@@ -1605,7 +1605,7 @@ class NiftiWrapper(object):
             if phase_info is None and "MRFOVGeometrySequence" in dcm_wrp.frames[0]:
                 phase_info = [f.get("MRFOVGeometrySequence")[0] for f in dcm_wrp.frames]
         if phase_info is None:
-            phase_info = dcm_wrp
+            phase_info = [dcm_wrp]
         phase_dirs = set(d.get('InPlanePhaseEncodingDirection') for d in phase_info)
         if len(phase_dirs) > 1:
             phase_dir = None

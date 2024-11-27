@@ -704,6 +704,8 @@ class DicomStack(object):
         InvalidStackError
             The stack is incomplete or invalid.
         '''
+        if len(self._files_info) == 0:
+            raise InvalidStackError("No valid files in the stack")
         # Determine output dtype
         stack_dtype = self._files_info[0][0].nii_img.dataobj.dtype
         bits_stored = self._files_info[0][0].get_meta('BitsStored', default=16)
