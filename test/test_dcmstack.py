@@ -363,7 +363,7 @@ class TestGuessDim(object):
                                   )
                       ]
         for in_dcm in self.inputs:
-            for key in dcmstack.DicomStack.sort_guesses:
+            for key in dcmstack.DicomStack.SORT_GUESSES:
                 if hasattr(in_dcm, key):
                     delattr(in_dcm, key)
 
@@ -380,7 +380,7 @@ class TestGuessDim(object):
 
     def test_single_guess(self):
         #Test situations where there is only one possible correct guess
-        for key in dcmstack.DicomStack.sort_guesses:
+        for key in dcmstack.DicomStack.SORT_GUESSES:
             stack = dcmstack.DicomStack()
             for idx, in_dcm in enumerate(self.inputs):
                 setattr(in_dcm, key, self._get_vr_ord(key, idx))
@@ -392,12 +392,12 @@ class TestGuessDim(object):
     def test_wrong_guess_first(self):
         #Test situations where the initial guesses are wrong
         stack = dcmstack.DicomStack()
-        for key in dcmstack.DicomStack.sort_guesses[:-1]:
+        for key in dcmstack.DicomStack.SORT_GUESSES[:-1]:
             for in_dcm in self.inputs:
                 setattr(in_dcm, key, self._get_vr_ord(key, 0))
         for idx, in_dcm in enumerate(self.inputs):
             setattr(in_dcm,
-                    dcmstack.DicomStack.sort_guesses[-1],
+                    dcmstack.DicomStack.SORT_GUESSES[-1],
                     self._get_vr_ord(key, idx) )
             stack.add_dcm(in_dcm)
         assert stack.shape == (192, 192, 2, 2)
@@ -648,8 +648,8 @@ class TestParseAndGroup(object):
         assert len(res) == 1
         ds = pydicom.read_file(self.in_paths[0])
         group_key = list(res.keys())[0]
-        for attr_idx, attr in enumerate(dcmstack.default_group_keys):
-            if attr in dcmstack.default_close_keys:
+        for attr_idx, attr in enumerate(dcmstack.DEFAULT_GROUP_KEYS):
+            if attr in dcmstack.DEFAULT_CLOSE_KEYS:
                 assert(np.allclose(group_key[attr_idx], getattr(ds, attr)))
             else:
                 assert group_key[attr_idx] == getattr(ds, attr)
@@ -674,8 +674,8 @@ class TestParseAndStack(object):
         assert len(res) == 1
         ds = pydicom.read_file(self.in_paths[0])
         group_key = list(res.keys())[0]
-        for attr_idx, attr in enumerate(dcmstack.default_group_keys):
-            if attr in dcmstack.default_close_keys:
+        for attr_idx, attr in enumerate(dcmstack.DEFAULT_GROUP_KEYS):
+            if attr in dcmstack.DEFAULT_CLOSE_KEYS:
                 assert(np.allclose(group_key[attr_idx], getattr(ds, attr)))
             else:
                 assert group_key[attr_idx] == getattr(ds, attr)

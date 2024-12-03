@@ -340,7 +340,7 @@ class DicomOrdering(object):
         return val
 
 
-default_group_keys =  ('SeriesInstanceUID',
+DEFAULT_GROUP_KEYS =  ('SeriesInstanceUID',
                        'SeriesNumber',
                        'ProtocolName',
                        'ImageOrientationPatient')
@@ -348,7 +348,7 @@ default_group_keys =  ('SeriesInstanceUID',
 multi-dimensional array together.'''
 
 
-default_close_keys = ('ImageOrientationPatient',)
+DEFAULT_CLOSE_KEYS = ('ImageOrientationPatient',)
 '''Default keys needing np.allclose instead of equaulity testing when grouping 
 '''
 
@@ -391,30 +391,28 @@ class DicomStack(object):
     guessed based off the data sets.
     '''
 
-    sort_guesses = ['SND.EchoTime',
-                    'SND.InversionTime',
-                    'SND.RepetitionTime',
-                    'SND.FlipAngle',
-                    'SND.AcquisitionTimeStamp',
-                    'AcquisitionNumber',
-                    'InstanceNumber',
-                   ]
+    SORT_GUESSES = (
+        'SND.EchoTime',
+        'SND.InversionTime',
+        'SND.RepetitionTime',
+        'SND.FlipAngle',
+        'SND.AcquisitionTimeStamp',
+        'AcquisitionNumber',
+        'InstanceNumber',
+    )
     '''The meta data keywords used when trying to guess the sorting order.
     Keys that come earlier in the list are given higher priority.'''
 
-    minimal_keys = set(sort_guesses +
-                       ['Rows',
-                        'Columns',
-                        'PixelSpacing',
-                        'ImageOrientationPatient',
-                        'InPlanePhaseEncodingDirection',
-                        'SharedFunctionalGroupsSequence',
-                        'PerFrameFunctionalGroupsSequence',
-                       ] +
-                       list(default_group_keys)
-                      )
-    '''Set of minimal meta data keys that should be provided if they exist in
-    the source DICOM files.'''
+    OTHER_REQ_ATTRS = (
+        'Rows',
+        'Columns',
+        'PixelSpacing',
+        'ImageOrientationPatient',
+        'InPlanePhaseEncodingDirection',
+        'BitsStored',
+        'SharedFunctionalGroupsSequence',
+        'PerFrameFunctionalGroupsSequence',
+    )
 
     def __init__(self, time_order=None, vector_order=None, meta_filter=None):
         if isinstance(time_order, str):
@@ -431,6 +429,25 @@ class DicomStack(object):
             self._meta_filter = meta_filter
         #Sets all the state variables to their defaults
         self.clear()
+
+    @classmethod
+    def get_min_req_meta(cls):
+        """Returns `(min_dicom, min_trans)`, the min required DICOM keys and translators 
+        """
+        min_keys = snd.get_snd_sources()
+        for key in DEFAULT_GROUP_KEYS + cls.SORT_GUESSES + cls.OTHER_REQ_ATTRS:
+            if key.startswith("SND."):
+                continue
+            min_keys.add(key)
+        min_dicom = []
+        min_trans = set()
+        for key in min_keys:
+            toks = key.split(".")
+            if len(toks) == 1:
+                min_dicom.append(key)
+            else:
+                min_trans.add(toks[0])
+        return min_dicom, min_trans
 
     def _chk_congruent(self, in_wrp):
         if not self._ref_input is None:
@@ -449,11 +466,11 @@ class DicomStack(object):
         Parameters
         ----------
         dcm : pydicom.dataset.Dataset
-            The data set being added to the stack
+            The dataset being added to the stack
 
         meta : dict
-            The extracted meta data for the DICOM data set `dcm`. If None
-            extract.default_extractor will be used.
+            The extracted meta data for the DICOM data set `dcm`. If None just the 
+            minimal needed meta data will be extracted
 
         Raises
         ------
@@ -472,8 +489,8 @@ class DicomStack(object):
             raise NonImageDataSetError()
         # Extract at least some minimal meta data
         if meta is None:
-            from .extract import default_extractor
-            meta = default_extractor(dcm)
+            from .extract import EXTRACTORS, ExtractionLevel
+            meta = EXTRACTORS[ExtractionLevel.MINIMAL](dcm)
         # Covert to DicomWrapper and NiftiWrapper
         dw = wrapper_from_data(dcm)
         nii_wrp = NiftiWrapper.from_dicom_wrapper(dw, meta)
@@ -484,8 +501,9 @@ class DicomStack(object):
         snd.inject(nii_wrp.meta_ext)
         # Sanity check against existing inputs, then pull some data we will need later
         self._chk_congruent(nii_wrp)
-        slp = nii_wrp.get_meta('RescaleSlope', default=1.0)
-        inter = nii_wrp.get_meta('RescaleIntercept', default=0.0)
+        slp, inter = nii_wrp.nii_img.header.get_slope_inter()
+        slp = 1 if slp is None else slp
+        inter = 0 if inter is None else inter
         self._slope_inter.add((slp, inter))
         self._phase_enc_dirs.add(nii_wrp.get_meta('InPlanePhaseEncodingDirection'))
         self._repetition_times.add(nii_wrp.get_meta('RepetitionTime'))
@@ -543,7 +561,6 @@ class DicomStack(object):
                 self._files_info[start_slice:end_slice] = \
                     sorted(self._files_info[start_slice:end_slice],
                            key=lambda x: x[1][-1])
-
         #Do a thorough check for correctness
         for vec_idx in range(num_vec_comps):
             file_idx = vec_idx*num_time_points*files_per_vol
@@ -625,7 +642,7 @@ class DicomStack(object):
                 self._vector_order is None):
             #Get a list of possible sort orders
             possible_orders = []
-            for key in self.sort_guesses:
+            for key in self.SORT_GUESSES:
                 vals = set([file_info[0].get_meta(key)
                             for file_info in self._files_info]
                           )
@@ -726,7 +743,7 @@ class DicomStack(object):
                 self._files_info[0][0].nii_img.dataobj, dtype=out_dtype
             )
             if scaled:
-                slope, inter = self._files_info[0][0].nii_img.header.get_slope_inter()
+                slope, inter = list(self._slope_inter)[0]
                 vox_array *= slope
                 vox_array += inter
             return vox_array
@@ -991,9 +1008,9 @@ class DicomStack(object):
         return NiftiWrapper(self.to_nifti(voxel_order, True))
 
 
-def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
+def parse_and_group(src_paths, group_by=DEFAULT_GROUP_KEYS, extractor=None,
                     force=False, warn_on_except=False,
-                    close_tests=default_close_keys):
+                    close_tests=DEFAULT_CLOSE_KEYS):
     '''Parse the given dicom files and group them together. Each group is
     stored as a (list) value in a dict where the key is a tuple of values
     corresponding to the keys in 'group_by'
@@ -1031,8 +1048,8 @@ def parse_and_group(src_paths, group_by=default_group_keys, extractor=None,
         object, the parsed meta data, and the filename.
     '''
     if extractor is None:
-        from .extract import default_extractor
-        extractor = default_extractor
+        from .extract import EXTRACTORS, ExtractionLevel
+        extractor = EXTRACTORS[ExtractionLevel.MINIMAL]
 
     results = {}
     close_elems = {}
@@ -1121,7 +1138,7 @@ def stack_group(group, warn_on_except=False, **stack_args):
     return result
 
 
-def parse_and_stack(src_paths, group_by=default_group_keys, extractor=None,
+def parse_and_stack(src_paths, group_by=DEFAULT_GROUP_KEYS, extractor=None,
                     force=False, warn_on_except=False, **stack_args):
     '''Parse the given dicom files into a dictionary containing one or more
     DicomStack objects.

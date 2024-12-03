@@ -4,8 +4,7 @@ We don't do any normalization at this level beyond converting decimal strings to
 and making sure strings are unicode. The one exception is translating private 
 mini-headers embedded in certain elements.
 """
-import struct
-import warnings
+import struct, re, warnings, enum
 from collections import namedtuple
 from typing import Dict, List
 
@@ -15,32 +14,13 @@ from pydicom.dataset import PrivateBlock
 from pydicom.datadict import keyword_for_tag, private_dictionaries
 from pydicom.charset import decode_element
 from nibabel.nicom import csareader
-try:
-    import chardet
-    have_chardet = True
-except ImportError:
-    have_chardet = False
-    pass
 
 from .dcmstack import DicomStack
-from .utils import PY2, byte_str
 
 
-def ignore_private(tag, name, ds):
-    '''Ignore rule for `MetaExtractor` to skip private DICOM elements (odd
-    group number).'''
-    if tag.group % 2 == 1:
-        return True
-    return False
-
-
-def ignore_unknown_private(tag, name, ds):
-    "Ignore private elements that don't have a name in pydicom private_dictionaries"
-    return tag.group % 2 == 1 and name.split(".")[1].startswith("0X")
-
-
+# Define some common rules for ignoring DICOM elements
 def ignore_pixel_data(tag, name, ds):
-    return tag == pydicom.tag.Tag(0x7fe0, 0x10)
+    return tag.group == 0x7fe0 and tag.elem in (0x8, 0x9, 0x10)
 
 
 def ignore_overlay_data(tag, name, ds):
@@ -53,18 +33,58 @@ def ignore_color_lut_data(tag, name, ds):
     )
 
 
-default_ignore_rules = (ignore_private,
-                        ignore_pixel_data,
-                        ignore_overlay_data,
-                        ignore_color_lut_data)
+IGNORE_BINARY_RULES = (ignore_pixel_data,
+                       ignore_overlay_data,
+                       ignore_color_lut_data)
 '''The default tuple of ignore rules for `MetaExtractor`.'''
 
 
-Translator = namedtuple('Translator', ['name',
-                                       'tag',
-                                       'priv_creator',
-                                       'trans_func']
-                       )
+def ignore_private(tag, name, ds):
+    '''Ignore rule for `MetaExtractor` to skip all private DICOM elements'''
+    return tag.group % 2 == 1
+
+
+def make_ignore_unknown_private(allow_creators=None, reject_creators=None):
+    """Make custom ignore rule for private elements, by default allowing "known" elements
+
+    If the element has a name in the pydicom private dictionaries, it is considered 
+    "known". Unknown elements are filtered by default, unless the "private creator" for
+    that block of private elements is in `allow_creators`. Known elements will also be
+    ignored if the private creator is in `reject_creators`.
+    """
+    allow_creators = tuple() if allow_creators is None else allow_creators
+    reject_creators = tuple() if reject_creators is None else reject_creators
+    if allow_creators:
+        allow_re = f"({'|'.join([x for x in allow_creators])})"
+    else:
+        allow_re = ".^"
+    if reject_creators:
+        reject_re = f"({'|'.join([x for x in reject_creators])})"
+    else:
+        reject_re = ".^"
+    def ignore_unknown_private(tag, name, ds):
+        if tag.group % 2 == 0:
+            return False
+        toks = name.split(".")
+        if re.match(allow_re, toks[0], flags=re.I):
+            return False
+        elif re.match(reject_re, toks[0], flags=re.I):
+            return True
+        return toks[1].startswith("0X")
+    return ignore_unknown_private
+
+
+def make_ignore_except_rule(include):
+    """Make rule that ignores everying not in `include`"""
+    def ignore_except(tag, name, ds):
+        if tag in include:
+            return False
+        return name not in include
+    return ignore_except
+
+
+# Define some translators for internal "mini headers" stored in private elements
+Translator = namedtuple('Translator', ['name', 'tag', 'priv_creator', 'trans_func'])
 '''A namedtuple for storing the four elements of a translator: a name, the
 pydicom.tag.Tag that can be translated, the private creator string (optional), and
 the function which takes the DICOM element and returns a dictionary.'''
@@ -92,8 +112,11 @@ def simplify_csa_dict(csa_dict):
     for tag in sorted(csa_dict['tags']):
         items = []
         for item in csa_dict['tags'][tag]['items']:
-            if isinstance(item, byte_str):
-                item = get_text(item)
+            if isinstance(item, bytes):
+                try:
+                    item = item.decode()
+                except UnicodeDecodeError:
+                    item = ""
             items.append(item)
         if len(items) == 0:
             continue
@@ -252,12 +275,6 @@ csa_series_trans = Translator('CsaSeries',
 '''Translator for parsing the CSA series sub header.'''
 
 
-default_translators = (csa_image_trans,
-                       csa_series_trans,
-                      )
-'''Default translators for MetaExtractor.'''
-
-
 def tag_to_str(tag):
     '''Convert a DICOM tag to a string representation using the group and
     element hex values seprated by an underscore.'''
@@ -294,17 +311,6 @@ class TextConverter:
 _get_text = TextConverter()
 
 
-default_conversions = {'DS' : float,
-                       'IS' : int,
-                       'AT' : tag_to_str,
-                       'OW' : _get_text,
-                       'OB' : _get_text,
-                       'OW or OB' : _get_text,
-                       'OB or OW' : _get_text,
-                       'UN' : _get_text,
-                      }
-
-
 class MetaExtractor(object):
     '''Callable object for extracting meta data from a dicom dataset
 
@@ -328,23 +334,40 @@ class MetaExtractor(object):
         Convert any exceptions from translators into warnings.
     '''
 
-    def __init__(self, ignore_rules=None, translators=None, conversions=None,
-                 warn_on_trans_except=True):
+    IGNORE_RULES = IGNORE_BINARY_RULES + (make_ignore_unknown_private(),)
+
+    TRANSLATORS = (csa_image_trans, csa_series_trans,)
+
+    CONVERSIONS = {
+        'DS' : float,
+        'IS' : int,
+        'AT' : tag_to_str,
+        'OW' : _get_text,
+        'OB' : _get_text,
+        'OW or OB' : _get_text,
+        'OB or OW' : _get_text,
+        'UN' : _get_text,
+    }
+
+    def __init__(
+        self, 
+        ignore_rules=None, 
+        translators=None, 
+        conversions=None,
+        warn_on_trans_except=True
+    ):
         if ignore_rules is None:
-            self.ignore_rules = default_ignore_rules
+            self.ignore_rules = self.IGNORE_RULES
         else:
             self.ignore_rules = ignore_rules
         if translators is None:
-            self.translators = default_translators
+            self.translators = self.TRANSLATORS
         else:
             self.translators = translators
         if conversions is None:
-            self.conversions = default_conversions
+            self.conversions = self.CONVERSIONS
         else:
             self.conversions = conversions
-        self._needs_prep_converters = set(
-            c for c in self.conversions.values() if hasattr(c, "prep_dataset")
-        )
         self.warn_on_trans_except = warn_on_trans_except
 
     def _get_priv_name(self, tag: BaseTag, pblocks: List[PrivateBlock]):
@@ -423,10 +446,11 @@ class MetaExtractor(object):
         converted to float and int types.
         '''
         # Some converters need to see full dataset before converting elements
-        for conv in self._needs_prep_converters:
-            conv.prep_dataset(dcm)
+        for conv in set(self.conversions.values()):
+            if hasattr(conv, "prep_dataset"):
+                conv.prep_dataset(dcm)
         # Get all the tags included in this dataset
-        tags = dcm.keys()
+        tags = list(dcm.keys())
         # Find private blocks in the dataset
         priv_groups = set(t.group for t in tags if t.group % 2 == 1)
         priv_blocks = {
@@ -454,6 +478,9 @@ class MetaExtractor(object):
         for tag in tags:
             is_priv = tag.group % 2 == 1
             if is_priv:
+                # Skip private creator elements
+                if tag.elem & 0xFF00 == 0:
+                    continue
                 # If there is a translator for this element, use it
                 trans = trans_map.get(tag)
                 if trans is not None:
@@ -469,6 +496,7 @@ class MetaExtractor(object):
                         if meta:
                             trans_meta[trans.name] = meta
                     continue
+                # Otherwise we construct a name for the private element
                 name = self._get_priv_name(tag, grp_blocks[tag.group])
             else:
                 name = keyword_for_tag(tag)
@@ -505,16 +533,71 @@ class MetaExtractor(object):
         return result
 
 
-def make_ignore_except_rule(include):
-    """Make rule that ignores everying not in `include`"""
-    def ignore_except(tag, name, ds):
-        if tag in include:
-            return False
-        return name not in include
-    return ignore_except
+# Preconfigure a few extractors with increasing levels of meta data extraction
+class ExtractionLevel(enum.Enum):
+    MINIMAL = "min"
+    MODERATE = "mod"
+    MORE = "more"
+    MAX = "max"
 
 
-minimal_extractor = MetaExtractor((make_ignore_except_rule(DicomStack.minimal_keys),))
+MIN_KEYS, MIN_TRANS_NAMES = DicomStack.get_min_req_meta()
+MIN_TRANSLATORS = tuple(t for t in MetaExtractor.TRANSLATORS if t.name in MIN_TRANS_NAMES)
 
 
-default_extractor = MetaExtractor()
+MODERATE_KEYS = MIN_KEYS[:]
+MODERATE_KEYS += [
+    "Modality",
+    "Manufacturer",
+    "ManufacturersModelName",
+    "SoftwareVersions",
+    "StationName",
+    "DeviceUID",
+    "MagneticFieldStrength",
+    "PatientID",
+    "PatientsName",
+    "PatientsAge",
+    "PatientsSex",
+    "PatientsSize",
+    "PatientsWeight",
+    "PatientPosition",
+    "PatientSpeciesDescription",
+    "PatientsBodyMassIndex",
+    "BodyPartExamined",
+    "StudyInstanceUID",
+    "StudyID",
+    "SeriesNumber",
+    "StudyDescription",
+    "SeriesInstanceUID",
+    "ImagedNucleus",
+    "ImagingFrequency",
+    "SOPInstanceUID",
+    "ImageType",
+    "AcqusitionNumber",
+    "InstanceNumber",
+    "ScanningSequence",
+    "SequenceVariant",
+    "ScanOptions",
+    "MRAcquisitionType",
+    "SequenceName",
+    "AngioFlag",
+    "NumberOfAverages",
+    "NumberOfPhaseEncodingSteps",
+    "EchoTrainLength",
+    "PercentSampling",
+    "PercentPhaseFieldOfView",
+    "PixelBandwidth",
+    "TriggerTime",
+    "ReceiveCoilName",
+    "TransmitCoilName",
+    "AcquisitionMatrix",
+    "InPlanePhaseEncodingDirection",
+]
+
+
+EXTRACTORS = {
+    ExtractionLevel.MINIMAL : MetaExtractor((make_ignore_except_rule(MIN_KEYS),), MIN_TRANSLATORS),
+    ExtractionLevel.MODERATE : MetaExtractor((make_ignore_except_rule(MODERATE_KEYS),)),
+    ExtractionLevel.MORE : MetaExtractor(),
+    ExtractionLevel.MAX : MetaExtractor(IGNORE_BINARY_RULES),
+}

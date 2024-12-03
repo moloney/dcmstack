@@ -245,7 +245,8 @@ def get_snd_sources(groups=SND_GROUPS) -> Set:
     """Get set containing all the needed source meta data"""
     res = set(GLOBAL_SOURCES)
     for grp in groups:
-        res |= grp.sources
+        for src in grp.sources:
+            res |= set(src.name)
     return res
 
 
