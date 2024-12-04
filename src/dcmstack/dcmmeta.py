@@ -1623,7 +1623,20 @@ class NiftiWrapper(object):
         result.meta_ext.reorient_transform = np.eye(4)
         if meta_dict:
             if not dcm_wrp.is_multiframe:
-                result.meta_ext.get_class_dict(('global', 'const')).update(meta_dict)
+                global_meta = result.meta_ext.get_class_dict(('global', 'const'))
+                global_meta.update(meta_dict)
+                if dcm_wrp.is_mosaic:
+                    # For mosaic images we move a few elems that provide per-slice meta
+                    slice_meta = result.meta_ext.get_class_dict(('global', 'slices'))
+                    for key in (
+                        "SIEMENS_MR_HEADER.MosaicRefAcqTimes", 
+                        "CsaImage.MosaicRefAcqTimes",
+                        "SourceImageSequence",
+                    ):
+                        vals = global_meta.get(key)
+                        if vals is not None:
+                            slice_meta[key] = vals
+                            del global_meta[key]
             else:
                 # Unpack and sort meta data from multiframe file that varies
                 global_meta = meta_dict.copy()

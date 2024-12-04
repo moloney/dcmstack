@@ -33,11 +33,12 @@ class SrcAttr:
 
 # Define some common source attributes
 SRCS = {
-    "AcquisitionDateTime": SrcAttr(("FrameReferenceDateTime", "FrameAcquisitionDateTime", "AcquisitionDateTime")),
-    "FlipAngle": SrcAttr("FlipAngle", ureg.degrees),
-    "RepetitionTime": SrcAttr("RepetitionTime", ureg.milliseconds),
-    "EchoTime": SrcAttr(("EffectiveEchoTime", "EchoTime"), ureg.milliseconds),
-    "InversionTime": SrcAttr(("InversionTime", "InversionTimes"), ureg.milliseconds),
+    "AcquisitionDateTime" : SrcAttr(("FrameReferenceDateTime", "FrameAcquisitionDateTime", "AcquisitionDateTime")),
+    "MosaicRefAcqTimes" : SrcAttr(("CsaImage.MosaicRefAcqTimes", "SIEMENS_MR_HEADER.MosaicRefAcqTimes")),
+    "FlipAngle" : SrcAttr("FlipAngle", ureg.degrees),
+    "RepetitionTime" : SrcAttr("RepetitionTime", ureg.milliseconds),
+    "EchoTime" : SrcAttr(("EffectiveEchoTime", "EchoTime"), ureg.milliseconds),
+    "InversionTime" : SrcAttr(("InversionTime", "InversionTimes"), ureg.milliseconds),
 }
 
 
@@ -207,6 +208,15 @@ def get_acq_ts(meta: DcmMetaExtension):
                 acq_dt = [dt + tm]
         # TODO: Implement heurstic check if times span more than one day
     acq_ts = [dt_to_datetime(dt).timestamp() for dt in acq_dt]
+    for key in ("CsaImage.MosaicRefAcqTimes", "SIEMENS_MR_HEADER.MosaicRefAcqTimes"):
+        vals = meta.get_values(key)
+        if vals is not None:
+            assert len(acq_ts) == 1
+            base_ts = acq_ts[0]
+            acq_ts = [base_ts + (x / 1000.0) for x in vals]
+            cls = ("global", "slices")
+            srcs.append(key)
+            break
     if cls == ("global", "const"):
         acq_ts = acq_ts[0]
     return ((acq_ts, cls), (srcs, ("global", "const")))
@@ -220,7 +230,7 @@ GEN_ATTRS = ParseGroup(
         ),
         MetaNorm(
             ("AcquisitionTimeStamp", "AcquisitionTimeStampSources"), 
-            ("AcquisitionTime", "AcquisitionDate", "AcquisitionDateTime", "CsaImage.MosaicRefAcqTime"),
+            ("AcquisitionTime", "AcquisitionDate", "AcquisitionDateTime", "MosaicRefAcqTimes"),
             get_acq_ts,
         )
     ]
@@ -242,7 +252,7 @@ SND_GROUPS = (GEN_ATTRS, MR_ATTRS)
 
 
 def get_snd_sources(groups=SND_GROUPS) -> Set:
-    """Get set containing all the needed source meta data"""
+    """Get set containing all the needed source meta data keys"""
     res = set(GLOBAL_SOURCES)
     for grp in groups:
         for src in grp.sources:
@@ -254,7 +264,10 @@ SND_VERS = "20241118"
 
 
 def gen_snd_meta(meta: DcmMetaExtension, groups: Tuple[ParseGroup, ...] = SND_GROUPS):
-    """Generate the normalized meta data"""
+    """Generate the normalized meta data
+    
+    At least for now we assume `meta` comes from a single DICOM file.
+    """
     for grp in groups:
         if grp.applies is not None and not grp.applies(meta):
             continue
