@@ -20,7 +20,7 @@ with warnings.catch_warnings():
 class TestCsa(object):
     def setup_method(self, method):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = pydicom.read_file(data_fn)
+        self.data = pydicom.dcmread(data_fn)
 
     def teardown_method(self, method):
         del self.data
@@ -70,7 +70,7 @@ class TestCsa(object):
 class TestMetaExtractor(object):
     def setup_method(self, method):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = pydicom.read_file(data_fn)
+        self.data = pydicom.dcmread(data_fn)
 
     def teardown_method(self,method):
         del self.data

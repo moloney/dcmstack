@@ -11,10 +11,8 @@ except ImportError:
     from ordereddict import OrderedDict
 
 import numpy as np
-try:
-    import pydicom
-except ImportError:
-    import dicom as pydicom
+import pydicom
+from pydicom.datadict import tag_for_keyword
 import nibabel as nb
 from nibabel.nifti1 import Nifti1Extensions
 from nibabel.spatialimages import HeaderDataError
@@ -353,12 +351,13 @@ DEFAULT_CLOSE_KEYS = ('ImageOrientationPatient',)
 '''
 
 
-_pix_attrs = ('PixelData', 'FloatPixelData', 'DoubleFloatPixelData')
+_pix_tags = tuple(tag_for_keyword(x) for x in ('PixelData', 'FloatPixelData', 'DoubleFloatPixelData'))
 
 
 def is_image(dcm):
     '''Test if the data set is an image'''
-    if any(hasattr(dcm, attr) for attr in _pix_attrs):
+    tags = set(dcm.keys())
+    if any(t in tags for t in _pix_tags):
         return True
     return False
 
@@ -1056,7 +1055,7 @@ def parse_and_group(src_paths, group_by=DEFAULT_GROUP_KEYS, extractor=None,
     for dcm_path in src_paths:
         #Read the DICOM file
         try:
-            dcm = pydicom.read_file(dcm_path, force=force)
+            dcm = pydicom.dcmread(dcm_path, force=force, defer_size=32)
         except Exception as e:
             if warn_on_except:
                 warnings.warn('Error reading file %s: %s' % (dcm_path, str(e)))

@@ -11,7 +11,7 @@ from typing import Dict, List
 import pydicom
 from pydicom.tag import BaseTag
 from pydicom.dataset import PrivateBlock
-from pydicom.datadict import keyword_for_tag, private_dictionaries
+from pydicom.datadict import keyword_for_tag, tag_for_keyword, private_dictionaries
 from pydicom.charset import decode_element
 from nibabel.nicom import csareader
 
@@ -76,10 +76,9 @@ def make_ignore_unknown_private(allow_creators=None, reject_creators=None):
 
 def make_ignore_except_rule(include):
     """Make rule that ignores everying not in `include`"""
+    incl_tags = set([tag_for_keyword(x) for x in include if isinstance(x, str)])
     def ignore_except(tag, name, ds):
-        if tag in include:
-            return False
-        return name not in include
+        return tag not in incl_tags
     return ignore_except
 
 

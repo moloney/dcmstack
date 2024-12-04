@@ -1039,7 +1039,7 @@ def test_from_dicom():
                          'dcmstack',
                          '2D_16Echo_qT2')
     src_fn = path.join(data_dir, 'TE_40_SlcPos_-33.707626341697.dcm')
-    src_dcm = pydicom.read_file(src_fn)
+    src_dcm = pydicom.dcmread(src_fn)
     src_dw = nb.nicom.dicomwrappers.wrapper_from_data(src_dcm)
     meta = {'EchoTime': 40}
     nw = dcmmeta.NiftiWrapper.from_dicom(src_dcm, meta)
