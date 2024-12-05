@@ -27,6 +27,7 @@ install_requires = ['pydicom >= 0.9.7',
                     'nibabel >= 5.3.1',
                     'pylibjpeg[all] ; python_version >= "3.8"',
                     'pint',
+                    'git+https://github.com/open-dicom/csa_header.git#egg=csa_header',
                    ]
 
 # Extra requirements for building documentation and testing
