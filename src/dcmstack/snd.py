@@ -33,12 +33,27 @@ class SrcAttr:
 
 # Define some common source attributes
 SRCS = {
-    "AcquisitionDateTime" : SrcAttr(("FrameReferenceDateTime", "FrameAcquisitionDateTime", "AcquisitionDateTime")),
-    "MosaicRefAcqTimes" : SrcAttr(("CsaImage.MosaicRefAcqTimes", "SIEMENS_MR_HEADER.MosaicRefAcqTimes")),
+    "AcquisitionDateTime" : SrcAttr(
+        ("FrameReferenceDateTime", "FrameAcquisitionDateTime", "AcquisitionDateTime")
+    ),
+    "MosaicRefAcqTimes" : SrcAttr(
+        ("CsaImage.MosaicRefAcqTimes", "SIEMENS_MR_HEADER.MosaicRefAcqTimes")
+    ),
     "FlipAngle" : SrcAttr("FlipAngle", ureg.degrees),
     "RepetitionTime" : SrcAttr("RepetitionTime", ureg.milliseconds),
     "EchoTime" : SrcAttr(("EffectiveEchoTime", "EchoTime"), ureg.milliseconds),
     "InversionTime" : SrcAttr(("InversionTime", "InversionTimes"), ureg.milliseconds),
+    "DiffusionBValue" : SrcAttr(
+        (
+            "DiffusionBValue", 
+            "SIEMENS_MR_HEADER.0XC", 
+            "SIEMENS_MR_HEADER.B_value", 
+            "CsaImage.B_value",
+            "GEMS_PARM_01.0X39",
+            "PHILIPS_IMAGING_DD_001.0X3",
+        ),
+        ureg.seconds / ureg.mm ** 2,
+    ),
 }
 
 
@@ -69,6 +84,7 @@ SND_ATTRS = [
     SndAttr("RepetitionTime", ureg.seconds, "TR"),
     SndAttr("EchoTime", ureg.seconds, "TE"),
     SndAttr("InversionTime", ureg.seconds, "TI"),
+    SndAttr("DiffusionBValue", ureg.seconds / ureg.mm ** 2, "b-value"),
 ]
 SND_ATTR_MAP = {x.name: x for x in SND_ATTRS}
 
@@ -243,6 +259,7 @@ MR_ATTRS = ParseGroup(
         "RepetitionTime",
         "EchoTime",
         "InversionTime",
+        "DiffusionBValue",
     ],
     lambda meta: meta.get_values("Modality") == "MR"
 )

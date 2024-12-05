@@ -311,6 +311,7 @@ class DicomStack(object):
     '''
 
     SORT_GUESSES = (
+        'SND.DiffusionBValue',
         'SND.EchoTime',
         'SND.InversionTime',
         'SND.RepetitionTime',

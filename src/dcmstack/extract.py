@@ -386,7 +386,7 @@ class MetaExtractor(object):
                 elem = priv_info[2]
                 break
         if elem == "Unknown":
-            elem = tag_to_str(tag)
+            elem = "%#X" % (tag.elem & 0xFF)
         else:
             elem = ''.join([t[0].upper() + t[1:] for t in elem.split()])
         return f"{creator.upper().replace(' ', '_')}.{elem}"
