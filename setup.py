@@ -7,7 +7,7 @@ exec(open(info_file).read())
 
 
 setup(name=NAME,
-      python_requires=">=2.7",
+      python_requires=">=3.8",
       description=DESCRIPTION,
       long_description=open("README.rst").read(),
       long_description_content_type="text/x-rst",
