@@ -1,33 +1,32 @@
-"""
-Command line interface to dcmstack.
-
-@author: moloney
-"""
+"""Command line interface to dcmstack."""
 from __future__ import print_function
 
 import os, sys, argparse, string
 from glob import glob
 
-try:
-    import pydicom
-except ImportError:
-    import dicom as pydicom
+import pydicom
 
 from . import dcmstack
-from .dcmstack import (parse_and_group, stack_group, DicomOrdering,
-                       default_group_keys)
+from .extract import ExtractionLevel, EXTRACTORS
+from .dcmstack import parse_and_group, stack_group, DicomOrdering, DEFAULT_GROUP_KEYS
 from .dcmmeta import NiftiWrapper
-from .utils import iteritems, ascii_letters
+from .utils import iteritems, ascii_letters, pdb_except_hook
 from . import extract
 from .info import __version__
 
 
-prog_descrip = """Stack DICOM files from each source directory into 2D to 5D
-volumes, optionally extracting meta data.
+prog_descrip = """Stack DICOM files from each source directory into 2D to 5D volumes, 
+optionally extracting meta data.
+
+If you use the --embed or --dump options meta data that is extracted from the DICOM 
+files will be summarized and then serialized as JSON and either embedded into the ouput 
+Nifti as a header extension or written separately as a JSON sidecar.
 """
 
-prog_epilog = """IT IS YOUR RESPONSIBILITY TO KNOW IF THERE IS PRIVATE HEALTH
+
+prog_epilog = """IT IS YOUR RESPONSIBILITY TO KNOW IF THERE IS PRIVATE HEALTH 
 INFORMATION IN THE METADATA EXTRACTED BY THIS PROGRAM."""
+
 
 def parse_tags(opt_str):
     tag_strs = opt_str.split(',')
@@ -41,6 +40,7 @@ def parse_tags(opt_str):
                    )
     return tags
 
+
 def sanitize_path_comp(path_comp):
     result = []
     for char in path_comp:
@@ -49,6 +49,7 @@ def sanitize_path_comp(path_comp):
         else:
             result.append(char)
     return ''.join(result)
+
 
 def main(argv=sys.argv):
     #Handle command line options
@@ -113,34 +114,32 @@ def main(argv=sys.argv):
                            'used as the vector variable. This option is rarely '
                            'needed.'))
 
-    meta_opt = arg_parser.add_argument_group('Meta Extraction and Filtering '
-                                             'Options')
-    meta_opt.add_argument('-l', '--list-translators', default=False,
+    extr_opt = arg_parser.add_argument_group('Meta Data Extraction Options')
+    extr_opt.add_argument("-l", "--level", default="more", 
+                          help=("Control the amount of meta data extracted. Higher "
+                          "levels will slow down conversion. Options: "
+                          f"{'/'.join(e.value for e in ExtractionLevel)}"))
+    extr_opt.add_argument('--allow-pcreator', action='append', 
+                          help=("Extract all meta data in matching 'Private Creator' "
+                          "blocks, even if the elem name is unknown. Can be regex."))
+    extr_opt.add_argument('--reject-pcreator', action='append', 
+                          help=("Skip all meta data in matching 'Private Creator' "
+                          "blocks, even if the elem name is known. Can be regex."))
+    extr_opt.add_argument('--list-translators', default=False,
                           action='store_true', help=('List enabled translators '
                           'and exit'))
-    meta_opt.add_argument('--disable-translator', default=None,
-                          help=('Disable the translators for the provided '
-                          'tags. Tags should be given in the format '
-                          '"0x0_0x0". More than one can be given in a comma '
-                          'separated list. If the word "all" is provided, all '
-                          'translators will be disabled.'))
-    meta_opt.add_argument('--extract-private', default=False,
-                          action='store_true',
-                          help=('Extract meta data from private elements, even '
-                          'if there is no translator. If the value for the '
-                          'element contains non-ascii bytes it will still be '
-                          'ignored. The extracted meta data may still be '
-                          'filtered out by the regular expressions.'))
-    meta_opt.add_argument('-i', '--include-regex', action='append',
+    
+    filt_opt = arg_parser.add_argument_group('Meta Data Filtering Options')
+    filt_opt.add_argument('-i', '--include-regex', action='append',
                           help=('Include any meta data where the key matches '
                           'the provided regular expression. This will override '
                           'any exclude expressions. Applies to all meta data.'))
-    meta_opt.add_argument('-e', '--exclude-regex', action='append',
+    filt_opt.add_argument('-e', '--exclude-regex', action='append',
                           help=('Exclude any meta data where the key matches '
                           'the provided regular expression. This will '
                           'supplement the default exclude expressions. Applies '
                           'to all meta data.'))
-    meta_opt.add_argument('--default-regexes', default=False,
+    filt_opt.add_argument('--default-regexes', default=False,
                           action='store_true',
                           help=('Print the list of default include and exclude '
                           'regular expressions and exit.'))
@@ -151,21 +150,25 @@ def main(argv=sys.argv):
     gen_opt.add_argument('--strict', default=False, action='store_true',
                          help=('Fail on the first exception instead of '
                          'showing a warning.'))
+    gen_opt.add_argument('--pdb', default=False, action='store_true',
+                         help=('Enter debugger on unhandled exceptions.'))
     gen_opt.add_argument('--version', default=False, action='store_true',
                          help=('Show the version and exit.'))
-
+    
     args = arg_parser.parse_args(argv[1:])
-
+    if args.pdb:
+        if sys.stderr.isatty():
+            sys.excepthook = pdb_except_hook
+        else:
+            print("Ignoring '--pdb' in non-interactive context")
     if args.version:
         print(__version__)
         return 0
-
     #Check if we are just listing the translators
     if args.list_translators:
         for translator in extract.default_translators:
             print('%s -> %s' % (translator.tag, translator.name))
         return 0
-
     #Check if we are just listing the default exclude regular expressions
     if args.default_regexes:
         print('Default exclude regular expressions:')
@@ -175,51 +178,28 @@ def main(argv=sys.argv):
         for regex in dcmstack.default_key_incl_res:
             print('\t' + regex)
         return 0
-
-    #Check if we are generating meta data
+    # If we are generating meta data setup the extractors, otherwise use minimal one
     gen_meta = args.embed_meta or args.dump_meta
-
     if gen_meta:
-        #Start with the module defaults
-        ignore_rules = extract.default_ignore_rules
-        translators = extract.default_translators
-
-        #Disable translators if requested
-        if args.disable_translator:
-            if args.disable_translator.lower() == 'all':
-                translators = tuple()
-            else:
-                try:
-                    disable_tags = parse_tags(args.disable_translator)
-                except:
-                    arg_parser.error('Invalid tag format to --disable-translator.')
-                new_translators = []
-                for translator in translators:
-                    if not translator.tag in disable_tags:
-                        new_translators.append(translator)
-                translators = new_translators
-
-        #Include non-translated private elements if requested
-        if args.extract_private:
-            ignore_rules = (extract.ignore_pixel_data,
-                            extract.ignore_overlay_data,
-                            extract.ignore_color_lut_data)
-
-        extractor = extract.MetaExtractor(ignore_rules, translators)
-
+        extractor = extract.EXTRACTORS[extract.ExtractionLevel(args.level.lower())]
+        if args.allow_pcreator or args.reject_pcreator:
+            kwargs = {}
+            if args.allow_pcreator:
+                kwargs["allow_creators"] = args.allow_pcreator
+            if args.reject_pcreator:
+                kwargs["reject_creators"] = args.reject_pcreator
+            priv_rule = extract.make_ignore_unknown_private(**kwargs)
+            extractor.ignore_rules = extract.IGNORE_BINARY_RULES + (priv_rule,)
     else:
-        extractor = extract.minimal_extractor
-
-    #Add include/exclude regexes to meta filter
+        extractor = extract.EXTRACTORS[ExtractionLevel.MINIMAL]
+    # Add include/exclude regexes to meta filter
     include_regexes = dcmstack.default_key_incl_res
     if args.include_regex:
         include_regexes += args.include_regex
     exclude_regexes = dcmstack.default_key_excl_res
     if args.exclude_regex:
         exclude_regexes += args.exclude_regex
-    meta_filter = dcmstack.make_key_regex_filter(exclude_regexes,
-                                                 include_regexes)
-
+    meta_filter = dcmstack.make_key_regex_filter(exclude_regexes, include_regexes)
     #Figure out time and vector ordering
     if args.time_var:
         if args.time_order:
@@ -249,7 +229,7 @@ def main(argv=sys.argv):
     if not args.group_by is None:
         group_by = args.group_by.split(',')
     else:
-        group_by = default_group_keys
+        group_by = DEFAULT_GROUP_KEYS
 
     #Handle each source directory individually
     for src_dir in args.src_dirs:

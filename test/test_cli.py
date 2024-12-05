@@ -36,7 +36,7 @@ def make_niftis(out_dir, extra_args=tuple()):
     '''Helper function runs dcmstack and returns any Nifti files  
     '''
     assert len(glob(opath.join(out_dir, '*.nii*'))) == 0
-    args = ['dcmstack', test_data['base_dir'], '--dest-dir', out_dir]
+    args = ['dcmstack', test_data['base_dir'], '--strict', '--dest-dir', out_dir]
     args.extend(extra_args)
     dcmstack_cli.main(args)
     return glob(opath.join(out_dir, '*.nii*'))

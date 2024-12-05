@@ -20,7 +20,7 @@ with warnings.catch_warnings():
 class TestCsa(object):
     def setup_method(self, method):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = pydicom.read_file(data_fn)
+        self.data = pydicom.dcmread(data_fn)
 
     def teardown_method(self, method):
         del self.data
@@ -70,7 +70,7 @@ class TestCsa(object):
 class TestMetaExtractor(object):
     def setup_method(self, method):
         data_fn = path.join(test_dir, 'data', 'extract', 'csa_test.dcm')
-        self.data = pydicom.read_file(data_fn)
+        self.data = pydicom.dcmread(data_fn)
 
     def teardown_method(self,method):
         del self.data
@@ -78,11 +78,9 @@ class TestMetaExtractor(object):
     def test_get_elem_key(self):
         ignore_rules = (extract.ignore_pixel_data,)
         extractor = extract.MetaExtractor(ignore_rules=ignore_rules)
-        for elem in self.data:
-            key = extractor._get_elem_key(elem)
+        for key in extractor(self.data):
             assert(key.strip() != '')
             assert(key[0].isalpha())
-            assert(key[-1].isalnum())
 
     def test_get_elem_value(self):
         ignore_rules = (extract.ignore_pixel_data,)
@@ -105,9 +103,18 @@ class TestMetaExtractor(object):
 
     def test_reloc_private(self):
         extractor = extract.MetaExtractor()
-        self.data[(0x29, 0x10)].tag = pydicom.tag.Tag((0x29, 0x20))
-        self.data[(0x29, 0x1010)].tag = pydicom.tag.Tag((0x29, 0x2010))
-        self.data[(0x29, 0x1020)].tag = pydicom.tag.Tag((0x29, 0x2020))
+        elem = self.data[(0x29, 0x10)]
+        elem.tag = pydicom.tag.Tag((0x29, 0x20))
+        self.data[(0x29, 0x20)] = elem
+        elem = self.data[(0x29, 0x1010)]
+        elem.tag = pydicom.tag.Tag((0x29, 0x2010))
+        self.data[(0x29, 0x2010)] = elem
+        elem = self.data[(0x29, 0x1020)]
+        elem.tag = pydicom.tag.Tag((0x29, 0x2020))
+        self.data[(0x29, 0x2020)] = elem
+        del self.data[(0x29, 0x10)]
+        del self.data[(0x29, 0x1010)]
+        del self.data[(0x29, 0x1020)]
         meta_dict = extractor(self.data)
         assert meta_dict["CsaImage.EchoLinePosition"] == 64
         assert meta_dict['CsaSeries.MrPhoenixProtocol.sEFISPEC.bEFIDataValid'] == 1

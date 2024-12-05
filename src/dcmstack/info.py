@@ -24,8 +24,9 @@ description = 'Stack DICOM images into volumes and convert to Nifti'
 
 # Hard dependencies
 install_requires = ['pydicom >= 0.9.7',
-                    'nibabel >= 2.5.1',
-                    'pylibjpeg-libjpeg ; python_version >= "3.7"',
+                    'nibabel >= 5.3.1',
+                    'pylibjpeg[all] ; python_version >= "3.8"',
+                    'pint',
                    ]
 
 # Extra requirements for building documentation and testing

@@ -17,6 +17,7 @@ from . import test_dir, src_dir
 
 try:
     import pydicom
+    import pydicom.dataset
     from pydicom.datadict import keyword_dict, dictionary_VR
     from pydicom.uid import ExplicitVRLittleEndian
 except ImportError:
@@ -29,7 +30,7 @@ from nibabel.orientations import aff2axcodes
 
 import dcmstack
 
-if hasattr(pydicom, "FileMetaDataset"):
+if hasattr(pydicom.dataset, "FileMetaDataset"):
     _def_file_meta = pydicom.dataset.FileMetaDataset()
 else:
      _def_file_meta = pydicom.dataset.Dataset()
@@ -52,11 +53,9 @@ def_dicom_attrs = {'file_meta' : _def_file_meta,
 def make_dicom(attrs=None, pix_val=1):
     '''Build a mock DICOM dataset for testing purposes'''
     ds = pydicom.dataset.Dataset()
-    ds.is_little_endian = True
-    if attrs is None:
-        attrs = {}
-    for attr_name, attr_val in attrs.items():
-        setattr(ds, attr_name, deepcopy(attr_val))
+    if attrs is not None:
+        for attr_name, attr_val in attrs.items():
+            setattr(ds, attr_name, deepcopy(attr_val))
     for attr_name, attr_val in def_dicom_attrs.items():
         if not hasattr(ds, attr_name):
             setattr(ds, attr_name, deepcopy(attr_val))
@@ -161,47 +160,44 @@ class TestReorderVoxels(object):
                        )
            )
 
-def test_dcm_time_to_sec():
-    assert dcmstack.dcm_time_to_sec('100235.123456') == 36155.123456
-    assert dcmstack.dcm_time_to_sec('100235') == 36155
-    assert dcmstack.dcm_time_to_sec('1002') == 36120
-    assert dcmstack.dcm_time_to_sec('10') == 36000
-
-    #Allow older NEMA style values
-    assert dcmstack.dcm_time_to_sec('10:02:35.123456') == 36155.123456
-    assert dcmstack.dcm_time_to_sec('10:02:35') == 36155
-    assert dcmstack.dcm_time_to_sec('10:02') == 36120
-    assert dcmstack.dcm_time_to_sec('10') == 36000
 
 class TestDicomOrdering(object):
+    class _MockNiiWrp:
+        def __init__(self, meta_dict):
+            self._meta_dict = meta_dict
+        
+        def get_meta(self, key):
+            return self._meta_dict.get(key)
+        
     def setup_method(self, method):
-        self.ds = {'EchoTime' : 2}
+        self.meta = {'EchoTime' : 2}
+        self.nw = TestDicomOrdering._MockNiiWrp(self.meta)
 
     def test_missing_key(self):
         ordering = dcmstack.DicomOrdering('blah')
-        assert ordering.get_ordinate(self.ds) == None
+        assert ordering.get_ordinate(self.nw) == None
 
     def test_non_abs(self):
         ordering = dcmstack.DicomOrdering('EchoTime')
-        assert ordering.get_ordinate(self.ds) == self.ds['EchoTime']
+        assert ordering.get_ordinate(self.nw) == self.meta['EchoTime']
 
     def test_abs(self):
         abs_order = [1,2,3]
         ordering = dcmstack.DicomOrdering('EchoTime', abs_ordering=abs_order)
-        assert ordering.get_ordinate(self.ds) == abs_order.index(self.ds['EchoTime'])
+        assert ordering.get_ordinate(self.nw) == abs_order.index(self.meta['EchoTime'])
 
     def test_abs_as_str(self):
         abs_order = ['1','2','3']
         ordering = dcmstack.DicomOrdering('EchoTime',
                                           abs_ordering=abs_order,
                                           abs_as_str=True)
-        assert ordering.get_ordinate(self.ds) == abs_order.index(str(self.ds['EchoTime']))
+        assert ordering.get_ordinate(self.nw) == abs_order.index(str(self.meta['EchoTime']))
 
     def test_abs_missing(self):
         abs_order = [1,3]
         ordering = dcmstack.DicomOrdering('EchoTime', abs_ordering=abs_order)
         with pytest.raises(ValueError):
-            ordering.get_ordinate(self.ds)
+            ordering.get_ordinate(self.nw)
 
 def test_image_collision():
     dcm_path = path.join(test_dir,
@@ -209,60 +205,52 @@ def test_image_collision():
                          'dcmstack',
                          '2D_16Echo_qT2',
                          'TE_20_SlcPos_-33.707626341697.dcm')
-    dcm = pydicom.read_file(dcm_path)
+    dcm = pydicom.dcmread(dcm_path)
     stack = dcmstack.DicomStack('EchoTime')
     stack.add_dcm(dcm)
     with pytest.raises(dcmstack.ImageCollisionError):
         stack.add_dcm(dcm)
 
+
 class TestIncongruentImage(object):
     def setup_method(self, method):
-        dcm_path = path.join(test_dir,
-                             'data',
-                             'dcmstack',
-                             '2D_16Echo_qT2',
-                             'TE_20_SlcPos_-33.707626341697.dcm')
-        self.dcm = pydicom.read_file(dcm_path)
-
+        self.dcm = make_dicom()
         self.stack = dcmstack.DicomStack()
         self.stack.add_dcm(self.dcm)
-        self.dcm = pydicom.read_file(dcm_path)
 
-    def _chk_raises(self):
+    def _chk_raises(self, ds):
         with pytest.raises(dcmstack.IncongruentImageError):
-            self.stack.add_dcm(self.dcm)
+            self.stack.add_dcm(ds)
 
     def test_rows(self):
-        self.dcm.Rows += 1
-        self._chk_raises()
+        ds = make_dicom({"Rows": self.dcm.Rows + 1})
+        self._chk_raises(ds)
 
     def test_columns(self):
-        self.dcm.Columns += 1
-        self._chk_raises()
+        ds = make_dicom({"Columns": self.dcm.Columns + 1})
+        self._chk_raises(ds)
 
     def test_pix_space(self):
-        self.dcm.PixelSpacing[0] *= 2
-        self._chk_raises()
+        ds = make_dicom(
+            {"PixelSpacing": [self.dcm.PixelSpacing[0] * 2, self.dcm.PixelSpacing[1]]}
+        )
+        self._chk_raises(ds)
 
     def test_close_pix_space(self):
-        self.dcm.PixelSpacing[0] += 1e-7
+        ds = make_dicom(
+            {"PixelSpacing": [self.dcm.PixelSpacing[0] + 1e-7, self.dcm.PixelSpacing[1]]}
+        )
         # Shouldn't raise
-        self.stack.add_dcm(self.dcm)
+        self.stack.add_dcm(ds)
 
     def test_orientation(self):
-        self.dcm.ImageOrientationPatient = \
-            [0.5 * elem
-             for elem in self.dcm.ImageOrientationPatient
-            ]
-        self._chk_raises()
+        ds = make_dicom({"ImageOrientationPatient": [1., 0., 0., 0., 0., 1.]})
+        self._chk_raises(ds)
 
     def test_close_orientation(self):
-        self.dcm.ImageOrientationPatient = \
-            [elem + 1e-7
-             for elem in self.dcm.ImageOrientationPatient
-            ]
+        ds = make_dicom({"ImageOrientationPatient": [1. - 1e-8, 0., 0., 0., 1., 0.]})
         # Shouldn't raise
-        self.stack.add_dcm(self.dcm)
+        self.stack.add_dcm(ds)
 
 
 class TestInvalidStack(object):
@@ -271,7 +259,7 @@ class TestInvalidStack(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -322,7 +310,7 @@ class TestGetShape(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -367,7 +355,7 @@ class TestGuessDim(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -375,12 +363,15 @@ class TestGuessDim(object):
                                   )
                       ]
         for in_dcm in self.inputs:
-            for key in dcmstack.DicomStack.sort_guesses:
+            for key in dcmstack.DicomStack.SORT_GUESSES:
                 if hasattr(in_dcm, key):
                     delattr(in_dcm, key)
 
     def _get_vr_ord(self, key, ordinate):
-        tag = keyword_dict[key]
+        try:
+            tag = keyword_dict[key]
+        except KeyError:
+            return ordinate
         vr = dictionary_VR(tag)
         if vr == 'TM':
             return '%06d.000000' % ordinate
@@ -389,7 +380,7 @@ class TestGuessDim(object):
 
     def test_single_guess(self):
         #Test situations where there is only one possible correct guess
-        for key in dcmstack.DicomStack.sort_guesses:
+        for key in dcmstack.DicomStack.SORT_GUESSES:
             stack = dcmstack.DicomStack()
             for idx, in_dcm in enumerate(self.inputs):
                 setattr(in_dcm, key, self._get_vr_ord(key, idx))
@@ -401,12 +392,12 @@ class TestGuessDim(object):
     def test_wrong_guess_first(self):
         #Test situations where the initial guesses are wrong
         stack = dcmstack.DicomStack()
-        for key in dcmstack.DicomStack.sort_guesses[:-1]:
+        for key in dcmstack.DicomStack.SORT_GUESSES[:-1]:
             for in_dcm in self.inputs:
                 setattr(in_dcm, key, self._get_vr_ord(key, 0))
         for idx, in_dcm in enumerate(self.inputs):
             setattr(in_dcm,
-                    dcmstack.DicomStack.sort_guesses[-1],
+                    dcmstack.DicomStack.SORT_GUESSES[-1],
                     self._get_vr_ord(key, idx) )
             stack.add_dcm(in_dcm)
         assert stack.shape == (192, 192, 2, 2)
@@ -417,7 +408,7 @@ class TestGetData(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(data_dir, fn))
                        for fn in ('TE_40_SlcPos_-33.707626341697.dcm',
                                   'TE_40_SlcPos_-23.207628249046.dcm',
                                   'TE_60_SlcPos_-33.707626341697.dcm',
@@ -463,6 +454,22 @@ class TestGetData(object):
         assert data.shape == stack.shape
         assert sha256(data).hexdigest() == \
             'bb3639a6ece13dc9a11d65f1b09ab3ccaed63b22dcf0f96fb5d3dd8805cc7b8a'
+    
+    def test_data_scaling(self):
+        inputs = deepcopy(self.inputs)
+        for input in inputs:
+            input.RescaleSlope = 10.0
+        stack = dcmstack.DicomStack(vector_order='EchoTime')
+        stack.add_dcm(inputs[0])
+        stack.add_dcm(inputs[1])
+        stack.add_dcm(inputs[2])
+        stack.add_dcm(inputs[3])
+        data = stack.get_data()
+        unscl_data = stack.get_data(scaled=False)
+        assert data.dtype == np.float32
+        assert unscl_data.dtype == np.int16
+        assert np.allclose(data, unscl_data*10.0)
+
 
 class TestGetAffine(object):
     def setup_method(self, method):
@@ -470,7 +477,7 @@ class TestGetAffine(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm'
                                  )
@@ -537,7 +544,7 @@ class TestToNifti(object):
                              'data',
                              'dcmstack',
                              '2D_16Echo_qT2')
-        self.inputs = [pydicom.read_file(path.join(self.data_dir, fn))
+        self.inputs = [pydicom.dcmread(path.join(self.data_dir, fn))
                        for fn in ('TE_20_SlcPos_-33.707626341697.dcm',
                                   'TE_20_SlcPos_-23.207628249046.dcm',
                                   'TE_40_SlcPos_-33.707626341697.dcm',
@@ -639,10 +646,10 @@ class TestParseAndGroup(object):
     def test_default(self):
         res = dcmstack.parse_and_group(self.in_paths)
         assert len(res) == 1
-        ds = pydicom.read_file(self.in_paths[0])
+        ds = pydicom.dcmread(self.in_paths[0])
         group_key = list(res.keys())[0]
-        for attr_idx, attr in enumerate(dcmstack.default_group_keys):
-            if attr in dcmstack.default_close_keys:
+        for attr_idx, attr in enumerate(dcmstack.DEFAULT_GROUP_KEYS):
+            if attr in dcmstack.DEFAULT_CLOSE_KEYS:
                 assert(np.allclose(group_key[attr_idx], getattr(ds, attr)))
             else:
                 assert group_key[attr_idx] == getattr(ds, attr)
@@ -665,10 +672,10 @@ class TestParseAndStack(object):
     def test_default(self):
         res = dcmstack.parse_and_stack(self.in_paths)
         assert len(res) == 1
-        ds = pydicom.read_file(self.in_paths[0])
+        ds = pydicom.dcmread(self.in_paths[0])
         group_key = list(res.keys())[0]
-        for attr_idx, attr in enumerate(dcmstack.default_group_keys):
-            if attr in dcmstack.default_close_keys:
+        for attr_idx, attr in enumerate(dcmstack.DEFAULT_GROUP_KEYS):
+            if attr in dcmstack.DEFAULT_CLOSE_KEYS:
                 assert(np.allclose(group_key[attr_idx], getattr(ds, attr)))
             else:
                 assert group_key[attr_idx] == getattr(ds, attr)
