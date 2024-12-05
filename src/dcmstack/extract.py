@@ -89,7 +89,7 @@ pydicom.tag.Tag that can be translated, the private creator string (optional), a
 the function which takes the DICOM element and returns a dictionary.'''
 
 
-def parse_csa(raw_bytes):
+def parse_csa(elem):
     '''Simplify the result of csa_header.CsaHeader
 
     Parameters
@@ -102,7 +102,7 @@ def parse_csa(raw_bytes):
     result : dict
         Simpler key -> value mapping
     '''
-    csa_dict = CsaHeader(raw_bytes).read()
+    csa_dict = CsaHeader(elem.value).read()
     if csa_dict is None:
         return None
     result = {}
