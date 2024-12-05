@@ -89,13 +89,15 @@ pydicom.tag.Tag that can be translated, the private creator string (optional), a
 the function which takes the DICOM element and returns a dictionary.'''
 
 
-def parse_csa(elem):
-    '''Simplify the result of csa_header.CsaHeader
+def translate_csa(elem):
+    '''Translate an element containing a Siemens CSA header
+    
+    Simplifues the result of csa_header.CsaHeader
 
     Parameters
     ----------
-    csa_dict : dict
-        The result from csa_header.CsaHeader
+    elem
+        The element we are translating
 
     Returns
     -------
@@ -110,6 +112,9 @@ def parse_csa(elem):
         val = elem['value']
         if val is None:
             continue
+        # TODO: Address this in csa_header package?
+        if isinstance(val, list):
+            val = ['' if x == b'' else x for x in val]
         result[key] = val
     return result
 
@@ -117,21 +122,21 @@ def parse_csa(elem):
 csa_image_trans = Translator('CsaImage',
                              pydicom.tag.Tag(0x29, 0x1010),
                              'SIEMENS CSA HEADER',
-                             parse_csa)
+                             translate_csa)
 '''Translator for the CSA image sub header.'''
 
 
 csa_series_trans = Translator('CsaSeries',
                               pydicom.tag.Tag(0x29, 0x1020),
                               'SIEMENS CSA HEADER',
-                              parse_csa)
+                              translate_csa)
 '''Translator for parsing the CSA series sub header.'''
 
 
 def tag_to_str(tag):
     '''Convert a DICOM tag to a string representation using the group and
     element hex values seprated by an underscore.'''
-    return '%#X_%#X' % (tag.group, tag.elem)
+    return '%#x_%#x' % (tag.group, tag.elem)
 
 
 unpack_vr_map = {'SL' : 'i',
@@ -240,7 +245,10 @@ class MetaExtractor(object):
                 elem = priv_info[2]
                 break
         if elem == "Unknown":
-            elem = "%#X" % (tag.elem & 0xFF)
+            if creator.upper() == "UNKNOWN":
+                elem = tag_to_str(tag)
+            else:
+                elem = "%#x" % (tag.elem & 0xFF)
         else:
             elem = ''.join([t[0].upper() + t[1:] for t in elem.split()])
         return f"{creator.upper().replace(' ', '_')}.{elem}"
