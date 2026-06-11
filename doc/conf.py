@@ -15,7 +15,7 @@ import sys, os
 
 #Mock unavailable packages for ReadTheDocs
 try:
-    from unitttest import mock
+    from unittest import mock
 except ImportError:
     import mock
  
