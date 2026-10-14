@@ -215,10 +215,10 @@ def main(argv=sys.argv):
     else:
         extractor = extract.EXTRACTORS[ExtractionLevel.MINIMAL]
     # Add include/exclude regexes to meta filter
-    include_regexes = dcmstack.default_key_incl_res
+    include_regexes = list(dcmstack.default_key_incl_res)
     if args.include_regex:
         include_regexes += args.include_regex
-    exclude_regexes = dcmstack.default_key_excl_res
+    exclude_regexes = list(dcmstack.default_key_excl_res)
     if args.exclude_regex:
         exclude_regexes += args.exclude_regex
     meta_filter = dcmstack.make_key_regex_filter(exclude_regexes, include_regexes)
